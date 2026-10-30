@@ -149,3 +149,13 @@ on their `testing` branches. Future commit propagation should keep
 `testing/main` synchronized with those exact changes, and all CI
 configurations should be run before considering promotion of the
 upstream branches.
+
+### CI correction — configure-time regression
+
+After publishing the new dependency gitlink, `testing/main` CI failed at
+CMake configuration because the old `logging|utility|macro|configuration`
+constraint remained in the one-line `require_same_dependency_commit` call.
+The obsolete chain was removed, while retaining the three valid checks:
+`configuration`, `logging|configuration`, and
+`logging|utility|configuration`. This was a migration regression, not an
+issue with the submodule commit identities. CI confirmation is pending.

@@ -12,7 +12,7 @@ endif()
 if(EXISTS "${PROJECT_SOURCE_DIR}/.git")
     require_same_dependency_commit(Configuration CHAINS
         "configuration" "logging|configuration"
-        "logging|utility|configuration" "logging|utility|macro|configuration")
+        "logging|utility|configuration")
 endif()
 setup_project()
 include_directories(${PROJECT_SOURCE_DIR}/include)
