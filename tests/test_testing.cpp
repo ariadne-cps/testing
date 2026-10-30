@@ -1,4 +1,5 @@
 #include "testing/fixture.hpp"
+#include "testing/checks.hpp"
 
 #include <iostream>
 #include <stdexcept>
@@ -132,5 +133,37 @@ int main() {
     if (fixture_log.find("[CHECK 2.1] reset check count") == std::string::npos) return 29;
     if (fixture_log.find("[CHECK 3.1] operation completes") == std::string::npos) return 30;
     if (fixture_log.find("[FAIL] throws") == std::string::npos) return 31;
+    Suite expressions("macro expressions");
+    std::ostringstream expression_output;
+    int evaluation_count = 0;
+    expressions.add("all macros", [&](Context& t) {
+        ARIADNE_PROVE(t, TestLogic::Truth::True);
+        ARIADNE_EXPECT_EQUAL(t, ++evaluation_count, 1);
+        ARIADNE_EXPECT_SAME(t, TestLogic::Value{2}, TestLogic::Value{2});
+        ARIADNE_EXPECT_WITHIN(t, 11, 10, 1);
+        ARIADNE_EXPECT_THROWS(t, std::runtime_error, throw std::runtime_error("expected"));
+        ARIADNE_EXPECT_EXCEPTION(t, throw 42);
+        ARIADNE_EXPECT_NO_THROW(t, (void)0);
+    });
+    ConsoleReporter expression_reporter(expression_output);
+    auto const expression_summary = expressions.run(expression_reporter);
+    if (expression_summary.passed != 1 || evaluation_count != 1) return 32;
+    auto const expression_log = expression_output.str();
+    if (expression_log.find("[CHECK 1.1] TestLogic::Truth::True") == std::string::npos) return 33;
+    if (expression_log.find("[CHECK 1.2] ++evaluation_count == 1") == std::string::npos) return 34;
+    if (expression_log.find("[CHECK 1.3] TestLogic::Value{2} same TestLogic::Value{2}") == std::string::npos) return 35;
+    if (expression_log.find("[CHECK 1.4] 11 within 1 of 10") == std::string::npos) return 36;
+    if (expression_log.find("[CHECK 1.7] (void)0 does not throw") == std::string::npos) return 37;
+    Suite ordering("deferred evaluation");
+    std::ostringstream ordering_output;
+    ordering.add("start precedes operands", [&](Context& t) {
+        ARIADNE_EXPECT_EQUAL(t, ([&]() {
+            if (ordering_output.str().find("[CHECK 1.1]") == std::string::npos)
+                throw std::runtime_error("CHECK event missing before operand evaluation");
+            return 2;
+        }()), 2);
+    });
+    ConsoleReporter ordering_reporter(ordering_output);
+    if (!ordering.run(ordering_reporter).successful()) return 38;
     return 0;
 }

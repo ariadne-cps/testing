@@ -245,3 +245,15 @@ announced. `check([&] { return condition(); }, description)` provides
 deferred evaluation after its CHECK event, as do exception checkers.
 A caught unexpected exception from a checker is an operational error
 and does not create a phantom extra numbered checker.
+
+## 2026-10-30 — Automatic assertion descriptions
+
+Optional `testing/checks.hpp` macros stringify user expressions and delegate
+all logic to typed Context functions. The wrappers cover proof, equality,
+ADL identity, bounded error, typed/any exceptions and no-throw expectations.
+Deferred `check_equal`, `check_same`, and `check_within` announce CHECK
+before evaluating operands, once, left to right. Existing eager methods
+delegate to the same implementation for identical semantics. There is no
+separate assertion engine or Logging dependency. Explicit Context methods
+remain available for custom diagnostic descriptions. Preprocessor commas in
+template arguments and braced initializers may require parentheses.

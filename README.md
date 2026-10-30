@@ -41,3 +41,16 @@ int main() {
     return suite.run(reporter).successful() ? 0 : 1;
 }
 ```
+
+## Self-describing assertions
+
+Include `testing/checks.hpp` to use optional macros
+`ARIADNE_PROVE(ctx(), predicate)`, `ARIADNE_EXPECT_EQUAL(ctx(), a, b)`,
+`ARIADNE_EXPECT_SAME(ctx(), a, b)`,
+`ARIADNE_EXPECT_WITHIN(ctx(), a, b, tolerance)`,
+`ARIADNE_EXPECT_THROWS(ctx(), Exception, operation())`,
+`ARIADNE_EXPECT_EXCEPTION(ctx(), operation())` and
+`ARIADNE_EXPECT_NO_THROW(ctx(), operation())`. Expression names are
+recorded automatically; operand evaluation is deferred until after the
+numbered CHECK progress event and happens once. Explicit Context calls
+remain available whenever a handwritten description is preferable.
