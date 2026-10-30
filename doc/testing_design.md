@@ -203,3 +203,11 @@ be verified on the new GitHub commit.
 
 This does not change `utility/testing` or `logging/testing`: those branches
 can evolve independently, while `testing/main` no longer tracks their commits.
+
+## 2026-10-30 — Typed and untyped exception expectations
+
+Utility migration requires test-side checks for expected and unexpected exceptions.
+Added `expect_throws<E>`, `expect_exception` and `expect_no_throw`, with
+single evaluation, caller source location and dedicated success/failure assertions.
+Wrong exception types and missing exceptions are failures. Self-tests validate
+all six paths. This keeps Utility free of a parallel testing harness.

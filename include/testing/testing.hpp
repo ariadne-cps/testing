@@ -141,6 +141,35 @@ class Context {
                "error=" + detail::render(error) + ", tolerance=" + detail::render(tolerance), location);
     }
 
+    template<class Exception, class Callable>
+    void expect_throws(Callable&& action, std::string_view description = "expected exception",
+                       std::source_location location = std::source_location::current()) {
+        try { std::invoke(std::forward<Callable>(action)); }
+        catch (Exception const&) { record(Outcome::Passed, description, {}, {}, {}, location); return; }
+        catch (std::exception const& e) {
+            record(Outcome::Failed, description, {}, {}, std::string("unexpected exception: ") + e.what(), location); return;
+        }
+        catch (...) { record(Outcome::Failed, description, {}, {}, "unexpected exception type", location); return; }
+        record(Outcome::Failed, description, {}, {}, "no exception thrown", location);
+    }
+    template<class Callable>
+    void expect_exception(Callable&& action, std::string_view description = "exception expected",
+                          std::source_location location = std::source_location::current()) {
+        try { std::invoke(std::forward<Callable>(action)); }
+        catch (...) { record(Outcome::Passed, description, {}, {}, {}, location); return; }
+        record(Outcome::Failed, description, {}, {}, "no exception thrown", location);
+    }
+    template<class Callable>
+    void expect_no_throw(Callable&& action, std::string_view description = "no exception expected",
+                         std::source_location location = std::source_location::current()) {
+        try { std::invoke(std::forward<Callable>(action)); }
+        catch (std::exception const& e) {
+            record(Outcome::Failed, description, {}, {}, e.what(), location); return;
+        }
+        catch (...) { record(Outcome::Failed, description, {}, {}, "unexpected exception", location); return; }
+        record(Outcome::Passed, description, {}, {}, {}, location);
+    }
+
     void skip(std::string_view reason,
               std::source_location location = std::source_location::current());
 

@@ -63,5 +63,15 @@ int main() {
     if (report.find("actual: 2") == std::string::npos) return 8;
     if (report.find("expected: 3") == std::string::npos) return 9;
     if (report.find("reporting: 1 passed, 1 failed") == std::string::npos) return 10;
+    Suite exceptions("exceptions");
+    exceptions.add("correct type", [](Context& t) { t.expect_throws<std::runtime_error>([] { throw std::runtime_error("yes"); }); });
+    exceptions.add("wrong type", [](Context& t) { t.expect_throws<std::runtime_error>([] { throw std::logic_error("wrong"); }); });
+    exceptions.add("missing", [](Context& t) { t.expect_exception([] {}); });
+    exceptions.add("any type", [](Context& t) { t.expect_exception([] { throw 42; }); });
+    exceptions.add("no throw", [](Context& t) { t.expect_no_throw([] {}); });
+    exceptions.add("unexpected", [](Context& t) { t.expect_no_throw([] { throw 42; }); });
+    CaptureReporter exceptions_reporter;
+    Summary es = exceptions.run(exceptions_reporter);
+    if (es.passed != 3 || es.failed != 3 || es.errors != 0) return 11;
     return 0;
 }
