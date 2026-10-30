@@ -31,66 +31,66 @@
 // Optional one-evaluation, source-stringifying wrappers.
 // For commas inside template/braced expressions, parenthesize the argument.
 
-#define ARIADNE_PROVE(context, expression) \
+#define ARIADNE_PROVE_CTX(context, expression) \
     (context).check([&]() -> decltype(auto) { return (expression); }, #expression)
 
-#define ARIADNE_EXPECT_EQUAL(context, actual, expected) \
+#define ARIADNE_EXPECT_EQUAL_CTX(context, actual, expected) \
     (context).check_equal( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         #actual " == " #expected)
 
-#define ARIADNE_EXPECT_SAME(context, actual, expected) \
+#define ARIADNE_EXPECT_SAME_CTX(context, actual, expected) \
     (context).check_same( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         #actual " same " #expected)
 
-#define ARIADNE_EXPECT_WITHIN(context, actual, expected, tolerance) \
+#define ARIADNE_EXPECT_WITHIN_CTX(context, actual, expected, tolerance) \
     (context).check_within( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         [&]() -> decltype(auto) { return (tolerance); }, \
         #actual " within " #tolerance " of " #expected)
 
-#define ARIADNE_EXPECT_THROWS(context, exception_type, statement) \
+#define ARIADNE_EXPECT_THROWS_CTX(context, exception_type, statement) \
     (context).expect_throws<exception_type>([&] { statement; }, \
         #statement " throws " #exception_type)
 
-#define ARIADNE_EXPECT_EXCEPTION(context, statement) \
+#define ARIADNE_EXPECT_EXCEPTION_CTX(context, statement) \
     (context).expect_exception([&] { statement; }, #statement " throws")
 
-#define ARIADNE_EXPECT_NO_THROW(context, statement) \
+#define ARIADNE_EXPECT_NO_THROW_CTX(context, statement) \
     (context).expect_no_throw([&] { statement; }, #statement " does not throw")
 
 
 // Comparators capture each expression only once, after [CHECK], including
 // mixed signed/unsigned integral comparison using std::cmp_*.
-#define ARIADNE_EXPECT_NOT_EQUAL(context, actual, expected) \
+#define ARIADNE_EXPECT_NOT_EQUAL_CTX(context, actual, expected) \
     (context).check_compare<::Ariadne::Testing::Comparison::NotEqual>( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         #actual " != " #expected)
 
-#define ARIADNE_EXPECT_LESS(context, actual, expected) \
+#define ARIADNE_EXPECT_LESS_CTX(context, actual, expected) \
     (context).check_compare<::Ariadne::Testing::Comparison::Less>( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         #actual " < " #expected)
 
-#define ARIADNE_EXPECT_LESS_EQUAL(context, actual, expected) \
+#define ARIADNE_EXPECT_LESS_EQUAL_CTX(context, actual, expected) \
     (context).check_compare<::Ariadne::Testing::Comparison::LessEqual>( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         #actual " <= " #expected)
 
-#define ARIADNE_EXPECT_GREATER(context, actual, expected) \
+#define ARIADNE_EXPECT_GREATER_CTX(context, actual, expected) \
     (context).check_compare<::Ariadne::Testing::Comparison::Greater>( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         #actual " > " #expected)
 
-#define ARIADNE_EXPECT_GREATER_EQUAL(context, actual, expected) \
+#define ARIADNE_EXPECT_GREATER_EQUAL_CTX(context, actual, expected) \
     (context).check_compare<::Ariadne::Testing::Comparison::GreaterEqual>( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
@@ -98,26 +98,26 @@
 
 // Predicates are resolved at their type-dependent call site, including ADL.
 // The not variants negate mathematical evidence, not its bool conversion.
-#define ARIADNE_EXPECT_UNARY_PREDICATE(context, predicate, operand) \
+#define ARIADNE_EXPECT_UNARY_PREDICATE_CTX(context, predicate, operand) \
     (context).check_unary( \
         [](auto const& value) -> decltype(auto) { return predicate(value); }, \
         [&]() -> decltype(auto) { return (operand); }, \
         #predicate "(" #operand ")")
 
-#define ARIADNE_EXPECT_NOT_UNARY_PREDICATE(context, predicate, operand) \
+#define ARIADNE_EXPECT_NOT_UNARY_PREDICATE_CTX(context, predicate, operand) \
     (context).check_unary( \
         [](auto const& value) -> decltype(auto) { return predicate(value); }, \
         [&]() -> decltype(auto) { return (operand); }, \
         "not " #predicate "(" #operand ")", true)
 
-#define ARIADNE_EXPECT_BINARY_PREDICATE(context, predicate, left, right) \
+#define ARIADNE_EXPECT_BINARY_PREDICATE_CTX(context, predicate, left, right) \
     (context).check_binary( \
         [](auto const& lhs, auto const& rhs) -> decltype(auto) { return predicate(lhs, rhs); }, \
         [&]() -> decltype(auto) { return (left); }, \
         [&]() -> decltype(auto) { return (right); }, \
         #predicate "(" #left ", " #right ")")
 
-#define ARIADNE_EXPECT_NOT_BINARY_PREDICATE(context, predicate, left, right) \
+#define ARIADNE_EXPECT_NOT_BINARY_PREDICATE_CTX(context, predicate, left, right) \
     (context).check_binary( \
         [](auto const& lhs, auto const& rhs) -> decltype(auto) { return predicate(lhs, rhs); }, \
         [&]() -> decltype(auto) { return (left); }, \
@@ -127,28 +127,90 @@
 
 // Evidence expectations express distinct test intentions. The proof form
 // deliberately retains Inconclusive when the result is indeterminate.
-#define ARIADNE_EXPECT_DEFINITELY(context, expression) \
+#define ARIADNE_EXPECT_DEFINITELY_CTX(context, expression) \
     (context).expect_evidence( \
         [&]() -> decltype(auto) { return (expression); }, \
         ::Ariadne::Testing::EvidenceExpectation::DefinitelyTrue, \
         "definitely(" #expression ")")
 
-#define ARIADNE_EXPECT_POSSIBLY(context, expression) \
+#define ARIADNE_EXPECT_POSSIBLY_CTX(context, expression) \
     (context).expect_evidence( \
         [&]() -> decltype(auto) { return (expression); }, \
         ::Ariadne::Testing::EvidenceExpectation::PossiblyTrue, \
         "possibly(" #expression ")")
 
-#define ARIADNE_EXPECT_NOT_POSSIBLY(context, expression) \
+#define ARIADNE_EXPECT_NOT_POSSIBLY_CTX(context, expression) \
     (context).expect_evidence( \
         [&]() -> decltype(auto) { return (expression); }, \
         ::Ariadne::Testing::EvidenceExpectation::NotPossibly, \
         "not possibly(" #expression ")")
 
-#define ARIADNE_EXPECT_INDETERMINATE(context, expression) \
+#define ARIADNE_EXPECT_INDETERMINATE_CTX(context, expression) \
     (context).expect_evidence( \
         [&]() -> decltype(auto) { return (expression); }, \
         ::Ariadne::Testing::EvidenceExpectation::Indeterminate, \
         "indeterminate(" #expression ")")
+
+
+// Fixture shorthand; *_CTX remains valid in free functions and lambdas.
+#define ARIADNE_PROVE(expression) \
+    ARIADNE_PROVE_CTX(this->ctx(), expression)
+
+#define ARIADNE_EXPECT_EQUAL(actual, expected) \
+    ARIADNE_EXPECT_EQUAL_CTX(this->ctx(), actual, expected)
+
+#define ARIADNE_EXPECT_SAME(actual, expected) \
+    ARIADNE_EXPECT_SAME_CTX(this->ctx(), actual, expected)
+
+#define ARIADNE_EXPECT_WITHIN(actual, expected, tolerance) \
+    ARIADNE_EXPECT_WITHIN_CTX(this->ctx(), actual, expected, tolerance)
+
+#define ARIADNE_EXPECT_THROWS(exception_type, statement) \
+    ARIADNE_EXPECT_THROWS_CTX(this->ctx(), exception_type, statement)
+
+#define ARIADNE_EXPECT_EXCEPTION(statement) \
+    ARIADNE_EXPECT_EXCEPTION_CTX(this->ctx(), statement)
+
+#define ARIADNE_EXPECT_NO_THROW(statement) \
+    ARIADNE_EXPECT_NO_THROW_CTX(this->ctx(), statement)
+
+#define ARIADNE_EXPECT_NOT_EQUAL(actual, expected) \
+    ARIADNE_EXPECT_NOT_EQUAL_CTX(this->ctx(), actual, expected)
+
+#define ARIADNE_EXPECT_LESS(actual, expected) \
+    ARIADNE_EXPECT_LESS_CTX(this->ctx(), actual, expected)
+
+#define ARIADNE_EXPECT_LESS_EQUAL(actual, expected) \
+    ARIADNE_EXPECT_LESS_EQUAL_CTX(this->ctx(), actual, expected)
+
+#define ARIADNE_EXPECT_GREATER(actual, expected) \
+    ARIADNE_EXPECT_GREATER_CTX(this->ctx(), actual, expected)
+
+#define ARIADNE_EXPECT_GREATER_EQUAL(actual, expected) \
+    ARIADNE_EXPECT_GREATER_EQUAL_CTX(this->ctx(), actual, expected)
+
+#define ARIADNE_EXPECT_UNARY_PREDICATE(predicate, operand) \
+    ARIADNE_EXPECT_UNARY_PREDICATE_CTX(this->ctx(), predicate, operand)
+
+#define ARIADNE_EXPECT_NOT_UNARY_PREDICATE(predicate, operand) \
+    ARIADNE_EXPECT_NOT_UNARY_PREDICATE_CTX(this->ctx(), predicate, operand)
+
+#define ARIADNE_EXPECT_BINARY_PREDICATE(predicate, left, right) \
+    ARIADNE_EXPECT_BINARY_PREDICATE_CTX(this->ctx(), predicate, left, right)
+
+#define ARIADNE_EXPECT_NOT_BINARY_PREDICATE(predicate, left, right) \
+    ARIADNE_EXPECT_NOT_BINARY_PREDICATE_CTX(this->ctx(), predicate, left, right)
+
+#define ARIADNE_EXPECT_DEFINITELY(expression) \
+    ARIADNE_EXPECT_DEFINITELY_CTX(this->ctx(), expression)
+
+#define ARIADNE_EXPECT_POSSIBLY(expression) \
+    ARIADNE_EXPECT_POSSIBLY_CTX(this->ctx(), expression)
+
+#define ARIADNE_EXPECT_NOT_POSSIBLY(expression) \
+    ARIADNE_EXPECT_NOT_POSSIBLY_CTX(this->ctx(), expression)
+
+#define ARIADNE_EXPECT_INDETERMINATE(expression) \
+    ARIADNE_EXPECT_INDETERMINATE_CTX(this->ctx(), expression)
 
 #endif // ARIADNE_TESTING_CHECKS_HPP

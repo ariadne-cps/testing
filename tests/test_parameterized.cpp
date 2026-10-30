@@ -65,12 +65,12 @@ struct InterfaceFixture final : ContextFixture {
 
     void test_value() {
         ++*executions;
-        ARIADNE_EXPECT_EQUAL(ctx(), implementation->value(), 42);
+        ARIADNE_EXPECT_EQUAL(implementation->value(), 42);
     }
 
     void test_other() {
         ++*executions;
-        ARIADNE_EXPECT_GREATER(ctx(), implementation->value(), 41);
+        ARIADNE_EXPECT_GREATER(implementation->value(), 41);
     }
     void test_demonstration() { ++*executions; }
 };
@@ -78,7 +78,7 @@ struct InterfaceFixture final : ContextFixture {
 struct PrecisionFixture : ContextFixture {
     int bits;
     PrecisionFixture(Context& context, int value) : ContextFixture(context), bits(value) {}
-    void test_precision() { ARIADNE_EXPECT_GREATER(ctx(), bits, 32); }
+    void test_precision() { ARIADNE_EXPECT_GREATER(bits, 32); }
 };
 
 struct ApproximateTag { static constexpr int value = 1; };
@@ -126,7 +126,7 @@ int main() {
 
     // A typed generic test is instantiated separately per compile-time tag.
     auto paradigm_check = []<class Tag>(Context& context, std::type_identity<Tag>) {
-        ARIADNE_EXPECT_GREATER(context, Tag::value, 0);
+        ARIADNE_EXPECT_GREATER_CTX(context, Tag::value, 0);
     };
     suite_variant(suite, "Approximate").add_typed<ApproximateTag>("api", paradigm_check);
     suite_variant(suite, "Validated").add_typed<ValidatedTag>("api", paradigm_check);
