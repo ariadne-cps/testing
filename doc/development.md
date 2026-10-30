@@ -257,9 +257,10 @@ checks witness validity conditionally.
 
 ### D10. Environment/configuration isolation and test fixture lifecycle
 
-- [ ] RAII backup/restore for per-case state (rounding modes, precision
+- [x] RAII backup/restore for per-case state (rounding modes, precision
       settings, singleton configuration, drawing backend, stream state).
       Preserve the original state even when the case throws.
+      Generic value and getter/restorer guards implemented; domain adapters remain local.
 - [ ] Define setup/teardown and share-or-recreate fixture semantics,
       without cross-case leakage, especially for solver warm starts.
 - [ ] Avoid mandatory Logging dependency even when Logging-dependent

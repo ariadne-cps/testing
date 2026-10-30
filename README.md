@@ -159,3 +159,7 @@ Parenthesize macro arguments containing commas, such as braced sequences.
 `Context::work_directory()` creates a temporary directory isolated to the running case. Use `Context::artifact(path, label, media_type, kind, lifetime)` to record artifacts and request retention; the default lifetime is `External`, which never changes an existing file. For managed outputs choose `Temporary`, `KeepOnFailure`, or `KeepAlways`; managed paths must be within the case directory.
 
 `expect_file_exists(path, description)`, `expect_file_equal(actual, reference, description)`, and `expect_file_signature(path, signature, description)` perform filesystem and binary checks, reporting missing files or the first differing byte offset. Golden files are read only, never overwritten; PNG interpretation belongs to consumers such as Rendering.
+
+## Restoring mutable test state
+
+Use `auto guard = Ariadne::Testing::preserve_value(setting);` for copyable state with non-throwing assignment. For global or domain-specific state, use `preserve_state(getter, restorer)`: the getter snapshots the original value once, and the `noexcept` restorer runs at scope exit, including exception unwinding or a failed fatal prerequisite. Guards are non-copyable and non-movable, and nested guards restore in reverse order. No global state is modified automatically.

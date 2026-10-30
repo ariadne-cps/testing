@@ -587,3 +587,9 @@ missing leaf and nested paths, non-regular directories, each assertion's
 classification, and prints exact summary counters on mismatch.
 The correction preserves test semantics: it fixes an incorrect assertion
 outcome rather than altering the expected summary to pass CI.
+
+## 2026-10-30 — D10: scoped test-state preservation
+
+Added header-only `testing/state.hpp` to the umbrella API. `preserve_value(value)` snapshots and restores a copyable, noexcept-assignable value; `preserve_state(getter, restorer)` supports domain-specific state with a single getter call and a statically required noexcept restorer. The returned `ScopedState` guard cannot be copied or moved. Restoration occurs on normal scope exit, exception unwinding, and fatal assertion abort without changing the assertion outcome. Nesting restores the immediately preceding value. Non-noexcept restorers are rejected at compile time, preventing a second exception from escaping a destructor during unwinding. Domain libraries implement their own adapters without depending on Logging or Graphics. The existing fixture policy remains fresh construction per case; shared lifecycle is not implicitly enabled.
+
+`test_state.cpp` covers normal restoration, nested scopes, per-case isolation, exception unwinding, custom getter/restorer evaluation counts, and fatal prerequisite aborts, with explicit diagnostics on failures. D10 setup/teardown and shared-fixture ownership remain open.

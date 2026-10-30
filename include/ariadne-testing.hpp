@@ -30,5 +30,6 @@
 #include "testing/fixture.hpp"
 #include "testing/checks.hpp"
 #include "testing/parameterized.hpp"
+#include "testing/state.hpp"
 
 #endif // ARIADNE_TESTING_UMBRELLA_HPP
