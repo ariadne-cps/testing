@@ -257,3 +257,12 @@ delegate to the same implementation for identical semantics. There is no
 separate assertion engine or Logging dependency. Explicit Context methods
 remain available for custom diagnostic descriptions. Preprocessor commas in
 template arguments and braced initializers may require parentheses.
+
+## 2026-10-30 — Source file headers and attribution
+
+Adopt the C++ file header convention shared by the other Ariadne
+repositories for every `testing` source (`.hpp`/`.cpp`): filename banner,
+Copyright 2026 and Author Luca Geretti, and the GPLv3-or-later license notice
+naming Ariadne Testing. The repository's LICENSE is GPLv3. This commit changes
+comments only; public APIs, execution behavior and dependency graph are
+unchanged. Future source files should use the same format.
