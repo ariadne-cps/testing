@@ -449,3 +449,12 @@ composed from `TESTING_SRC` and linked with the `testing` include interface;
 self-tests and downstream consumers use it only for test executables. Utility
 continues using the nested `TESTING_SRC` archive, without any production
 link dependency on Testing. No assertion behavior changes.
+
+## 2026-10-30 — Adopt centralized test-only CMake integration
+
+Pinned Configuration at `a3367703c0f95af09b823560f19c6830aaa760fc`.
+Its optional `setup_standalone_project_tests(USE_ARIADNE_TESTING)`
+initializes Testing solely for standalone test builds. The framework's
+build-tree static target `ariadne-testing` is reused directly by downstream
+tests rather than repackaging `TESTING_SRC` into a project-specific archive.
+No installation rules or production-library dependencies are introduced.
