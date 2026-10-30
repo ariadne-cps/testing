@@ -355,5 +355,40 @@ int main() {
     if (!solver_summary.successful() || solver_state_reporter.results.size() != 1 ||
         solver_state_reporter.results[0].assertions.size() != 2 ||
         solver_state_reporter.results[0].assertions[0].outcome != Outcome::Passed) return 67;
+    Suite diagnostics("diagnostics");
+    std::ostringstream diag_output;
+    diagnostics.add("nested oracle", [&](Context& c) {
+        auto file_scope = c.scope("oracle", "floatmp_rounding.tsv");
+        {
+            auto row_scope = c.scope("row", 21);
+            if (diag_output.str().find("[SCOPE 1] oracle=floatmp_rounding.tsv / row=21") == std::string::npos)
+                throw std::runtime_error("scope not flushed before work");
+            c.note("input prepared");
+            c.inspect("expected", 42);
+            c.warning("reference is approximate");
+            c.measure("calculation", [&] { c.prove(false, "deliberate failure"); });
+        }
+        c.prove(true, "restored to file scope");
+    });
+    diagnostics.add("unwinding", [](Context& c) {
+        auto outer = c.scope("phase=outer");
+        auto inner = c.scope("row=error");
+        throw std::runtime_error("intentional nested error");
+    });
+    diagnostics.add("scope restored across cases", [](Context& c) {
+        c.prove(true, "new case has no labels");
+    });
+    ConsoleReporter diag_reporter(diag_output, ConsoleDetail::Concise);
+    auto const diag_summary = diagnostics.run(diag_reporter);
+    if (diag_summary.failed != 1 || diag_summary.errors != 1 ||
+        diag_summary.passed != 1) return 68;
+    if (diag_output.str().find("[WARN] oracle=floatmp_rounding.tsv / row=21 / reference is approximate") ==
+        std::string::npos) return 69;
+    if (diag_output.str().find("context: oracle=floatmp_rounding.tsv / row=21") ==
+        std::string::npos) return 70;
+    if (diag_output.str().find("diagnostic: input prepared") == std::string::npos ||
+        diag_output.str().find("diagnostic: calculation") == std::string::npos) return 71;
+    if (diag_output.str().find("context: phase=outer / row=error") == std::string::npos) return 72;
+    if (diag_output.str().find("[CHECK 3.1] new case has no labels") == std::string::npos) return 73;
     return 0;
 }
