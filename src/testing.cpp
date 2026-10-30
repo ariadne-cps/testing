@@ -319,8 +319,8 @@ void Context::elapsed(std::string description, std::chrono::nanoseconds duration
 
 Outcome Context::outcome(Evidence value) {
     switch (value) {
-        case Evidence::True: return Outcome::Passed;
-        case Evidence::False: return Outcome::Failed;
+        case Evidence::Proven: return Outcome::Passed;
+        case Evidence::Refuted: return Outcome::Failed;
         case Evidence::Indeterminate: return Outcome::Inconclusive;
         default: return Outcome::Error;
     }

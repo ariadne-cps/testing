@@ -52,7 +52,7 @@
 
 namespace Ariadne {
 
-enum class Evidence { False, True, Indeterminate };
+enum class Evidence { Refuted, Proven, Indeterminate };
 enum class Outcome { Passed, Failed, Inconclusive, Skipped, Error };
 
 // The relation is selected at compile time; predicate evidence stays three-valued.
@@ -172,19 +172,19 @@ Evidence evidence(T const& value) {
         if (definite && !possible) {
             throw std::logic_error("Inconsistent logical evidence: definitely true but not possibly true");
         }
-        if (definite) return Evidence::True;
-        if (!possible) return Evidence::False;
+        if (definite) return Evidence::Proven;
+        if (!possible) return Evidence::Refuted;
         return Evidence::Indeterminate;
     } else {
-        return static_cast<bool>(value) ? Evidence::True : Evidence::False;
+        return static_cast<bool>(value) ? Evidence::Proven : Evidence::Refuted;
     }
 }
 
 // Negating a proof must not turn uncertainty into a boolean success.
 inline Evidence negate(Evidence value) {
     switch (value) {
-        case Evidence::True: return Evidence::False;
-        case Evidence::False: return Evidence::True;
+        case Evidence::Proven: return Evidence::Refuted;
+        case Evidence::Refuted: return Evidence::Proven;
         case Evidence::Indeterminate: return Evidence::Indeterminate;
         default: throw std::logic_error("Invalid mathematical evidence");
     }
@@ -351,10 +351,10 @@ class Context {
                 status = outcome(actual);
                 break;
             case EvidenceExpectation::PossiblyTrue:
-                status = actual == Evidence::False ? Outcome::Failed : Outcome::Passed;
+                status = actual == Evidence::Refuted ? Outcome::Failed : Outcome::Passed;
                 break;
             case EvidenceExpectation::NotPossibly:
-                status = actual == Evidence::False ? Outcome::Passed
+                status = actual == Evidence::Refuted ? Outcome::Passed
                        : actual == Evidence::Indeterminate ? Outcome::Inconclusive : Outcome::Failed;
                 break;
             case EvidenceExpectation::Indeterminate:
@@ -366,8 +366,8 @@ class Context {
         }
         auto const evidence_name = [](Evidence value) -> std::string {
             switch (value) {
-                case Evidence::True: return "true";
-                case Evidence::False: return "false";
+                case Evidence::Proven: return "true";
+                case Evidence::Refuted: return "false";
                 case Evidence::Indeterminate: return "indeterminate";
                 default: return "invalid";
             }
@@ -442,7 +442,7 @@ class Context {
                     return comparison;
                 else return detail::evidence(comparison);
             }();
-            if (verdict == Evidence::False && !first_failure) {
+            if (verdict == Evidence::Refuted && !first_failure) {
                 first_failure = actual_count;
                 failure_actual = snippet(*a);
                 failure_expected = snippet(*e);

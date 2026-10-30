@@ -40,8 +40,8 @@ using ADL-based customization or in test-only adapters owned by those domains.
 ### Rigorous semantics
 
 The mathematical evidence lattice for the first implementation is:
-- `Evidence::True`: definitively established.
-- `Evidence::False`: definitively refuted.
+- `Evidence::Proven`: definitively established.
+- `Evidence::Refuted`: definitively refuted.
 - `Evidence::Indeterminate`: neither established nor refuted.
 
 `Context::prove` maps these to `Passed`, `Failed`, and `Inconclusive`
@@ -651,3 +651,19 @@ new namespace. No compatibility alias to the removed namespace is provided;
 this is an intentional source-level API break. The `ariadne-testing` CMake
 target, file paths and the build-tree-only/no-install boundary stay unchanged.
 Utility updates its nine test executables and pinned Testing gitlink separately.
+
+## 2026-10-30 — Public Evidence enumerator collision with Utility
+
+Moving the Testing API from `Ariadne::Testing` to `Ariadne` caused
+GCC `-Wshadow -Werror` failures when test clients included both the
+framework and Utility. Utility already defines `True` and `False` as
+`std::true_type` and `std::false_type` aliases; these are compile-time
+types, whereas the Testing `Evidence` enumerators are runtime three-valued
+logical classifications. The two are not interchangeable, and Testing must
+remain independent of Utility.
+
+Renamed `Evidence::True` to `Evidence::Proven` and `Evidence::False`
+to `Evidence::Refuted`, retaining `Evidence::Indeterminate`. Updated all
+comparisons, negation and outcome conversion without changing behavior.
+The self-test includes an explicit compile-time check for the new enumerators.
+No warning flags are suppressed, and the namespace remains `Ariadne`.

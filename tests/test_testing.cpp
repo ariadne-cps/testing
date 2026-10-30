@@ -66,6 +66,9 @@ struct CaptureReporter final : Reporter {
 };
 
 int main() {
+    // Public evidence enumerators must not collide with Utility's
+    // Ariadne::True and Ariadne::False type aliases.
+    static_assert(Evidence::Refuted != Evidence::Proven);
     Suite suite("self-test");
     suite.add("bool pass", [](Context& t) { t.prove(true, "true"); });
     suite.add("validated pass", [](Context& t) { t.prove(TestLogic::Truth::True, "proved"); });
