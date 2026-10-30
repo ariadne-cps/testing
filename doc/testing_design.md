@@ -223,3 +223,25 @@ mathematical interpretation of negative signed values and avoids compiler
 warnings. For numerical user-defined types, keep their `operator==` and ADL
 three-valued evidence unchanged. The framework self-test now checks equality
 across positive mixed-sign types and inequality of -1 versus max unsigned.
+
+
+## 2026-10-30 — Two-level test-function/checker progress
+
+Each registered suite case corresponds to one test function (not a group of
+functions). A case has a one-based index in the execution order; each
+`Context` has its own one-based checker count. Thus `4.21` means
+the 21st checker of the 4th function in the current executable's suite.
+The counter resets per case, and suite case total is known at runtime.
+No third nesting level is introduced; each file defines its own suite.
+
+The `Reporter` lifecycle has two optional no-op virtual hooks,
+`case_started` and `check_started`. The console implementation emits
+`[RUN 4/10] suite / function` and `[CHECK 4.21] property` and flushes
+before execution of the associated function or checker body.
+
+For eager C++ calls such as `expect_equal(f(), expected)`, evaluation
+of `f()` happens before entering the checker; a hang there cannot be
+announced. `check([&] { return condition(); }, description)` provides
+deferred evaluation after its CHECK event, as do exception checkers.
+A caught unexpected exception from a checker is an operational error
+and does not create a phantom extra numbered checker.

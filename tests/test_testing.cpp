@@ -86,5 +86,24 @@ int main() {
     if (sign_summary.passed != 1 || sign_summary.failed != 1) return 15;
     if (sign_reporter.results.size() != 2 ||
         sign_reporter.results[1].outcome != Outcome::Failed) return 16;
+    Suite progress("progress");
+    std::ostringstream live;
+    ConsoleReporter live_reporter(live);
+    progress.add("first", [&](Context& t) {
+        if (live.str().find("[RUN 1/2] progress / first") == std::string::npos)
+            throw std::runtime_error("missing case-start event");
+        t.check([&] {
+            if (live.str().find("[CHECK 1.1] deferred predicate") == std::string::npos)
+                throw std::runtime_error("checker event not flushed before predicate");
+            return true;
+        }, "deferred predicate");
+        t.prove(true, "second assertion");
+    });
+    progress.add("second", [](Context& t) { t.prove(true, "reset counter"); });
+    auto const ps = progress.run(live_reporter);
+    if (ps.passed != 2 || ps.errors != 0) return 17;
+    if (live.str().find("[CHECK 1.2] second assertion") == std::string::npos) return 18;
+    if (live.str().find("[RUN 2/2] progress / second") == std::string::npos) return 19;
+    if (live.str().find("[CHECK 2.1] reset counter") == std::string::npos) return 20;
     return 0;
 }
