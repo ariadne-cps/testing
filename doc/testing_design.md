@@ -593,3 +593,27 @@ outcome rather than altering the expected summary to pass CI.
 Added header-only `testing/state.hpp` to the umbrella API. `preserve_value(value)` snapshots and restores a copyable, noexcept-assignable value; `preserve_state(getter, restorer)` supports domain-specific state with a single getter call and a statically required noexcept restorer. The returned `ScopedState` guard cannot be copied or moved. Restoration occurs on normal scope exit, exception unwinding, and fatal assertion abort without changing the assertion outcome. Nesting restores the immediately preceding value. Non-noexcept restorers are rejected at compile time, preventing a second exception from escaping a destructor during unwinding. Domain libraries implement their own adapters without depending on Logging or Graphics. The existing fixture policy remains fresh construction per case; shared lifecycle is not implicitly enabled.
 
 `test_state.cpp` covers normal restoration, nested scopes, per-case isolation, exception unwinding, custom getter/restorer evaluation counts, and fatal prerequisite aborts, with explicit diagnostics on failures. D10 setup/teardown and shared-fixture ownership remain open.
+
+## 2026-10-30 — Coverage playbook: fixture.hpp targeted missing paths
+
+The user's LLVM 21 coverage attachment for `testing/main` at commit
+`de203692596b1da97adba4e9aaca322faa385368` reported `fixture.hpp`
+at 6/7 functions, 28/29 lines, and 4/6 branches. Inspection of the
+per-instantiation branch records identified the unexecuted const `ctx()`
+accessor (line 45), the false branch of `starts_with("test_")` (line 60)
+for the existing `Fixture`, `FixtureExample`, and `CompactFixture`
+instantiations, the `NoThrow` path in `Fixture` (line 63), and the
+unsuccessful `run_suite` return (line 74).
+
+Added behavioral self-tests in the existing `test_testing.cpp` and
+`test_requirements.cpp`, without manufacturing new fixture types or changing
+production semantics. Each verifies a concrete public behavior: a const
+fixture sees the same context, explicit unprefixed case names are preserved,
+`NoThrow` wraps a normally successful fixture and records its completion,
+and an actual failed assertion makes `run_suite` return 1 with a FAIL
+diagnostic. The existing prefixed and direct-path cases remain unchanged.
+
+The baseline and the proposed changes are distinct: a fresh coverage report
+for the new commit is needed to verify any actual metric improvement. The
+official tool summary, including template-instantiation effects, controls
+whether the file can be called fully covered.

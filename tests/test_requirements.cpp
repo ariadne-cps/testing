@@ -85,5 +85,20 @@ int main() {
     if(capture.results[5].assertions[0].detail != "unexpected exception type") return 7;
     if(capture.results[6].assertions[0].detail != "no exception thrown") return 8;
     if(capture.results[7].assertions[0].outcome != Outcome::Error) return 9;
+
+    // The previously uncovered NoThrow path belongs to this exact Fixture
+    // instantiation; verify a passing method under that execution policy.
+    // Also check that an explicit non-prefixed name is preserved verbatim.
+    Suite named_fixture("explicit names and NoThrow");
+    add_fixture_test<Fixture>(named_fixture, "without_prefix",
+        &Fixture::test_fixture, FixtureCheck::NoThrow);
+    Captured named_capture;
+    auto const named_summary = named_fixture.run(named_capture);
+    if (named_summary.passed != 1 || named_summary.failed != 0 ||
+        named_summary.errors != 0 || named_capture.results.size() != 1 ||
+        named_capture.results[0].name != "without_prefix" ||
+        named_capture.results[0].assertions.size() != 3 ||
+        named_capture.results[0].assertions[2].outcome != Outcome::Passed)
+        return 10;
     return 0;
 }

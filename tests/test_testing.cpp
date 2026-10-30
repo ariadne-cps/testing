@@ -152,6 +152,11 @@ int main() {
         void test_second() { ctx().prove(true, "reset check count"); }
         void test_print_only() { }
         void test_throws() { throw std::runtime_error("expected to be caught"); }
+        void test_const_context() {
+            FixtureExample const& self = *this;
+            ctx().prove(&self.ctx() == &ctx(),
+                        "const fixture accessor refers to the active context");
+        }
     };
     Suite fixture_suite("fixtures");
     ARIADNE_ADD_TEST_TO(fixture_suite, FixtureExample, test_first);
@@ -170,6 +175,22 @@ int main() {
     if (fixture_log.find("[CHECK 2.1] reset check count") == std::string::npos) return 29;
     if (fixture_log.find("[CHECK 3.1] operation completes") == std::string::npos) return 30;
     if (fixture_log.find("[FAIL] throws") == std::string::npos) return 31;
+
+    // Exercise explicit fixture labels without the test_ prefix using the
+    // same FixtureExample instantiation as the existing prefix cases.
+    Suite named_fixture("explicit fixture naming");
+    add_fixture_test<FixtureExample>(named_fixture, "custom_label",
+        &FixtureExample::test_const_context, FixtureCheck::NoThrow);
+    CaptureReporter named_fixture_reporter;
+    auto const named_fixture_summary = named_fixture.run(named_fixture_reporter);
+    if (named_fixture_summary.passed != 1 || named_fixture_summary.failed != 0 ||
+        named_fixture_summary.errors != 0 ||
+        named_fixture_reporter.results.size() != 1 ||
+        named_fixture_reporter.results[0].name != "custom_label" ||
+        named_fixture_reporter.results[0].assertions.size() != 2 ||
+        named_fixture_reporter.results[0].assertions[0].outcome != Outcome::Passed)
+        return 79;
+
     Suite expressions("macro expressions");
     std::ostringstream expression_output;
     int evaluation_count = 0;
@@ -443,6 +464,27 @@ int main() {
         std::ostringstream compact_output;
         if (::Ariadne::Testing::run_suite(ariadne_test_suite, compact_output) != 0) return 77;
         if (compact_output.str().find("[PASS] compact") == std::string::npos) return 78;
+
+        // Preserve the conventional registration above, and separately verify
+        // the API's handling of an explicitly supplied, unprefixed label.
+        Suite compact_alias("compact aliases");
+        add_fixture_test<CompactFixture>(compact_alias, "manual_label",
+            &CompactFixture::test_compact, FixtureCheck::Direct);
+        CaptureReporter alias_capture;
+        auto const alias_summary = compact_alias.run(alias_capture);
+        if (alias_summary.passed != 1 || alias_summary.failed != 0 ||
+            alias_capture.results.size() != 1 ||
+            alias_capture.results[0].name != "manual_label" ||
+            alias_capture.results[0].assertions.size() != 3)
+            return 80;
     }
+    // A failed proof must make run_suite return a nonzero exit status while
+    // retaining the original FAIL diagnostics.
+    Suite rejected("expected rejection");
+    rejected.add("disproved", [](Context& t) { t.prove(false, "false proof"); });
+    std::ostringstream rejected_output;
+    if (run_suite(rejected, rejected_output) != 1 ||
+        rejected_output.str().find("[FAIL] disproved") == std::string::npos)
+        return 81;
     return 0;
 }
