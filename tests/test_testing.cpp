@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <stdexcept>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -49,5 +50,18 @@ int main() {
     if (s.successful() || reporter.results.size() != 11) return 2;
     if (reporter.results[9].assertions[0].actual != "<unprintable>") return 3;
     if (reporter.results[6].assertions[0].detail != "test error") return 4;
+    std::ostringstream output;
+    ConsoleReporter console(output);
+    Suite rendered("reporting");
+    rendered.add("success", [](Context& t) { t.prove(true, "established"); });
+    rendered.add("failure", [](Context& t) { t.expect_equal(2, 3, "numbers differ"); });
+    Summary const rendered_summary = rendered.run(console);
+    if (rendered_summary.passed != 1 || rendered_summary.failed != 1) return 5;
+    std::string const report = output.str();
+    if (report.find("[PASS] success") == std::string::npos) return 6;
+    if (report.find("[FAIL] failure") == std::string::npos) return 7;
+    if (report.find("actual: 2") == std::string::npos) return 8;
+    if (report.find("expected: 3") == std::string::npos) return 9;
+    if (report.find("reporting: 1 passed, 1 failed") == std::string::npos) return 10;
     return 0;
 }

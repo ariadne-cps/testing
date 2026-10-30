@@ -4,6 +4,17 @@ This document is the evolving architectural contract and design journal for
 `ariadne-cps/testing`. Update it whenever changing semantics, dependencies,
 CI conventions, or migration decisions.
 
+## Current architecture (2026-10-30)
+
+`testing` depends only on `configuration` for CMake/build infrastructure,
+not on `logging`, `utility`, `macro` or any numerical component.
+Reporting is via the `Reporter` interface, with built-in
+`ConsoleReporter(std::ostream&)`; result capture is independent of global
+logging state, verbosity, threading and schedulers.
+
+The dated entries below are historical; the original Logging dependency and
+`LoggingReporter` design described there are superseded.
+
 ## 2026-10-30 — Initial bootstrap
 
 ### Goals
@@ -159,3 +170,36 @@ The obsolete chain was removed, while retaining the three valid checks:
 `configuration`, `logging|configuration`, and
 `logging|utility|configuration`. This was a migration regression, not an
 issue with the submodule commit identities. CI confirmation is pending.
+
+## 2026-10-30 — Remove Logging dependency entirely
+
+### Decision
+
+Testing is a standalone proof-oriented testing framework. Only the pinned
+`ss/cfg` Configuration gitlink remains. Remove the `ss/log` Git submodule
+and entry from `.gitmodules`, the unused `ss/CMakeLists.txt`, the
+`add_subdirectory(ss)` call, obsolete cross-submodule commit consistency
+checks, and `target_link_libraries(testing INTERFACE logging)`.
+No logging library shall be required to build, test, or install Testing.
+
+Remove `LoggingReporter` and `#include "logging/logging.hpp"` from the
+public API and implementation. Keep the abstract `Reporter` interface and
+the direct-to-`std::ostream` `ConsoleReporter`. This avoids dependence on
+verbosity, muting, thread registration and scheduler state. Optional reporters
+provided by higher-level consumers can adapt to external systems without
+changing Testing's own dependencies.
+
+### Testing and compatibility
+
+Extend self-tests with a `ConsoleReporter` output regression checking
+PASS/FAIL lines, actual/expected values, and summary formatting. Keep existing
+tests of ternary truth and error classification unchanged. Removing the
+`LoggingReporter` public type is an intentional API break.
+
+Local GCC 14 Debug and Release builds, with strict project warnings including
+`-Wswitch-default -Werror`, and a local Clang C++20 build passed the self-tests
+for this change. The full Configuration-based CMake and CI matrix remain to
+be verified on the new GitHub commit.
+
+This does not change `utility/testing` or `logging/testing`: those branches
+can evolve independently, while `testing/main` no longer tracks their commits.

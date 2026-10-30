@@ -4,7 +4,6 @@
 #include <iostream>
 #include <sstream>
 
-#include "logging/logging.hpp"
 
 namespace Ariadne::Testing {
 namespace {
@@ -58,16 +57,6 @@ void ConsoleReporter::case_finished(CaseResult const& result) {
 
 void ConsoleReporter::suite_finished(std::string_view name, Summary const& summary) {
     _output << summary_text(name,summary) << '\n';
-}
-
-void LoggingReporter::case_finished(CaseResult const& result) {
-    std::ostringstream os;
-    os << "[TEST " << outcome_name(result.outcome) << "] " << result.name;
-    Logger::instance().println(0, os.str());
-}
-
-void LoggingReporter::suite_finished(std::string_view name, Summary const& summary) {
-    Logger::instance().println(0, summary_text(name,summary));
 }
 
 Outcome Context::outcome(Evidence value) {

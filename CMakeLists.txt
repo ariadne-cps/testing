@@ -9,20 +9,13 @@ if(NOT TARGET ariadne-configuration)
     endif()
     include("${CMAKE_CURRENT_SOURCE_DIR}/ss/cfg/cmake/ProjectOptions.cmake")
 endif()
-if(EXISTS "${PROJECT_SOURCE_DIR}/.git")
-    require_same_dependency_commit(Configuration CHAINS
-        "configuration" "logging|configuration"
-        "logging|utility|configuration")
-endif()
 setup_project()
 include_directories(${PROJECT_SOURCE_DIR}/include)
-add_subdirectory(ss)
 if(NOT TARGET testing)
     add_library(testing INTERFACE)
     target_include_directories(testing INTERFACE
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include/ariadne-testing>)
-    target_link_libraries(testing INTERFACE logging)
     add_subdirectory(src)
     target_link_libraries(TESTING_SRC PRIVATE testing)
 endif()

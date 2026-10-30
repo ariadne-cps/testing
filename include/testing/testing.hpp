@@ -61,13 +61,6 @@ class ConsoleReporter final : public Reporter {
     std::ostream& _output;
 };
 
-// Optional telemetry: logger verbosity/muting may suppress messages.
-class LoggingReporter final : public Reporter {
-  public:
-    void case_finished(CaseResult const& result) override;
-    void suite_finished(std::string_view name, Summary const& summary) override;
-};
-
 namespace detail {
 
 template<class T>
