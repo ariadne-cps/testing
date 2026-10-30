@@ -29,7 +29,7 @@ is not required. For installation, use a Release build, target
 ## Example
 
 ```cpp
-#include "testing/testing.hpp"
+#include "ariadne-testing.hpp"
 #include <iostream>
 
 int main() {
@@ -44,20 +44,21 @@ int main() {
 
 ## Self-describing assertions
 
-Include `testing/checks.hpp` to use optional macros
-`ARIADNE_PROVE(ctx(), predicate)`, `ARIADNE_EXPECT_EQUAL(ctx(), a, b)`,
-`ARIADNE_EXPECT_SAME(ctx(), a, b)`,
-`ARIADNE_EXPECT_WITHIN(ctx(), a, b, tolerance)`,
-`ARIADNE_EXPECT_THROWS(ctx(), Exception, operation())`,
-`ARIADNE_EXPECT_EXCEPTION(ctx(), operation())` and
-`ARIADNE_EXPECT_NO_THROW(ctx(), operation())`. Expression names are
+Include `ariadne-testing.hpp` to access all public Testing APIs, including
+fixture, checks and parameterized helpers. Within `ContextFixture` methods,
+use `ARIADNE_PROVE(predicate)`, `ARIADNE_EXPECT_EQUAL(a, b)`,
+`ARIADNE_EXPECT_SAME(a, b)`, `ARIADNE_EXPECT_WITHIN(a, b, tolerance)`,
+`ARIADNE_EXPECT_THROWS(Exception, operation())`,
+`ARIADNE_EXPECT_EXCEPTION(operation())` and
+`ARIADNE_EXPECT_NO_THROW(operation())`. In free functions or Context&
+lambdas use their `_CTX(context, ...)` equivalents. Expression names are
 recorded automatically; operand evaluation is deferred until after the
 numbered CHECK progress event and happens once. Explicit Context calls
 remain available whenever a handwritten description is preferable.
 
 ## Relational and predicate checks
 
-In addition to equality and tolerance, `testing/checks.hpp` exposes
+In addition to equality and tolerance, `ariadne-testing.hpp` exposes
 `ARIADNE_EXPECT_NOT_EQUAL`, `ARIADNE_EXPECT_LESS`,
 `ARIADNE_EXPECT_LESS_EQUAL`, `ARIADNE_EXPECT_GREATER`,
 `ARIADNE_EXPECT_GREATER_EQUAL`, and generic
@@ -69,11 +70,10 @@ relations, such as `refines`, can be supplied by their owner via ADL.
 
 ## Explicit evidence expectations
 
-Include `testing/checks.hpp` and use
-`ARIADNE_EXPECT_DEFINITELY(ctx(), proposition)`,
-`ARIADNE_EXPECT_POSSIBLY(ctx(), proposition)`,
-`ARIADNE_EXPECT_NOT_POSSIBLY(ctx(), proposition)`, or
-`ARIADNE_EXPECT_INDETERMINATE(ctx(), proposition)`.
+Inside a fixture, use `ARIADNE_EXPECT_DEFINITELY(proposition)`,
+`ARIADNE_EXPECT_POSSIBLY(proposition)`,
+`ARIADNE_EXPECT_NOT_POSSIBLY(proposition)`, or
+`ARIADNE_EXPECT_INDETERMINATE(proposition)`; outside a fixture use `_CTX`.
 An indeterminate proposition *expected* to be indeterminate passes; an
 indeterminate result under a requested definite proof remains inconclusive.
 The possibly check only establishes non-refutation and must not be confused
@@ -85,7 +85,7 @@ with a definite mathematical proof. The report retains observed evidence.
 
 ## Parameterized suites and fixture factories
 
-Include `testing/parameterized.hpp` for implementation/precision variants.
+The umbrella header also provides implementation/precision variants.
 For each case, `fixture_variant<Fixture>(suite, "implementation", factory)`
 constructs a fresh fixture using the supplied `Context&`, with an
 implementation owned or cloned by the factory. Register a subset of test

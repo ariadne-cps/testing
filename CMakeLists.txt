@@ -19,7 +19,9 @@ if(NOT TARGET testing)
     add_subdirectory(src)
     target_link_libraries(TESTING_SRC PRIVATE testing)
 endif()
-ariadne_register_public_headers(TARGET testing DIRECTORIES "${PROJECT_SOURCE_DIR}/include/testing")
+ariadne_register_public_headers(TARGET testing
+    DIRECTORIES "${PROJECT_SOURCE_DIR}/include/testing"
+    FILES "${PROJECT_SOURCE_DIR}/include/ariadne-testing.hpp")
 setup_project_library(TARGET ariadne-testing OBJECTS TESTING_SRC LINK_LIBRARIES testing)
 setup_standalone_project_tests(TARGET ariadne-testing TEST_DIRECTORY tests TEST_TARGET tests
     SOURCES "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/src")

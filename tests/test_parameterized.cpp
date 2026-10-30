@@ -23,8 +23,7 @@
  *  along with Ariadne Testing. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "testing/parameterized.hpp"
-#include "testing/checks.hpp"
+#include "ariadne-testing.hpp"
 
 #include <memory>
 #include <sstream>

@@ -421,3 +421,18 @@ these remain in development.md.
 The canonical expression-checking macros take an explicit context and have a `_CTX` suffix (e.g. `ARIADNE_EXPECT_EQUAL_CTX(context, actual, expected)`). The unsuffixed macros are fixture-only shorthand using `this->ctx()`, and preserve expression stringification and single evaluation by forwarding to `_CTX`. They are not valid in free functions or ordinary Context& lambdas; no global or thread-local context is introduced.
 
 For the conventional single-suite main, `ARIADNE_TEST_SUITE(name)` declares a local variable `ariadne_test_suite`; `ARIADNE_ADD_TEST(Fixture, method)` and `ARIADNE_ADD_TEST_NO_THROW(Fixture, method)` use it, and `ARIADNE_RUN_TESTS()` evaluates the standard console exit gate. The explicit `ARIADNE_ADD_TEST_TO(suite, Fixture, method)` and `ARIADNE_ADD_TEST_NO_THROW_TO` variants continue to support independent suites in one executable. `run_suite(suite, output)` is the underlying helper; callers may still instantiate reporters directly. These naming changes require downstream migrations from old explicit-context and explicit-suite macro signatures. No assertion or suite outcome semantics change.
+
+## 2026-10-30 — Public umbrella header
+
+Added `include/ariadne-testing.hpp` as the recommended single include for
+clients. It exposes the core `Suite`/`Context` API, `ContextFixture`
+and suite macros, expression assertion macros (including explicit `_CTX`
+forms), and parameterized suite/fixture variants. It does not alter any of
+the underlying component headers, their independence, or test semantics.
+
+Both framework self-test executables now include the umbrella header to
+exercise it. The CMake public-header registry includes the new root-level
+header via `FILES`, alongside the existing `include/testing` directory,
+so standalone install bundles include both the new entry point and the
+individual headers. Downstream `utility/testing` may replace its Testing
+component includes with the umbrella header without modifying test bodies.
