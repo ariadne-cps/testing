@@ -66,3 +66,15 @@ with corresponding `NOT_` forms. Each expression is evaluated once after
 the numbered CHECK notification. Generic predicate negation preserves an
 indeterminate verdict rather than coercing it to a boolean. Domain-specific
 relations, such as `refines`, can be supplied by their owner via ADL.
+
+## Explicit evidence expectations
+
+Include `testing/checks.hpp` and use
+`ARIADNE_EXPECT_DEFINITELY(ctx(), proposition)`,
+`ARIADNE_EXPECT_POSSIBLY(ctx(), proposition)`,
+`ARIADNE_EXPECT_DEFINITELY_FALSE(ctx(), proposition)`, or
+`ARIADNE_EXPECT_INDETERMINATE(ctx(), proposition)`.
+An indeterminate proposition *expected* to be indeterminate passes; an
+indeterminate result under a requested definite proof remains inconclusive.
+The possibly check only establishes non-refutation and must not be confused
+with a definite mathematical proof. The report retains observed evidence.

@@ -70,7 +70,7 @@ but discards structured operands and predicate semantics.
 
 ### D02. Mathematical evidence intentions and outcome-policy matrix
 
-- [ ] Define explicit checks for "definitely true", "possibly true",
+- [x] Define explicit checks for "definitely true", "possibly true",
       "definitely false", "indeterminate" and other *observed*
       logical status/value checks as supported by foundation. Distinguish
       a predicate's mathematical classification from whether a test met its

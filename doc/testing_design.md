@@ -283,3 +283,27 @@ operators, integer signedness, ADL, positive/negative predicates, uncertainty,
 failed-value diagnostics and progress before evaluation. GitHub CI on the
 first implementation commit was initiated; full matrix status is verified
 separately.
+
+## 2026-10-30 — D02 (partial): explicit mathematical evidence expectations
+
+Added `EvidenceExpectation` with `DefinitelyTrue`, `PossiblyTrue`,
+`DefinitelyFalse` and `Indeterminate`, and deferred
+`Context::expect_evidence(callable, expectation, description)`.
+The helper records the **observed evidence** and **expected evidence
+intention** separately. In particular, `Indeterminate` is a passing
+assertion only when explicitly expected; it remains `Inconclusive`
+for a demand for definite proof or refutation. `PossiblyTrue` passes
+on True or Indeterminate and fails on False: this is a non-refutation
+check, **not** a proof of the proposition. Domain statuses such as SAT,
+UNSAT and UNKNOWN are ordinary domain values, not automatically mapped to
+Testing's `Inconclusive` outcome.
+
+Optional `ARIADNE_EXPECT_DEFINITELY`, `ARIADNE_EXPECT_POSSIBLY`,
+`ARIADNE_EXPECT_DEFINITELY_FALSE` and `ARIADNE_EXPECT_INDETERMINATE`
+macros use deferred lambdas and expression stringification. Existing
+`Context::prove` and `ARIADNE_PROVE` retain strict proof semantics.
+Self-tests verify passing expectations, unsuccessful possibility,
+inconclusive proof/refutation, failed mismatched expectation and the
+recorded evidence labels. Policy configuration, legacy equivalence
+mapping and domain-status adapters remain on the development backlog.
+The new implementation was published for the GitHub Actions CI matrix.
