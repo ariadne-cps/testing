@@ -318,3 +318,29 @@ Indeterminate it remains Inconclusive, and when it is True it fails.
 This is a terminology-only change to the public API; the previous
 falsity-oriented name was removed rather than retained as a second alias.
 Self-tests assert the observed/expected labels and all three outcomes.
+
+## 2026-10-30 — D02: explicit CI acceptance and legacy migration equivalence
+
+Implemented `AcceptancePolicy`, `InconclusivePolicy` and `SkippedPolicy` for `Summary::acceptable(policy)`. The existing `successful()` is unchanged in effect: an inconclusive proof blocks CI. Explicit NonBlocking inconclusives can be tolerated only at the exit gate; every assertion outcome, case outcome, count and reporter entry remains Inconclusive. A genuine pass is still required, while Failed and Error always block. Self-tests exercise strict/permissive gates, skipped blocking, passless suites and failure/error rejection. An expected solver UNKNOWN + ResourceExhausted is tested as ordinary domain enum equality, and passes without turning mathematical uncertainty into a proof.
+
+### Legacy macro migration mapping (verified source semantics)
+
+Source: `ariadne-cps/macro/include/macro/testing.hpp` on main; `function/tests/test_taylor_model.cpp` on main for local REFINES. Old `AriadneTesting::decision(x)` invokes ADL `decide(x)` or converts to bool, distinct from the `definitely/possibly` mapping used by `truth(x)` and Testing's evidence checks. **Do not mechanically substitute when a domain's decision semantics differ.**
+
+| Legacy | Candidate replacement | Non-equivalence or required verification |
+|---|---|---|
+| `ASSERT(x)` | `ARIADNE_PROVE(ctx(),x)` | Old Indeterminate merely warns and does not increment failures; new Inconclusive blocks default CI. |
+| `EQUAL(a,b)`, `EQUALS(a,b)` | `ARIADNE_EXPECT_EQUAL` | Old uses `decision(a==b)` and can re-evaluate operands for diagnostic printing; new captures once and preserves evidence. |
+| `NOT_EQUAL(a,b)` | `ARIADNE_EXPECT_NOT_EQUAL` | Old negates the bool decision of `a==b`; new uses `a!=b` and preserves its evidence. |
+| `SAME(a,b)`, `SAME_AS(a,b)` | `ARIADNE_EXPECT_SAME` | Old uses `decision(same(a,b))`; new uses the evidence classification of ADL same. |
+| `LESS(a,b)`, `COMPARE(a,op,b)` | Relational/check_equal macros according to operator | Old decision semantics and possible operand re-evaluation differ. |
+| `WITHIN(a,b,t)` | `ARIADNE_EXPECT_WITHIN` | Magnitude and tolerance relation remain, but old uses decision and may re-evaluate failing operands. |
+| `CHECK(a,b)`, `CHECK_WARN(a,b)` | Equality or warning adapter | CHECK uses testing_check + decision; CHECK_WARN only warns and does not fail. |
+| `UNARY_PREDICATE`, `BINARY_PREDICATE` | Generic predicate macros | Old decision/operand re-evaluation may differ; new evaluates once and preserves evidence. |
+| `CONCEPT`, `STATIC_ASSERT`, `SAME_TYPE` | C++ compile-time checks or ordinary checks | Legacy macro assertions happen at runtime even for compile-time expressions. |
+| `FAIL(statement)` | `ARIADNE_EXPECT_EXCEPTION` | Both expect an exception of any type. |
+| `THROWS(statement,E)` | `ARIADNE_EXPECT_THROWS` | Both require type E; new also handles unexpected non-standard exception types as a failed expectation. |
+| local `REFINES(a,b)` | Generic binary predicate + domain-local diagnostic adapter | Old additionally prints model differences, error and norm on failure, requiring a domain adapter to retain coverage. |
+| `EXECUTE`, `TRY`, `CONSTRUCT`, `ASSIGN`, `PRINT`, `WARN` | Explicit C++ with check/notes | These have differing scope, side-effect and exception semantics; do not automatically replace. |
+
+The table is guidance, **not a proof that all consumer call sites are equivalent**. Preserve test behavior during migration and review any intentional increase in proof strictness.

@@ -75,16 +75,16 @@ but discards structured operands and predicate semantics.
       logical status/value checks as supported by foundation. Distinguish
       a predicate's mathematical classification from whether a test met its
       **expected** classification.
-- [ ] Specify configurable handling/reporting for inconclusive evidence
-      without silently turning failed proofs into successful checks.
-      Preserve the existing default that an inconclusive \`prove\` fails CI.
-- [ ] Separate test \`Inconclusive\` from a *successfully verified* domain
+- [x] Specify configurable exit-gate handling/reporting for inconclusive evidence
+      without changing assertion outcomes; the default remains strict.
+- [x] Separate test \`Inconclusive\` from a *successfully verified* domain
       result of \`UNKNOWN\` (e.g. expected SMT resource exhaustion).
       A test of an expected UNKNOWN reason should pass.
-- [ ] Write an explicit migration equivalence table for legacy
+- [x] Write an explicit migration equivalence table for legacy
       \`ASSERT\`, \`EQUAL\`, \`EQUALS\`, \`SAME\`, \`COMPARE\`, \`WITHIN\`,
       \`CHECK\`, \`CONCEPT\`, \`FAIL\`, \`THROWS\` and local \`REFINES\`,
-      including each legacy policy for indeterminate values.
+      including legacy treatment of indeterminate values; verify each
+      conversion against its original domain semantics.
 
 **Evidence:** [foundation/test_logical.cpp](https://github.com/ariadne-cps/foundation/blob/main/tests/test_logical.cpp)
 exercises true/false/likely/unlikely/indeterminate logical values;

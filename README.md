@@ -78,3 +78,7 @@ An indeterminate proposition *expected* to be indeterminate passes; an
 indeterminate result under a requested definite proof remains inconclusive.
 The possibly check only establishes non-refutation and must not be confused
 with a definite mathematical proof. The report retains observed evidence.
+
+## Exit-gate policy
+
+`Summary::successful()` is strict; explicit `summary.acceptable(AcceptancePolicy{InconclusivePolicy::NonBlocking, SkippedPolicy::NonBlocking})` allows a caller to tolerate inconclusives only when choosing an exit status. It does not change stored outcomes, reporter labels or counters, does not allow failures/errors, and still requires at least one genuinely passing case. Solver UNKNOWN is an ordinary domain value, not automatically a testing Inconclusive.
