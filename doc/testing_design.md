@@ -573,3 +573,17 @@ identity, retention, cleanup, expected results, artifact records, byte offset),
 so CTest --output-on-failure gives actionable evidence rather than a bare exit code.
 The expected test outcomes and D06 semantics are unchanged. This is a regression
 fix; platform validation must be checked on its own commit.
+
+## 2026-10-30 — D06 correction: missing files are failures, not errors
+
+On macOS and GCC/libstdc++, `std::filesystem::is_regular_file(path, error)`
+may report `no_such_file_or_directory` for an absent file. The original
+`expect_file_exists` implementation classified *any* nonempty error code
+as `Outcome::Error`, causing the missing-file self-test to produce a
+wrong suite summary. Treat `no_such_file_or_directory` and
+`not_a_directory` as `Failed` (an unmet file expectation); retain
+`Error` for unrelated filesystem errors. The test explicitly covers
+missing leaf and nested paths, non-regular directories, each assertion's
+classification, and prints exact summary counters on mismatch.
+The correction preserves test semantics: it fixes an incorrect assertion
+outcome rather than altering the expected summary to pass CI.

@@ -206,10 +206,16 @@ void Context::expect_file_exists(std::filesystem::path const& path,
     auto const index=begin_check(description);
     std::error_code error;
     bool const exists=std::filesystem::is_regular_file(path,error);
-    record(error ? Outcome::Error : exists ? Outcome::Passed : Outcome::Failed,
-           description,path.string(),"regular file",
-           error ? error.message() : exists ? "" : "file absent or not regular",
-           location,index);
+    // Some standard libraries report ENOENT/ENOTDIR as an error_code;
+    // these still mean an absent regular file, not a testing infrastructure
+    // error. Preserve Error for other filesystem failures.
+    bool const absent=error == std::errc::no_such_file_or_directory ||
+                      error == std::errc::not_a_directory;
+    Outcome const status=error && !absent ? Outcome::Error :
+                         exists ? Outcome::Passed : Outcome::Failed;
+    record(status,description,path.string(),"regular file",
+           error && !absent ? error.message() :
+           exists ? "" : "file absent or not regular",location,index);
 }
 
 void Context::expect_file_equal(std::filesystem::path const& actual,
