@@ -125,3 +125,27 @@ all project warning flags, including `-Wswitch-default -Werror`. Both
 self-test executions passed. These local checks used a minimal logger stub;
 they do **not** establish that the full GitHub Actions matrix, GCC 12, or
 integration with the real Logging submodule has passed. Check CI for those.
+
+## 2026-10-30 — Remove the Macro repository from the dependency chain
+
+The intended dependency chain is now `testing -> logging -> utility`, with
+general-purpose production macros internal to Utility as
+`utility/macros.hpp`. Utility and Logging changes are staged on their
+respective `testing` branches; Testing tracks the exact Logging
+`testing` commit in its `main` gitlink, which transitively pins Utility's
+`testing` commit. All repositories continue to use the identical
+Configuration commit.
+
+The dependency constraints in Testing CMake drop the obsolete
+`logging|utility|macro|configuration` path. Utility and Logging
+bootstrap tests no longer include `macro/testing.hpp`; each keeps
+independent, standard-C++ assertion helpers without a reverse
+dependency on Testing. The legacy dedicated test of Macro's test macros
+is removed from Utility because the test suite no longer uses that API.
+
+**Migration note:** This branch update does not modify `utility/main` or
+`logging/main`. The above gitlinks intentionally point to commits
+on their `testing` branches. Future commit propagation should keep
+`testing/main` synchronized with those exact changes, and all CI
+configurations should be run before considering promotion of the
+upstream branches.
