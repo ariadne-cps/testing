@@ -467,3 +467,29 @@ automatically reuses an existing `ariadne-testing` target, initializes
 Testing when declared as a Git submodule, or leaves ordinary CTest alone
 if absent. Testing's own standalone self-tests do not require a self-submodule.
 Testing stays build-tree-only, uninstalled and absent from production targets.
+
+## 2026-10-30 — D09: fatal prerequisites and typed exception messages
+
+Added `Context::require` and the `ARIADNE_REQUIRE` / `ARIADNE_REQUIRE_CTX`
+macros. Checks are announced before their predicates are evaluated once.
+Failed or indeterminate requirements record their original evidence-derived
+outcomes, then stop only the current case using an internal `AbortCase`
+marker. `Suite::run` recognizes that marker without synthesizing an Error.
+The preexisting exception checkers rethrow it rather than incorrectly
+counting a failed prerequisite as an expected exception. Exceptions thrown
+while evaluating a requirement remain uncaught test Errors. A caller's
+own catch-all around a fatal assertion can swallow the internal marker;
+test authors must not do this. Threaded case abortion is unsupported.
+
+Added `expect_throws_message<Exception>` and the corresponding fixture and
+explicit-context macros. Only `std::exception`-derived exception types are
+supported, matching a substring of `what()` and preserving actual and
+expected strings in assertion records; missing/wrong types and messages
+fail rather than passing. Arbitrary exception payload checks remain in D09.
+Dedicated `test_requirements.cpp` covers fatal aborts, preserved evidence,
+exception interception, source-order evaluation, message mismatch, wrong
+exception type, and subsequent case execution. No production dependencies,
+new installation rules, or changes to existing tests are introduced.
+
+The README now exposes the same six status/coverage badges as other Ariadne
+repositories, pointing to Testing's own workflows and Codecov page.

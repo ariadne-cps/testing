@@ -1,5 +1,12 @@
 # Ariadne Testing
 
+[![macOS Status](https://github.com/ariadne-cps/testing/actions/workflows/macos.yml/badge.svg)](https://github.com/ariadne-cps/testing/actions/workflows/macos.yml)
+[![Ubuntu Status](https://github.com/ariadne-cps/testing/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/ariadne-cps/testing/actions/workflows/ubuntu.yml)
+[![Windows Status](https://github.com/ariadne-cps/testing/actions/workflows/win.yml/badge.svg)](https://github.com/ariadne-cps/testing/actions/workflows/win.yml)
+[![Sanitizers Status](https://github.com/ariadne-cps/testing/actions/workflows/sanitizers.yml/badge.svg)](https://github.com/ariadne-cps/testing/actions/workflows/sanitizers.yml)
+[![Coverage Status](https://github.com/ariadne-cps/testing/actions/workflows/coverage.yml/badge.svg)](https://github.com/ariadne-cps/testing/actions/workflows/coverage.yml)
+[![codecov](https://codecov.io/gh/ariadne-cps/testing/branch/main/graph/badge.svg)](https://codecov.io/gh/ariadne-cps/testing)
+
 A C++20 testing framework designed for rigorous numerical software. It provides
 proof-oriented three-valued assertions, distinct test outcomes, source locations
 and structured test results, with no external test framework.
@@ -108,3 +115,18 @@ that do not increment assertion counters or count as successful checks.
 `ConsoleReporter(output, ConsoleDetail::Concise)` hides successful
 notes and measurements, but preserves warnings/scopes and displays
 additional details if the case fails.
+
+## Fatal prerequisites and exception messages
+
+`ARIADNE_REQUIRE(condition)` records a prerequisite and stops the current
+fixture test case if it is false or indeterminate; the equivalent for a
+free function or Context& lambda is `ARIADNE_REQUIRE_CTX(context, condition)`.
+The recorded outcome is `Failed` for false evidence and `Inconclusive`
+for indeterminate evidence, not `Error`. Exceptions thrown while evaluating
+prerequisites are errors. Other cases continue normally. Do not intercept
+this internal control-flow signal in a test's user-defined catch-all handler.
+
+`ARIADNE_EXPECT_THROWS_MESSAGE(std::runtime_error, action(), "keyword")`
+checks both a `std::exception`-derived type and a substring of `what()`.
+A `_CTX(context, ...)` form is available outside fixtures. The action is
+executed only after the numbered CHECK notification.

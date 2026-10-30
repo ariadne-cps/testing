@@ -34,6 +34,9 @@
 #define ARIADNE_PROVE_CTX(context, expression) \
     (context).check([&]() -> decltype(auto) { return (expression); }, #expression)
 
+#define ARIADNE_REQUIRE_CTX(context, expression) \
+    (context).require([&]() -> decltype(auto) { return (expression); }, #expression)
+
 #define ARIADNE_EXPECT_EQUAL_CTX(context, actual, expected) \
     (context).check_equal( \
         [&]() -> decltype(auto) { return (actual); }, \
@@ -56,6 +59,10 @@
 #define ARIADNE_EXPECT_THROWS_CTX(context, exception_type, statement) \
     (context).expect_throws<exception_type>([&] { statement; }, \
         #statement " throws " #exception_type)
+
+#define ARIADNE_EXPECT_THROWS_MESSAGE_CTX(context, exception_type, statement, substring) \
+    (context).expect_throws_message<exception_type>([&] { statement; }, (substring), \
+        #statement " throws " #exception_type " containing " #substring)
 
 #define ARIADNE_EXPECT_EXCEPTION_CTX(context, statement) \
     (context).expect_exception([&] { statement; }, #statement " throws")
@@ -156,6 +163,9 @@
 #define ARIADNE_PROVE(expression) \
     ARIADNE_PROVE_CTX(this->ctx(), expression)
 
+#define ARIADNE_REQUIRE(expression) \
+    ARIADNE_REQUIRE_CTX(this->ctx(), expression)
+
 #define ARIADNE_EXPECT_EQUAL(actual, expected) \
     ARIADNE_EXPECT_EQUAL_CTX(this->ctx(), actual, expected)
 
@@ -167,6 +177,9 @@
 
 #define ARIADNE_EXPECT_THROWS(exception_type, statement) \
     ARIADNE_EXPECT_THROWS_CTX(this->ctx(), exception_type, statement)
+
+#define ARIADNE_EXPECT_THROWS_MESSAGE(exception_type, statement, substring) \
+    ARIADNE_EXPECT_THROWS_MESSAGE_CTX(this->ctx(), exception_type, statement, substring)
 
 #define ARIADNE_EXPECT_EXCEPTION(statement) \
     ARIADNE_EXPECT_EXCEPTION_CTX(this->ctx(), statement)

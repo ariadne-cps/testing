@@ -238,12 +238,14 @@ checks witness validity conditionally.
 
 ### D09. Abort-on-failure checks and exception-rich assertions
 
-- [ ] Add \`require\`/fatal checks for prerequisites (e.g. file open,
+- [x] Add \`require\`/fatal checks for prerequisites (e.g. file open,
       valid parsed row, non-null pointer) and avoid unsafe continuation
       after a necessary assertion fails. Document \`Failed\` vs \`Error\`.
 - [ ] Provide exception type, message substring and exception payload
       checks, with argument evaluation announced before execution;
       retain \`expect_no_throw\` for operations without other assertions.
+      **Partial:** typed exception + message-substring check is implemented;
+      generic exception-payload checking remains open.
 - [ ] For old \`CONSTRUCT\`, \`NAMED_CONSTRUCT\`, \`EXECUTE\`, \`EVALUATE\`
       and \`ASSIGN\`, prefer normal C++ with \`expect_no_throw\`,
       value checks and structured notes. Avoid macros that obscure

@@ -190,6 +190,9 @@ auto magnitude(T const& value) {
     }
 }
 
+// Internal case-abort marker, not a user-observable test exception.
+struct AbortCase {};
+
 } // namespace detail
 
 class Context {
@@ -443,11 +446,24 @@ class Context {
                      [&]() -> Tolerance const& { return tolerance; }, description, location);
     }
 
+    // Stop only this case if a prerequisite is false or indeterminate.
+    // The check is recorded before aborting, retaining its original outcome.
+    template<class Callable>
+    void require(Callable&& predicate, std::string_view description,
+                 std::source_location location = std::source_location::current()) {
+        auto const index = begin_check(description);
+        auto const evidence = detail::evidence(std::invoke(std::forward<Callable>(predicate)));
+        auto const status = outcome(evidence);
+        record(status, description, {}, {}, {}, location, index);
+        if (status != Outcome::Passed) throw detail::AbortCase{};
+    }
+
     template<class Exception, class Callable>
     void expect_throws(Callable&& action, std::string_view description = "expected exception",
                        std::source_location location = std::source_location::current()) {
         auto const index = begin_check(description);
         try { std::invoke(std::forward<Callable>(action)); }
+        catch (detail::AbortCase const&) { throw; }
         catch (Exception const&) { record(Outcome::Passed, description, {}, {}, {}, location, index); return; }
         catch (std::exception const& e) {
             record(Outcome::Failed, description, {}, {}, std::string("unexpected exception: ") + e.what(), location, index); return;
@@ -455,11 +471,44 @@ class Context {
         catch (...) { record(Outcome::Failed, description, {}, {}, "unexpected exception type", location, index); return; }
         record(Outcome::Failed, description, {}, {}, "no exception thrown", location, index);
     }
+    // Both the exception type and the message substring must match.
+    template<class Exception, class Callable>
+    void expect_throws_message(Callable&& action, std::string_view substring,
+                               std::string_view description = "expected exception message",
+                               std::source_location location = std::source_location::current()) {
+        static_assert(std::is_base_of_v<std::exception, Exception>,
+                      "Exception message checks require a std::exception-derived type");
+        auto const index = begin_check(description);
+        try { std::invoke(std::forward<Callable>(action)); }
+        catch (detail::AbortCase const&) { throw; }
+        catch (Exception const& e) {
+            std::string const actual(e.what());
+            bool const matches = actual.find(substring) != std::string::npos;
+            record(matches ? Outcome::Passed : Outcome::Failed, description,
+                   actual, std::string(substring),
+                   matches ? "" : "exception message mismatch", location, index);
+            return;
+        }
+        catch (std::exception const& e) {
+            record(Outcome::Failed, description, e.what(), std::string(substring),
+                   "unexpected exception type", location, index);
+            return;
+        }
+        catch (...) {
+            record(Outcome::Failed, description, {}, std::string(substring),
+                   "unexpected non-standard exception", location, index);
+            return;
+        }
+        record(Outcome::Failed, description, {}, std::string(substring),
+               "no exception thrown", location, index);
+    }
+
     template<class Callable>
     void expect_exception(Callable&& action, std::string_view description = "exception expected",
                           std::source_location location = std::source_location::current()) {
         auto const index = begin_check(description);
         try { std::invoke(std::forward<Callable>(action)); }
+        catch (detail::AbortCase const&) { throw; }
         catch (...) { record(Outcome::Passed, description, {}, {}, {}, location, index); return; }
         record(Outcome::Failed, description, {}, {}, "no exception thrown", location, index);
     }
@@ -468,6 +517,7 @@ class Context {
                          std::source_location location = std::source_location::current()) {
         auto const index = begin_check(description);
         try { std::invoke(std::forward<Callable>(action)); }
+        catch (detail::AbortCase const&) { throw; }
         catch (std::exception const& e) {
             record(Outcome::Failed, description, {}, {}, e.what(), location, index); return;
         }
