@@ -79,7 +79,7 @@ int main() {
         t.expect_equal(2, std::size_t{2}, "int versus size_t");
     });
     mixed_signs.add("negative must not equal max unsigned", [](Context& t) {
-        t.expect_equal(-1, std::size_t{-1}, "negative signed versus max unsigned");
+        t.expect_equal(-1, static_cast<std::size_t>(-1), "negative signed versus max unsigned");
     });
     CaptureReporter sign_reporter;
     Summary const sign_summary = mixed_signs.run(sign_reporter);
