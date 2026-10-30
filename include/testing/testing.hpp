@@ -30,6 +30,9 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <future>
+#include <condition_variable>
+#include <mutex>
 #include <iosfwd>
 #include <source_location>
 #include <sstream>
@@ -470,6 +473,73 @@ class Context {
         }
         catch (...) { record(Outcome::Failed, description, {}, {}, "unexpected exception", location, index); return; }
         record(Outcome::Passed, description, {}, {}, {}, location, index);
+    }
+
+    // Bounded waits observe externally synchronized state; they do not
+    // cancel worker threads. The caller owns the future and its lifetime.
+    template<class Future, class Rep, class Period>
+    void expect_ready(Future& future, std::chrono::duration<Rep, Period> timeout,
+                      std::string_view description,
+                      std::source_location location = std::source_location::current()) {
+        auto const index = begin_check(description);
+        if (timeout < timeout.zero()) {
+            record(Outcome::Error, description, {}, {}, "negative timeout", location, index);
+            return;
+        }
+        auto const start = std::chrono::steady_clock::now();
+        auto const status = future.wait_for(timeout);
+        auto const elapsed_time = std::chrono::steady_clock::now() - start;
+        std::string observed;
+        Outcome result;
+        switch (status) {
+            case std::future_status::ready:
+                observed = "ready";
+                result = Outcome::Passed;
+                break;
+            case std::future_status::timeout:
+                observed = "timeout";
+                result = Outcome::Failed;
+                break;
+            case std::future_status::deferred:
+                observed = "deferred";
+                result = Outcome::Failed;
+                break;
+            default:
+                observed = "unexpected future status";
+                result = Outcome::Error;
+                break;
+        }
+        record(result, description, observed, "ready",
+               "waited=" + detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                elapsed_time).count()) + "ms; limit=" +
+               detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                timeout).count()) + "ms",
+               location, index);
+    }
+
+    // Use wait_for's predicate overload to handle spurious wakeups. The
+    // predicate executes while the caller's unique_lock is held.
+    template<class Lock, class Predicate, class Rep, class Period>
+    void expect_eventually(std::condition_variable_any& condition, Lock& lock,
+                           Predicate&& predicate, std::chrono::duration<Rep, Period> timeout,
+                           std::string_view description,
+                           std::source_location location = std::source_location::current()) {
+        auto const index = begin_check(description);
+        if (timeout < timeout.zero()) {
+            record(Outcome::Error, description, {}, {}, "negative timeout", location, index);
+            return;
+        }
+        auto const start = std::chrono::steady_clock::now();
+        bool const completed = condition.wait_for(lock, timeout,
+                                                  std::forward<Predicate>(predicate));
+        auto const elapsed_time = std::chrono::steady_clock::now() - start;
+        record(completed ? Outcome::Passed : Outcome::Failed, description,
+               completed ? "condition satisfied" : "timeout", "condition satisfied",
+               "waited=" + detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                elapsed_time).count()) + "ms; limit=" +
+               detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                timeout).count()) + "ms",
+               location, index);
     }
 
     // Deferred checker: emit progress before evaluating its potentially costly predicate.
