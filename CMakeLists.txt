@@ -13,18 +13,12 @@ setup_project()
 include_directories(${PROJECT_SOURCE_DIR}/include)
 if(NOT TARGET testing)
     add_library(testing INTERFACE)
-    target_include_directories(testing INTERFACE
-        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include/ariadne-testing>)
+    target_include_directories(testing INTERFACE "${PROJECT_SOURCE_DIR}/include")
     add_subdirectory(src)
     target_link_libraries(TESTING_SRC PRIVATE testing)
 endif()
-ariadne_register_public_headers(TARGET testing
-    DIRECTORIES "${PROJECT_SOURCE_DIR}/include/testing"
-    FILES "${PROJECT_SOURCE_DIR}/include/ariadne-testing.hpp")
-setup_project_library(TARGET ariadne-testing OBJECTS TESTING_SRC LINK_LIBRARIES testing)
+# Test support only: do not register public install headers or installation rules.
+add_library(ariadne-testing STATIC $<TARGET_OBJECTS:TESTING_SRC>)
+target_link_libraries(ariadne-testing PUBLIC testing)
 setup_standalone_project_tests(TARGET ariadne-testing TEST_DIRECTORY tests TEST_TARGET tests
     SOURCES "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/src")
-if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
-    ariadne_install_dependency_bundle(TARGET testing DESTINATION include/ariadne-testing)
-endif()

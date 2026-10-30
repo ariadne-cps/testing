@@ -436,3 +436,16 @@ header via `FILES`, alongside the existing `include/testing` directory,
 so standalone install bundles include both the new entry point and the
 individual headers. Downstream `utility/testing` may replace its Testing
 component includes with the umbrella header without modifying test bodies.
+
+## 2026-10-30 — Test-only distribution (correction to umbrella entry)
+
+The public umbrella header `include/ariadne-testing.hpp` is used from the
+build tree, not an installed SDK. The earlier note about registering it for
+installation is superseded: the Testing framework must **not be installed**.
+Removed the install-interface include directory, public header registration,
+standalone `setup_project_library` packaging and install bundle. The
+`ariadne-testing` target remains available as a build-tree static library
+composed from `TESTING_SRC` and linked with the `testing` include interface;
+self-tests and downstream consumers use it only for test executables. Utility
+continues using the nested `TESTING_SRC` archive, without any production
+link dependency on Testing. No assertion behavior changes.

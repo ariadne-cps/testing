@@ -5,7 +5,7 @@ proof-oriented three-valued assertions, distinct test outcomes, source locations
 and structured test results, with no external test framework.
 
 The **only repository dependency** is `ariadne-cps/configuration`, used for
-CMake configuration and packaging. Testing has no runtime dependency on
+CMake configuration and test builds. Testing has no runtime dependency on
 Logging, Utility or Macro, nor on numerical domain libraries.
 
 `ConsoleReporter` writes to a caller-provided `std::ostream`; the abstract
@@ -23,8 +23,8 @@ ctest --test-dir build-debug --output-on-failure
 ```
 
 CMake initializes only the pinned Configuration submodule; recursive checkout
-is not required. For installation, use a Release build, target
-`ariadne-testing` and `cmake --install`.
+is not required. This framework is a **test-only dependency** and is not
+installed: consumers compile/link it from source for their test targets.
 
 ## Example
 
