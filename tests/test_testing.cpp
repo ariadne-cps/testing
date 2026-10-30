@@ -1,4 +1,4 @@
-#include "testing/testing.hpp"
+#include "testing/fixture.hpp"
 
 #include <iostream>
 #include <stdexcept>
@@ -105,5 +105,32 @@ int main() {
     if (live.str().find("[CHECK 1.2] second assertion") == std::string::npos) return 18;
     if (live.str().find("[RUN 2/2] progress / second") == std::string::npos) return 19;
     if (live.str().find("[CHECK 2.1] reset counter") == std::string::npos) return 20;
+    struct FixtureExample : ContextFixture {
+        using ContextFixture::ContextFixture;
+        void test_first() {
+            ctx().prove(true, "first check");
+            ctx().expect_equal(3, 3, "second check");
+        }
+        void test_second() { ctx().prove(true, "reset check count"); }
+        void test_print_only() { }
+        void test_throws() { throw std::runtime_error("expected to be caught"); }
+    };
+    Suite fixture_suite("fixtures");
+    ARIADNE_ADD_TEST(fixture_suite, FixtureExample, test_first);
+    ARIADNE_ADD_TEST(fixture_suite, FixtureExample, test_second);
+    ARIADNE_ADD_TEST_NO_THROW(fixture_suite, FixtureExample, test_print_only);
+    ARIADNE_ADD_TEST_NO_THROW(fixture_suite, FixtureExample, test_throws);
+    std::ostringstream fixture_out;
+    ConsoleReporter fixture_reporter(fixture_out);
+    auto const fixture_summary = fixture_suite.run(fixture_reporter);
+    if (fixture_summary.passed != 3 || fixture_summary.failed != 1 ||
+        fixture_summary.errors != 0) return 25;
+    auto const fixture_log = fixture_out.str();
+    if (fixture_log.find("[RUN 1/4] fixtures / first") == std::string::npos) return 26;
+    if (fixture_log.find("[CHECK 1.2] second check") == std::string::npos) return 27;
+    if (fixture_log.find("[RUN 2/4] fixtures / second") == std::string::npos) return 28;
+    if (fixture_log.find("[CHECK 2.1] reset check count") == std::string::npos) return 29;
+    if (fixture_log.find("[CHECK 3.1] operation completes") == std::string::npos) return 30;
+    if (fixture_log.find("[FAIL] throws") == std::string::npos) return 31;
     return 0;
 }
