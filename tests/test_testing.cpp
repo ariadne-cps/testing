@@ -73,5 +73,18 @@ int main() {
     CaptureReporter exceptions_reporter;
     Summary es = exceptions.run(exceptions_reporter);
     if (es.passed != 3 || es.failed != 3 || es.errors != 0) return 11;
+    Suite mixed_signs("mixed signedness");
+    mixed_signs.add("same positive", [](Context& t) {
+        t.expect_equal(std::size_t{2}, 2, "size_t versus int");
+        t.expect_equal(2, std::size_t{2}, "int versus size_t");
+    });
+    mixed_signs.add("negative must not equal max unsigned", [](Context& t) {
+        t.expect_equal(-1, std::size_t{-1}, "negative signed versus max unsigned");
+    });
+    CaptureReporter sign_reporter;
+    Summary const sign_summary = mixed_signs.run(sign_reporter);
+    if (sign_summary.passed != 1 || sign_summary.failed != 1) return 15;
+    if (sign_reporter.results.size() != 2 ||
+        sign_reporter.results[1].outcome != Outcome::Failed) return 16;
     return 0;
 }

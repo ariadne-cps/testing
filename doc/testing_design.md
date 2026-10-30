@@ -211,3 +211,15 @@ Added `expect_throws<E>`, `expect_exception` and `expect_no_throw`, with
 single evaluation, caller source location and dedicated success/failure assertions.
 Wrong exception types and missing exceptions are failures. Self-tests validate
 all six paths. This keeps Utility free of a parallel testing harness.
+
+## 2026-10-30 — Signed and unsigned integral equality
+
+Integration with the Utility test suite revealed that the generic
+`expect_equal(A,B)` implementation triggers `-Wsign-compare -Werror`
+when an unsigned value is compared with a signed expectation in its
+instantiated function template. For two non-bool built-in integral operands,
+use C++20 `std::cmp_equal` instead of `operator==`: it preserves the correct
+mathematical interpretation of negative signed values and avoids compiler
+warnings. For numerical user-defined types, keep their `operator==` and ADL
+three-valued evidence unchanged. The framework self-test now checks equality
+across positive mixed-sign types and inequality of -1 versus max unsigned.

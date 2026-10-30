@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -116,8 +117,17 @@ class Context {
     void expect_equal(A const& actual, B const& expected,
                       std::string_view description = "equality",
                       std::source_location location = std::source_location::current()) {
-        auto const relation = (actual == expected);
-        record(outcome(detail::evidence(relation)), description,
+        auto const verdict = [&]() {
+            using Actual = std::remove_cvref_t<A>;
+            using Expected = std::remove_cvref_t<B>;
+            if constexpr (std::is_integral_v<Actual> && std::is_integral_v<Expected>
+                          && !std::is_same_v<Actual,bool> && !std::is_same_v<Expected,bool>) {
+                return detail::evidence(std::cmp_equal(actual,expected));
+            } else {
+                return detail::evidence(actual == expected);
+            }
+        }();
+        record(outcome(verdict), description,
                detail::render(actual), detail::render(expected), {}, location);
     }
 
