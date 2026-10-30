@@ -50,13 +50,13 @@
 #define ARIADNE_EXPECT_RANGES_BY_CTX(context, actual, expected, comparator) \
     (context).check_ranges([&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
-        [&]() -> decltype(auto) { return (comparator); }, #actual " ranges by " #expected)
+        [&]() { return ::Ariadne::Testing::detail::capture_callable(comparator); }, #actual " ranges by " #expected)
 
 #define ARIADNE_EXPECT_RANGES_AT_CTX(context, actual, expected, comparator, path) \
     (context).check_ranges([&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
-        [&]() -> decltype(auto) { return (comparator); }, \
-        [&]() -> decltype(auto) { return (path); }, #actual " ranges at " #expected)
+        [&]() { return ::Ariadne::Testing::detail::capture_callable(comparator); }, \
+        [&]() { return ::Ariadne::Testing::detail::capture_callable(path); }, #actual " ranges at " #expected)
 
 #define ARIADNE_EXPECT_SAME_CTX(context, actual, expected) \
     (context).check_same( \

@@ -198,6 +198,17 @@ Evidence equal_evidence(Actual const& actual, Expected const& expected) {
     }
 }
 
+// Retain non-copyable lvalue callables by reference and own temporaries.
+// Wrapping named functions also avoids MSVC's inability to deduce a
+ // decltype(auto) return directly from a function designator.
+template<class Callable>
+auto capture_callable(Callable&& callable) {
+    if constexpr (std::is_lvalue_reference_v<Callable>)
+        return std::ref(callable);
+    else
+        return std::forward<Callable>(callable);
+}
+
 template<class T>
 auto magnitude(T const& value) {
     if constexpr (requires { mag(value); }) {

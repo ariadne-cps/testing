@@ -532,3 +532,20 @@ exercises equal/mismatched lengths, singleton and missing elements,
 heterogeneous integral equality, indeterminate comparator, path selection,
 input iterators and fixture shorthand. Concrete tree adapters are delegated
 to downstream repositories rather than included in the framework.
+
+## 2026-10-30 — D07: MSVC callable capture portability fix
+
+Windows/MSVC compilation of the D07 self-test failed when a free function
+(`same_value`) was passed to `ARIADNE_EXPECT_RANGES_BY_CTX`: the macro's
+`decltype(auto)` factory returned a function designator, which MSVC rejected
+with C3556/C3169. This was a macro portability bug, not an sccache failure,
+and the existing semantic test remains in place.
+
+The comparator and optional path factory macros now call
+`detail::capture_callable` after the CHECK notification. It keeps lvalue
+callables (including named free functions and non-copyable functors) through
+`std::reference_wrapper` and owns rvalue callable temporaries by move,
+without repeating expression evaluation. The underlying range comparison,
+evidence classification, mismatch reporting, and test case inventory are
+unchanged, except for additional regressions covering the capture modes.
+Verification by the new Windows CI run remains required.

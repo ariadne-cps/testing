@@ -53,6 +53,20 @@ int main() {
             [](int a, int b) { return a==b; },
             [](std::size_t i) { return std::string("node/")+std::to_string(i); });
     });
+    suite.add("non-copyable comparator", [](Context& c) {
+        struct Comparator {
+            Comparator() = default;
+            Comparator(Comparator const&) = delete;
+            bool operator()(int a, int b) const { return a == b; }
+        } comparator;
+        ARIADNE_EXPECT_RANGES_BY_CTX(c, (std::vector<int>{1,2}),
+            (std::vector<int>{1,2}), comparator);
+    });
+    suite.add("named path function", [](Context& c) {
+        ARIADNE_EXPECT_RANGES_AT_CTX(c, (std::vector<Uncertain>{{1},{2}}),
+            (std::vector<Uncertain>{{1},{2}}), same_value,
+            [](std::size_t i) { return std::to_string(i); });
+    });
     suite.add("single pass", [](Context& c) {
         std::istringstream lhs("1 2 3");
         std::istringstream rhs("1 2 3");
@@ -63,8 +77,8 @@ int main() {
     ARIADNE_ADD_TEST_TO(suite,Fixture,test_short);
     Capture report;
     auto const summary=suite.run(report);
-    if(summary.passed!=3 || summary.failed!=4 || summary.inconclusive!=1 ||
-       summary.errors!=0 || evaluations!=1 || report.cases.size()!=8) return 1;
+    if(summary.passed!=5 || summary.failed!=4 || summary.inconclusive!=1 ||
+       summary.errors!=0 || evaluations!=1 || report.cases.size()!=10) return 1;
     if(report.cases[1].assertions[0].detail.find("first_mismatch_index=1")==std::string::npos ||
        report.cases[1].assertions[0].actual.find("value=7")==std::string::npos) return 2;
     if(report.cases[2].assertions[0].detail.find("actual_count=3, expected_count=2")==std::string::npos) return 3;
