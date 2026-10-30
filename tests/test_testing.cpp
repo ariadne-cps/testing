@@ -27,6 +27,9 @@
 #include "testing/checks.hpp"
 
 #include <iostream>
+#include <future>
+#include <mutex>
+#include <condition_variable>
 #include <stdexcept>
 #include <sstream>
 #include <string>
@@ -390,5 +393,38 @@ int main() {
         diag_output.str().find("diagnostic: calculation") == std::string::npos) return 71;
     if (diag_output.str().find("context: phase=outer / row=error") == std::string::npos) return 72;
     if (diag_output.str().find("[CHECK 3.1] new case has no labels") == std::string::npos) return 73;
+    Suite bounded_waits("bounded waits");
+    CaptureReporter bounded_reporter;
+    bounded_waits.add("ready future and immediate condition", [](Context& c) {
+        std::promise<int> p;
+        auto f = p.get_future();
+        p.set_value(42);
+        c.expect_ready(f, std::chrono::milliseconds(10), "future ready");
+        std::condition_variable_any cv;
+        std::mutex mutex;
+        std::unique_lock<std::mutex> lock(mutex);
+        c.expect_eventually(cv, lock, [] { return true; },
+                            std::chrono::milliseconds(10), "predicate already true");
+    });
+    bounded_waits.add("future timeout and deferred", [](Context& c) {
+        std::promise<int> p;
+        auto f = p.get_future();
+        c.expect_ready(f, std::chrono::milliseconds(0), "future not ready");
+        auto deferred = std::async(std::launch::deferred, [] { return 3; });
+        c.expect_ready(deferred, std::chrono::milliseconds(0), "deferred is not ready");
+    });
+    bounded_waits.add("condition timeout", [](Context& c) {
+        std::condition_variable_any cv;
+        std::mutex mutex;
+        std::unique_lock<std::mutex> lock(mutex);
+        c.expect_eventually(cv, lock, [] { return false; },
+                            std::chrono::milliseconds(0), "condition never true");
+    });
+    auto const bounded_summary = bounded_waits.run(bounded_reporter);
+    if (bounded_summary.passed != 1 || bounded_summary.failed != 2 ||
+        bounded_summary.errors != 0 || bounded_reporter.results.size() != 3) return 74;
+    if (bounded_reporter.results[1].assertions[0].actual != "timeout" ||
+        bounded_reporter.results[1].assertions[1].actual != "deferred") return 75;
+    if (bounded_reporter.results[2].assertions[0].actual != "timeout") return 76;
     return 0;
 }

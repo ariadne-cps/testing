@@ -400,3 +400,18 @@ Self-tests cover nested scopes, pre-work flush, warning visibility,
 notes and elapsed diagnostics on failure, captured context on failure
 and exception, and independence across cases. This change does not
 alter mathematical assertion outcomes or the Suite summary semantics.
+
+## 2026-10-30 — D05 (partial): bounded future and condition waits
+
+Implemented `Context::expect_ready(future, timeout, description)` and
+`Context::expect_eventually(condition_variable_any, unique_lock, predicate,
+timeout, description)`. Both emit and flush CHECK before waiting, evaluate
+future status or a condition under the supplied lock, and retain elapsed
+milliseconds and deadline in failure details. Ready and satisfied states
+pass; timeout and deferred futures fail explicitly. Negative timeouts are
+classified as Error. The code never attempts to cancel or detach workers.
+For a truly deadlocked worker, an independent process-level CTest timeout
+remains necessary. Added synchronous, deterministic self-tests for ready,
+timeout, deferred, satisfied and unsatisfied statuses. No claims of
+cross-thread Context safety or worker exception aggregation are made;
+these remain in development.md.
