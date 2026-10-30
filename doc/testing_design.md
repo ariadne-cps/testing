@@ -89,17 +89,6 @@ install target, and CTest. The framework's own test executable checks its
 collected outcomes using ordinary C++ conditionals, rather than trusting the
 framework under test.
 
-### Deferred design choices
-
-1. Explicit policies for indeterminate and skipped cases.
-2. Test fixture lifetime and environment isolation (precision, rounding mode).
-3. Property-based testing, seeds, reproductions, shrinking.
-4. Domain adapters for validated numbers, enclosures, intervals and sets.
-5. Optional thin expression-stringification macros and compatibility migration.
-6. Per-test scoped log capture, concurrent execution and output ordering.
-7. JUnit/JSON reporters and per-case CTest discovery.
-8. Fatal assertions, expected exception assertions, timeouts and parameterization.
-
 ### Verification log
 
 - Local GCC 14 C++20 build and self-test run executed with a minimal Logger stub;
