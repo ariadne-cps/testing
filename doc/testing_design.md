@@ -1,0 +1,99 @@
+# Ariadne Testing — design journal
+
+This document is the evolving architectural contract and design journal for
+`ariadne-cps/testing`. Update it whenever changing semantics, dependencies,
+CI conventions, or migration decisions.
+
+## 2026-10-30 — Initial bootstrap
+
+### Goals
+
+Build an in-house C++20 testing framework tailored to rigorous numerical software,
+without Catch2, GoogleTest, doctest, or any external test framework. Replace the
+monolithic testing macros with a model separating mathematical evidence, test outcomes,
+test execution, and presentation. The original `macro/testing.hpp` combines these
+responsibilities and, in some failure paths, evaluates operands again.
+
+### Dependency and build policy
+
+Production dependency direction: `testing -> logging -> utility -> macro`.
+The repository pins `logging` and `configuration` as Git submodules. Its
+`configuration` commit must match all the transitive routes through Logging,
+Utility and Macro. These foundational repositories must not add a reverse
+submodule dependency on Testing; their self-tests remain bootstrap tests.
+
+`testing` must not depend on `numeric`, `interval`, `algebra` or other
+high-level modules. Domain-specific numerical assertions should be implemented
+using ADL-based customization or in test-only adapters owned by those domains.
+
+### Rigorous semantics
+
+The mathematical evidence lattice for the first implementation is:
+- `Evidence::True`: definitively established.
+- `Evidence::False`: definitively refuted.
+- `Evidence::Indeterminate`: neither established nor refuted.
+
+`Context::prove` maps these to `Passed`, `Failed`, and `Inconclusive`
+respectively. `Skipped` and `Error` are operational outcomes, not mathematical
+truth values. Uncaught exceptions result in `Error`; no recorded assertions
+result in `Skipped`. An inconsistent ADL predicate reporting
+`definitely(v) && !possibly(v)` is a logic error.
+
+A suite is successful iff at least one test case passed, and no case failed,
+was inconclusive, or errored. An intentionally skipped case does not by itself
+fail an otherwise successful suite. Within one case, the severity ordering is:
+`Error > Failed > Inconclusive > Skipped > Passed`. More explicit handling of
+skip/inconclusive policies remains future work.
+
+### Initial API
+
+`Suite` manages named cases of type `void(Context&)`. `Context` provides:
+- `prove` for three-valued mathematical propositions;
+- `expect_equal` for `==`;
+- `expect_same` for ADL `same`;
+- `expect_within` for `mag(actual-expected) <= tolerance` (or `std::abs`);
+- `skip` for explicitly omitted checks.
+
+For evidence, `definitely` and `possibly` are found via ADL; other values use
+boolean conversion. Diagnostic values are streamed where possible, or display
+`<unprintable>`. `std::source_location` captures call-site file and line.
+Assertion operands are passed once and not re-evaluated during diagnostics.
+No guarantee of left-to-right evaluation of distinct C++ function arguments
+is implied.
+
+### Reporting and Logging
+
+`ConsoleReporter` renders results without requiring logger state. The
+optional `LoggingReporter` uses the Ariadne Logger, whose verbosity, muting
+and scheduling may suppress output. It is **never** authoritative for verdicts:
+those reside in structured `CaseResult` and `AssertionRecord` instances.
+A future structured log capture interface must address thread safety,
+lifetime/isolation, flushing, and global logger configuration.
+
+### CI and bootstrap tests
+
+Match the existing `ariadne-cps/logging` CI layout on `main`: Ubuntu and macOS
+Debug/Release, Windows MSVC Debug/Release, sanitizers, coverage with GCC/LLVM,
+install target, and CTest. The framework's own test executable checks its
+collected outcomes using ordinary C++ conditionals, rather than trusting the
+framework under test.
+
+### Deferred design choices
+
+1. Explicit policies for indeterminate and skipped cases.
+2. Test fixture lifetime and environment isolation (precision, rounding mode).
+3. Property-based testing, seeds, reproductions, shrinking.
+4. Domain adapters for validated numbers, enclosures, intervals and sets.
+5. Optional thin expression-stringification macros and compatibility migration.
+6. Per-test scoped log capture, concurrent execution and output ordering.
+7. JUnit/JSON reporters and per-case CTest discovery.
+8. Fatal assertions, expected exception assertions, timeouts and parameterization.
+
+### Verification log
+
+- Local GCC 14 C++20 build and self-test run executed with a minimal Logger stub;
+  it verifies the framework core, not integration against the actual dependency build.
+- GitHub Actions platform builds and full CMake integration: pending CI runs.
+- No migration of the old `macro/testing.hpp` or other repositories attempted.
+
+Maintain this journal as a durable record of future decisions, not only a roadmap.
