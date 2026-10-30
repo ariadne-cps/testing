@@ -25,6 +25,7 @@
 
 #include "testing/testing.hpp"
 
+#include <atomic>
 #include <exception>
 #include <iostream>
 #include <sstream>
@@ -159,10 +160,13 @@ Context::~Context() noexcept {
 std::filesystem::path const& Context::work_directory() {
     if (!_work_directory) {
         auto const base = std::filesystem::temp_directory_path();
+        // A stack address is reused for successive test cases. Use a new
+        // candidate ID for each allocation, with create_directory as the
+        // atomic uniqueness check across concurrent processes.
+        static std::atomic<std::uint64_t> next_id{0};
         for (unsigned i=0; i<1000; ++i) {
-            auto candidate = base / ("ariadne-case-" +
-                std::to_string(reinterpret_cast<std::uintptr_t>(this)) + "-" +
-                std::to_string(i));
+            auto const id = next_id.fetch_add(1, std::memory_order_relaxed);
+            auto candidate = base / ("ariadne-case-" + std::to_string(id));
             std::error_code error;
             if (std::filesystem::create_directory(candidate, error)) {
                 _work_directory = std::move(candidate);

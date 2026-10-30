@@ -557,3 +557,19 @@ Added `ArtifactRecord` with path, label, media type, kind, lifetime and metadata
 Managed outputs must reside beneath the owned work directory. It is removed after the reporter has consumed the result unless a registered output specifies `KeepAlways` or `KeepOnFailure` on a non-passing case. External files are never deleted or written by cleanup. The framework cannot preserve outputs when the process terminates abnormally, and only the output-directory ownership is managed; arbitrary external files remain the caller's responsibility.
 
 Added `test_artifacts.cpp` covering a passing case cleanup, retained failure output, unchanged golden reference, missing file, unequal bytes and mismatched signature. Testing remains independent of rendering libraries and keeps no install rules.
+
+## 2026-10-30 — D06 regression correction: directory identity and diagnostics
+
+The initial D06 commit failed all Debug/CTest workflows because its artifact self-test
+returned a bare nonzero code. Consecutive Context instances reuse a stack address;
+the work-directory naming scheme based on that address also reused the same path,
+so an existing retention directory could hide the expected successful-case cleanup.
+The allocator now uses an atomic monotonically increasing candidate counter and
+atomic create_directory for cross-process collision detection. Each successful
+allocation receives a distinct path. The golden fixture's external file name is
+also derived from the isolated case directory instead of a constant global name.
+The self-test emits descriptive stderr on every failed postcondition (directory
+identity, retention, cleanup, expected results, artifact records, byte offset),
+so CTest --output-on-failure gives actionable evidence rather than a bare exit code.
+The expected test outcomes and D06 semantics are unchanged. This is a regression
+fix; platform validation must be checked on its own commit.
