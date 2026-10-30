@@ -255,3 +255,31 @@ Copyright 2026 and Author Luca Geretti, and the GPLv3-or-later license notice
 naming Ariadne Testing. The repository's LICENSE is GPLv3. This commit changes
 comments only; public APIs, execution behavior and dependency graph are
 unchanged. Future source files should use the same format.
+
+## 2026-10-30 — D01: deferred comparisons and ADL predicate checks
+
+Added a compile-time `Comparison` selector and `Context::check_compare` for
+`!=`, `<`, `<=`, `>` and `>=`. As in `check_equal`, built-in non-bool
+integer pairs use C++20 `std::cmp_*` to preserve negative signed vs unsigned
+ordering and avoid `-Wsign-compare`, while user-defined types use their own
+relational operators and evidence. Two new functions, `check_unary` and
+`check_binary`, invoke arbitrary C++ predicates (including ADL calls),
+render the arguments and preserve evidence: True/False/Indeterminate. For
+negation, `detail::negate(Evidence)` swaps True/False and leaves
+Indeterminate unchanged, instead of using boolean negation of a validated
+predicate. All checkers announce and flush the check event before evaluating
+operands, which are evaluated exactly once, left to right.
+
+Added optional thin expression macros `ARIADNE_EXPECT_NOT_EQUAL`,
+`ARIADNE_EXPECT_LESS`, `ARIADNE_EXPECT_LESS_EQUAL`,
+`ARIADNE_EXPECT_GREATER`, `ARIADNE_EXPECT_GREATER_EQUAL`,
+`ARIADNE_EXPECT_UNARY_PREDICATE`, `ARIADNE_EXPECT_NOT_UNARY_PREDICATE`,
+`ARIADNE_EXPECT_BINARY_PREDICATE` and
+`ARIADNE_EXPECT_NOT_BINARY_PREDICATE` in `testing/checks.hpp`.
+The macros stringify the source expression but leave test classification,
+operand evaluation and diagnostics in the C++ framework. No domain-specific
+relation or production dependency was added. Self-tests exercise all five
+operators, integer signedness, ADL, positive/negative predicates, uncertainty,
+failed-value diagnostics and progress before evaluation. GitHub CI on the
+first implementation commit was initiated; full matrix status is verified
+separately.

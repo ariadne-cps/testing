@@ -41,10 +41,10 @@ any repository above configuration, or external test frameworks.
 
 ### D01. Generic, evidence-preserving relational and predicate checks
 
-- [ ] Add deferred, single-evaluation comparators for <, <=, >, >=, !=,
+- [x] Add deferred, single-evaluation comparators for <, <=, >, >=, !=,
       and (where meaningful) explicit equality; preserve left-to-right
       operand evaluation and emit CHECK *before* computing operands.
-- [ ] Add unary/binary predicates with ADL, including negated relations, and
+- [x] Add unary/binary predicates with ADL, including negated relations, and
       retain/render both operands, the relation name and the resulting
       mathematical evidence. Provide thin optional macros for source spelling.
 - [ ] Keep exact equality, domain-specific \`same\`/identity, mathematical
@@ -52,7 +52,7 @@ any repository above configuration, or external test frameworks.
       numerical tolerance **separate**; expose generic predicate checking
       in Testing and allow domain-local named adapters instead of depending
       on numeric/function/interval/set.
-- [ ] Preserve signed/unsigned integral comparison safety and support
+- [x] Preserve signed/unsigned integral comparison safety and support
       heterogeneous user-defined operands; test indeterminate-valued
       relations and single-evaluation side effects.
 

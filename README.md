@@ -54,3 +54,15 @@ Include `testing/checks.hpp` to use optional macros
 recorded automatically; operand evaluation is deferred until after the
 numbered CHECK progress event and happens once. Explicit Context calls
 remain available whenever a handwritten description is preferable.
+
+## Relational and predicate checks
+
+In addition to equality and tolerance, `testing/checks.hpp` exposes
+`ARIADNE_EXPECT_NOT_EQUAL`, `ARIADNE_EXPECT_LESS`,
+`ARIADNE_EXPECT_LESS_EQUAL`, `ARIADNE_EXPECT_GREATER`,
+`ARIADNE_EXPECT_GREATER_EQUAL`, and generic
+`ARIADNE_EXPECT_UNARY_PREDICATE`/`ARIADNE_EXPECT_BINARY_PREDICATE`
+with corresponding `NOT_` forms. Each expression is evaluated once after
+the numbered CHECK notification. Generic predicate negation preserves an
+indeterminate verdict rather than coercing it to a boolean. Domain-specific
+relations, such as `refines`, can be supplied by their owner via ADL.
