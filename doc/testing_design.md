@@ -458,3 +458,12 @@ initializes Testing solely for standalone test builds. The framework's
 build-tree static target `ariadne-testing` is reused directly by downstream
 tests rather than repackaging `TESTING_SRC` into a project-specific archive.
 No installation rules or production-library dependencies are introduced.
+
+## 2026-10-30 — Automatic Testing discovery in Configuration
+
+Configuration commit `d57304ec9d37ba27f99a9f28e23b9e0272d15b0a` removes the explicit
+`USE_ARIADNE_TESTING` option. `setup_standalone_project_tests`
+automatically reuses an existing `ariadne-testing` target, initializes
+Testing when declared as a Git submodule, or leaves ordinary CTest alone
+if absent. Testing's own standalone self-tests do not require a self-submodule.
+Testing stays build-tree-only, uninstalled and absent from production targets.
