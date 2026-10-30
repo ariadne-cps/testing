@@ -27,6 +27,9 @@
 #define ARIADNE_TESTING_TESTING_HPP
 
 #include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <system_error>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -84,6 +87,19 @@ struct AssertionRecord {
     std::vector<std::string> context;
 };
 
+// The framework only records these references; adapters decide file formats.
+enum class ArtifactKind { Output, Reference, Difference };
+enum class ArtifactLifetime { External, Temporary, KeepOnFailure, KeepAlways };
+
+struct ArtifactRecord {
+    std::filesystem::path path;
+    std::string label;
+    std::string media_type;
+    ArtifactKind kind = ArtifactKind::Output;
+    ArtifactLifetime lifetime = ArtifactLifetime::External;
+    std::vector<std::pair<std::string, std::string>> metadata;
+};
+
 struct CaseResult {
     std::string name;
     Outcome outcome = Outcome::Passed;
@@ -93,6 +109,7 @@ struct CaseResult {
     std::size_t case_index = 0;
     std::size_t case_total = 0;
     std::vector<DiagnosticEvent> diagnostics;
+    std::vector<ArtifactRecord> artifacts;
 };
 
 // Exit-gate policy only: assertion outcomes and summary counts never change.
@@ -244,6 +261,34 @@ class Context {
 
     explicit Context(CaseResult& result, Reporter* reporter = nullptr)
         : _result(result), _reporter(reporter) { }
+
+    Context(Context const&) = delete;
+    Context& operator=(Context const&) = delete;
+    ~Context() noexcept;
+
+    // Lazily allocated, uniquely created directory for this case's outputs.
+    std::filesystem::path const& work_directory();
+
+    // Attach metadata only. Never writes or regenerates a reference file.
+    void artifact(std::filesystem::path path, std::string label,
+                  std::string media_type = "application/octet-stream",
+                  ArtifactKind kind = ArtifactKind::Output,
+                  ArtifactLifetime lifetime = ArtifactLifetime::External,
+                  std::vector<std::pair<std::string,std::string>> metadata = {});
+
+    // File expectations issue CHECK before inspecting the filesystem.
+    void expect_file_exists(std::filesystem::path const& path,
+                            std::string_view description,
+                            std::source_location location = std::source_location::current());
+    void expect_file_equal(std::filesystem::path const& actual,
+                           std::filesystem::path const& reference,
+                           std::string_view description,
+                           std::source_location location = std::source_location::current());
+    void expect_file_signature(std::filesystem::path const& actual,
+                               std::string_view signature,
+                               std::string_view description,
+                               std::source_location location = std::source_location::current());
+
 
     Scope scope(std::string label,
                 std::source_location location = std::source_location::current());
@@ -805,6 +850,7 @@ class Context {
     std::size_t _check_count = 0;
     std::vector<std::string> _scopes;
     std::vector<std::string> _unwinding_scopes;
+    std::optional<std::filesystem::path> _work_directory;
 };
 
 class Suite {

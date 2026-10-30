@@ -142,6 +142,117 @@ void ConsoleReporter::suite_finished(std::string_view name, Summary const& summa
     _output << summary_text(name,summary) << '\n';
 }
 
+Context::~Context() noexcept {
+    if (!_work_directory) return;
+    bool preserve = false;
+    for (auto const& artifact : _result.artifacts) {
+        if (artifact.lifetime == ArtifactLifetime::KeepAlways ||
+            (artifact.lifetime == ArtifactLifetime::KeepOnFailure &&
+             _result.outcome != Outcome::Passed)) preserve = true;
+    }
+    if (!preserve) {
+        std::error_code error;
+        std::filesystem::remove_all(*_work_directory, error);
+    }
+}
+
+std::filesystem::path const& Context::work_directory() {
+    if (!_work_directory) {
+        auto const base = std::filesystem::temp_directory_path();
+        for (unsigned i=0; i<1000; ++i) {
+            auto candidate = base / ("ariadne-case-" +
+                std::to_string(reinterpret_cast<std::uintptr_t>(this)) + "-" +
+                std::to_string(i));
+            std::error_code error;
+            if (std::filesystem::create_directory(candidate, error)) {
+                _work_directory = std::move(candidate);
+                break;
+            }
+            if (error && error != std::errc::file_exists) {
+                throw std::filesystem::filesystem_error("create work directory",candidate,error);
+            }
+        }
+        if (!_work_directory) throw std::runtime_error("Cannot allocate isolated test directory");
+    }
+    return *_work_directory;
+}
+
+void Context::artifact(std::filesystem::path path, std::string label,
+                       std::string media_type, ArtifactKind kind,
+                       ArtifactLifetime lifetime,
+                       std::vector<std::pair<std::string,std::string>> metadata) {
+    if (path.empty() || label.empty())
+        throw std::invalid_argument("Artifact path and label must not be empty");
+    // Retention applies only to outputs owned by this Context.
+    if (lifetime != ArtifactLifetime::External) {
+        auto const root = std::filesystem::weakly_canonical(work_directory());
+        auto const target = std::filesystem::weakly_canonical(path);
+        auto relative = target.lexically_relative(root);
+        if (relative.empty() || relative == "." ||
+            *relative.begin() == "..")
+            throw std::invalid_argument("Managed artifacts must be inside the case directory");
+    }
+    _result.artifacts.push_back({std::move(path),std::move(label),
+        std::move(media_type),kind,lifetime,std::move(metadata)});
+}
+
+void Context::expect_file_exists(std::filesystem::path const& path,
+                                 std::string_view description,
+                                 std::source_location location) {
+    auto const index=begin_check(description);
+    std::error_code error;
+    bool const exists=std::filesystem::is_regular_file(path,error);
+    record(error ? Outcome::Error : exists ? Outcome::Passed : Outcome::Failed,
+           description,path.string(),"regular file",
+           error ? error.message() : exists ? "" : "file absent or not regular",
+           location,index);
+}
+
+void Context::expect_file_equal(std::filesystem::path const& actual,
+                                std::filesystem::path const& reference,
+                                std::string_view description,
+                                std::source_location location) {
+    auto const index=begin_check(description);
+    std::ifstream a(actual,std::ios::binary);
+    std::ifstream b(reference,std::ios::binary);
+    if (!a || !b) {
+        record(Outcome::Failed,description,actual.string(),reference.string(),
+               !a ? "cannot open actual file" : "cannot open reference file",location,index);
+        return;
+    }
+    std::size_t offset=0;
+    for (;;) {
+        int const x=a.get(),y=b.get();
+        if (x!=y) {
+            record(Outcome::Failed,description,actual.string(),reference.string(),
+                   "first differing byte offset="+std::to_string(offset),location,index);
+            return;
+        }
+        if (x==std::char_traits<char>::eof()) break;
+        ++offset;
+    }
+    record(Outcome::Passed,description,actual.string(),reference.string(),{},location,index);
+}
+
+void Context::expect_file_signature(std::filesystem::path const& actual,
+                                    std::string_view signature,
+                                    std::string_view description,
+                                    std::source_location location) {
+    auto const index=begin_check(description);
+    std::ifstream stream(actual,std::ios::binary);
+    if (!stream) {
+        record(Outcome::Failed,description,actual.string(),std::string(signature),
+               "cannot open actual file",location,index);
+        return;
+    }
+    std::string found(signature.size(),'\0');
+    stream.read(found.data(),static_cast<std::streamsize>(found.size()));
+    found.resize(static_cast<std::size_t>(stream.gcount()));
+    bool const equal=found==signature;
+    record(equal ? Outcome::Passed : Outcome::Failed,description,actual.string(),
+           "binary signature",equal ? "" : "signature mismatch",location,index);
+}
+
 Context::Scope::Scope(Context& context, std::string label, std::source_location location)
     : _context(&context), _depth(context.enter_scope(std::move(label), location)),
       _uncaught(std::uncaught_exceptions()) { }

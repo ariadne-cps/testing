@@ -153,3 +153,9 @@ They accept C++20 input ranges, count both sequences, and report the first
 difference with short value excerpts. Pairwise indeterminate evidence yields
 an Inconclusive check unless another pair definitely differs or counts differ.
 Parenthesize macro arguments containing commas, such as braced sequences.
+
+## Artifact files and golden references
+
+`Context::work_directory()` creates a temporary directory isolated to the running case. Use `Context::artifact(path, label, media_type, kind, lifetime)` to record artifacts and request retention; the default lifetime is `External`, which never changes an existing file. For managed outputs choose `Temporary`, `KeepOnFailure`, or `KeepAlways`; managed paths must be within the case directory.
+
+`expect_file_exists(path, description)`, `expect_file_equal(actual, reference, description)`, and `expect_file_signature(path, signature, description)` perform filesystem and binary checks, reporting missing files or the first differing byte offset. Golden files are read only, never overwritten; PNG interpretation belongs to consumers such as Rendering.

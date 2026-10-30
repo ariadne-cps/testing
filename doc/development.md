@@ -183,13 +183,13 @@ manually measures durations; numeric test files annotate frozen TSV cases.
 
 ### D06. External artifact and golden-regression support
 
-- [ ] Expose a generic test artifact reference (path, type, label and
+- [x] Expose a generic test artifact reference (path, type, label and
       lifetime) and a failure attachment/diff path; support isolated
       per-case temporary output directories and predictable cleanup.
-- [ ] Keep PNG decoding and pixel-exact comparison in Rendering's local
+- [x] Keep PNG decoding and pixel-exact comparison in Rendering's local
       adapters; Testing records artifact locations, differences and
       checksums/metadata, not a graphics dependency.
-- [ ] Support checks on output-file existence and content/signature,
+- [x] Support checks on output-file existence and content/signature,
       with useful diagnostics. Never auto-regenerate or overwrite golden
       references when a test fails.
 

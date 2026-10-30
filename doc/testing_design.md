@@ -549,3 +549,11 @@ without repeating expression evaluation. The underlying range comparison,
 evidence classification, mismatch reporting, and test case inventory are
 unchanged, except for additional regressions covering the capture modes.
 Verification by the new Windows CI run remains required.
+
+## 2026-10-30 — D06: generic artifacts and golden-regression files
+
+Added `ArtifactRecord` with path, label, media type, kind, lifetime and metadata. A Context can create a per-case isolated temporary directory with `work_directory()`, register references with `artifact()`, and check file existence, byte-for-byte content and binary signatures. Each file assertion announces CHECK before filesystem inspection. Byte comparison reports the offset of the first mismatch; the framework does not parse PNGs or regenerate golden references.
+
+Managed outputs must reside beneath the owned work directory. It is removed after the reporter has consumed the result unless a registered output specifies `KeepAlways` or `KeepOnFailure` on a non-passing case. External files are never deleted or written by cleanup. The framework cannot preserve outputs when the process terminates abnormally, and only the output-directory ownership is managed; arbitrary external files remain the caller's responsibility.
+
+Added `test_artifacts.cpp` covering a passing case cleanup, retained failure output, unchanged golden reference, missing file, unequal bytes and mismatched signature. Testing remains independent of rendering libraries and keeps no install rules.
