@@ -16,8 +16,8 @@ std::string_view outcome_name(Outcome result) {
         case Outcome::Inconclusive: return "INCONCLUSIVE";
         case Outcome::Skipped: return "SKIP";
         case Outcome::Error: return "ERROR";
+        default: return "UNKNOWN";
     }
-    return "UNKNOWN";
 }
 
 int priority(Outcome result) {
@@ -27,8 +27,8 @@ int priority(Outcome result) {
         case Outcome::Inconclusive: return 2;
         case Outcome::Failed: return 3;
         case Outcome::Error: return 4;
+        default: return 4;
     }
-    return 4;
 }
 
 std::string summary_text(std::string_view name, Summary const& summary) {
@@ -75,8 +75,8 @@ Outcome Context::outcome(Evidence value) {
         case Evidence::True: return Outcome::Passed;
         case Evidence::False: return Outcome::Failed;
         case Evidence::Indeterminate: return Outcome::Inconclusive;
+        default: return Outcome::Error;
     }
-    return Outcome::Error;
 }
 
 void Context::record(Outcome status, std::string_view description,
@@ -123,6 +123,10 @@ Summary Suite::run(Reporter& reporter) const {
             case Outcome::Inconclusive: ++summary.inconclusive; break;
             case Outcome::Skipped: ++summary.skipped; break;
             case Outcome::Error: ++summary.errors; break;
+            default:
+                ++summary.errors;
+                result.outcome = Outcome::Error;
+                break;
         }
         reporter.case_finished(result);
     }

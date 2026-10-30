@@ -97,3 +97,31 @@ framework under test.
 - No migration of the old `macro/testing.hpp` or other repositories attempted.
 
 Maintain this journal as a durable record of future decisions, not only a roadmap.
+
+## 2026-10-30 — Resolve GCC 12 -Wswitch-default CI failure
+
+### Observation
+
+The Ubuntu Release job with GCC 12 and `WARNINGS_AS_ERRORS=ON` rejected
+four exhaustive enum `switch` statements in `src/testing.cpp` because the
+project enables `-Wswitch-default`. This warning requires an explicit
+`default` branch even when all declared enumerators are covered.
+
+### Resolution
+
+Add a `default` arm to each of `outcome_name`, `priority`,
+`Context::outcome`, and the outcome aggregation in `Suite::run`.
+Retain the former fallback semantics: unsupported names print `UNKNOWN`,
+unsupported priorities receive error severity, invalid mathematical evidence
+becomes `Error`, and invalid case outcomes are counted as errors and normalized
+to `Outcome::Error` before reporting. Do not suppress warnings or relax
+`-Werror`.
+
+### Verification
+
+Recompiled `src/testing.cpp` and `tests/test_testing.cpp` in local Release
+(`-O3 -DNDEBUG`) and Debug (`-O0 -g`) configurations with GCC 14 and
+all project warning flags, including `-Wswitch-default -Werror`. Both
+self-test executions passed. These local checks used a minimal logger stub;
+they do **not** establish that the full GitHub Actions matrix, GCC 12, or
+integration with the real Logging submodule has passed. Check CI for those.
