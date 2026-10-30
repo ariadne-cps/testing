@@ -31,7 +31,7 @@
 #include <sstream>
 
 
-namespace Ariadne::Testing {
+namespace Ariadne {
 namespace {
 
 std::string_view outcome_name(Outcome result) {
@@ -397,4 +397,4 @@ Summary Suite::run(Reporter& reporter) const {
     return summary;
 }
 
-} // namespace Ariadne::Testing
+} // namespace Ariadne

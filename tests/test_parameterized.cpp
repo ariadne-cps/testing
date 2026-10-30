@@ -33,7 +33,7 @@
 #include <utility>
 #include <vector>
 
-using namespace Ariadne::Testing;
+using namespace Ariadne;
 
 struct CaptureReporter final : Reporter {
     std::vector<CaseResult> results;

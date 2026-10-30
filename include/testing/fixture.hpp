@@ -33,7 +33,7 @@
 #include <string_view>
 #include <type_traits>
 
-namespace Ariadne::Testing {
+namespace Ariadne {
 
 // Each test case constructs its own fixture with a valid Context reference.
 class ContextFixture {
@@ -55,7 +55,7 @@ void add_fixture_test(Suite& suite, std::string_view method_name,
                       void (Fixture::*method)(),
                       FixtureCheck check = FixtureCheck::Direct) {
     static_assert(std::is_constructible_v<Fixture, Context&>,
-                  "Fixture must be constructible from Ariadne::Testing::Context&");
+                  "Fixture must be constructible from Ariadne::Context&");
     // Display "map_get" for a method named "test_map_get".
     if (method_name.starts_with("test_")) method_name.remove_prefix(5);
     suite.add(std::string(method_name), [method, check](Context& context) {
@@ -74,18 +74,18 @@ inline int run_suite(Suite const& suite, std::ostream& output = std::cout) {
     return suite.run(reporter).successful() ? 0 : 1;
 }
 
-} // namespace Ariadne::Testing
+} // namespace Ariadne
 
 // Only the name/stringification is a macro; semantics are type-checked C++.
 #define ARIADNE_ADD_TEST_TO(suite, Fixture, method) \
-    ::Ariadne::Testing::add_fixture_test<Fixture>((suite), #method, &Fixture::method)
+    ::Ariadne::add_fixture_test<Fixture>((suite), #method, &Fixture::method)
 
 #define ARIADNE_ADD_TEST_NO_THROW_TO(suite, Fixture, method) \
-    ::Ariadne::Testing::add_fixture_test<Fixture>((suite), #method, &Fixture::method, \
-        ::Ariadne::Testing::FixtureCheck::NoThrow)
+    ::Ariadne::add_fixture_test<Fixture>((suite), #method, &Fixture::method, \
+        ::Ariadne::FixtureCheck::NoThrow)
 
 // Conventional single-suite main; explicit *_TO supports multiple suites.
-#define ARIADNE_TEST_SUITE(name) ::Ariadne::Testing::Suite ariadne_test_suite(name)
+#define ARIADNE_TEST_SUITE(name) ::Ariadne::Suite ariadne_test_suite(name)
 
 #define ARIADNE_ADD_TEST(Fixture, method) \
     ARIADNE_ADD_TEST_TO(ariadne_test_suite, Fixture, method)
@@ -93,6 +93,6 @@ inline int run_suite(Suite const& suite, std::ostream& output = std::cout) {
 #define ARIADNE_ADD_TEST_NO_THROW(Fixture, method) \
     ARIADNE_ADD_TEST_NO_THROW_TO(ariadne_test_suite, Fixture, method)
 
-#define ARIADNE_RUN_TESTS() ::Ariadne::Testing::run_suite(ariadne_test_suite)
+#define ARIADNE_RUN_TESTS() ::Ariadne::run_suite(ariadne_test_suite)
 
 #endif // ARIADNE_TESTING_FIXTURE_HPP

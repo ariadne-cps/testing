@@ -40,11 +40,11 @@ installed: consumers compile/link it from source for their test targets.
 #include <iostream>
 
 int main() {
-    Ariadne::Testing::Suite suite("arithmetic");
-    suite.add("integer identity", [](Ariadne::Testing::Context& t) {
+    Ariadne::Suite suite("arithmetic");
+    suite.add("integer identity", [](Ariadne::Context& t) {
         t.expect_equal(1 + 1, 2, "one plus one");
     });
-    Ariadne::Testing::ConsoleReporter reporter(std::cout);
+    Ariadne::ConsoleReporter reporter(std::cout);
     return suite.run(reporter).successful() ? 0 : 1;
 }
 ```
@@ -162,4 +162,4 @@ Parenthesize macro arguments containing commas, such as braced sequences.
 
 ## Restoring mutable test state
 
-Use `auto guard = Ariadne::Testing::preserve_value(setting);` for copyable state with non-throwing assignment. For global or domain-specific state, use `preserve_state(getter, restorer)`: the getter snapshots the original value once, and the `noexcept` restorer runs at scope exit, including exception unwinding or a failed fatal prerequisite. Guards are non-copyable and non-movable, and nested guards restore in reverse order. No global state is modified automatically.
+Use `auto guard = Ariadne::preserve_value(setting);` for copyable state with non-throwing assignment. For global or domain-specific state, use `preserve_state(getter, restorer)`: the getter snapshots the original value once, and the `noexcept` restorer runs at scope exit, including exception unwinding or a failed fatal prerequisite. Guards are non-copyable and non-movable, and nested guards restore in reverse order. No global state is modified automatically.

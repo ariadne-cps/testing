@@ -36,7 +36,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace Ariadne::Testing {
+namespace Ariadne {
 
 // A display-name prefix for a variant: implementation, precision, or paradigm.
 // There are no nested counters: each (variant, case) is one Suite case.
@@ -138,7 +138,7 @@ auto fixture_variant(Suite& suite, std::string name) {
                                      [](Context& context) { return Fixture(context); });
 }
 
-} // namespace Ariadne::Testing
+} // namespace Ariadne
 
 // Only stringify the method name; member access is checked by the compiler.
 // The variant group already knows the fixture type, so it is not repeated.
@@ -147,6 +147,6 @@ auto fixture_variant(Suite& suite, std::string name) {
 
 #define ARIADNE_ADD_VARIANT_TEST_NO_THROW(group, method) \
     (group).add(#method, [](auto& fixture) { fixture.method(); }, \
-                ::Ariadne::Testing::FixtureCheck::NoThrow)
+                ::Ariadne::FixtureCheck::NoThrow)
 
 #endif // ARIADNE_TESTING_PARAMETERIZED_HPP

@@ -50,7 +50,7 @@
 #include <utility>
 #include <vector>
 
-namespace Ariadne::Testing {
+namespace Ariadne {
 
 enum class Evidence { False, True, Indeterminate };
 enum class Outcome { Passed, Failed, Inconclusive, Skipped, Error };
@@ -867,6 +867,6 @@ class Suite {
     std::vector<TestCase> _tests;
 };
 
-} // namespace Ariadne::Testing
+} // namespace Ariadne
 
 #endif // ARIADNE_TESTING_TESTING_HPP

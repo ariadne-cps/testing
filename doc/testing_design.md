@@ -641,3 +641,13 @@ No framework source, fixture semantics or CMake coverage scope changed.
 The expected effect is improved source-level line/branch coverage in
 `parameterized.hpp`, but the numerical delta must be confirmed from
 a new official coverage report for the published commit.
+
+## 2026-10-30 — Public namespace flattened to Ariadne
+
+The public and implementation C++ namespace is now `Ariadne`, rather than
+`Ariadne::Testing`. All check macros, fixture/parameterized helpers, state
+guards, built-in reporters, library self-tests and README examples use the
+new namespace. No compatibility alias to the removed namespace is provided;
+this is an intentional source-level API break. The `ariadne-testing` CMake
+target, file paths and the build-tree-only/no-install boundary stay unchanged.
+Utility updates its nine test executables and pinned Testing gitlink separately.

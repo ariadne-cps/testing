@@ -34,7 +34,7 @@
 #include <string>
 #include <vector>
 
-using namespace Ariadne::Testing;
+using namespace Ariadne;
 
 namespace TestLogic {
 
@@ -462,7 +462,7 @@ int main() {
         ARIADNE_ADD_TEST(CompactFixture, test_compact);
         ARIADNE_ADD_TEST_NO_THROW(CompactFixture, test_no_throw);
         std::ostringstream compact_output;
-        if (::Ariadne::Testing::run_suite(ariadne_test_suite, compact_output) != 0) return 77;
+        if (::Ariadne::run_suite(ariadne_test_suite, compact_output) != 0) return 77;
         if (compact_output.str().find("[PASS] compact") == std::string::npos) return 78;
 
         // Preserve the conventional registration above, and separately verify

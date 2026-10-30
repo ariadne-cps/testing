@@ -4,7 +4,7 @@
 #include <string>
 #include <iterator>
 
-using namespace Ariadne::Testing;
+using namespace Ariadne;
 
 struct Capture : Reporter {
     std::vector<CaseResult> cases;
