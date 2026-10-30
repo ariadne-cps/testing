@@ -42,6 +42,17 @@ std::string summary_text(std::string_view name, Summary const& summary) {
 
 ConsoleReporter::ConsoleReporter(std::ostream& output) : _output(output) { }
 
+void ConsoleReporter::case_started(CaseResult const& result) {
+    _output << "[RUN " << result.case_index << '/' << result.case_total << "] "
+            << result.suite_name << " / " << result.name << '\n' << std::flush;
+}
+
+void ConsoleReporter::check_started(CaseResult const& result, std::size_t index,
+                                    std::string_view description) {
+    _output << "[CHECK " << result.case_index << '.' << index << "] "
+            << description << '\n' << std::flush;
+}
+
 void ConsoleReporter::case_finished(CaseResult const& result) {
     _output << '[' << outcome_name(result.outcome) << "] " << result.name << '\n';
     if (result.outcome == Outcome::Passed) return;
@@ -68,16 +79,23 @@ Outcome Context::outcome(Evidence value) {
     }
 }
 
+std::size_t Context::begin_check(std::string_view description) {
+    auto const index = ++_check_count;
+    if (_reporter) _reporter->check_started(_result, index, description);
+    return index;
+}
+
 void Context::record(Outcome status, std::string_view description,
                      std::string actual, std::string expected, std::string detail,
-                     std::source_location location) {
+                     std::source_location location, std::size_t index) {
     _result.assertions.push_back({status, std::string(description), std::move(actual),
-        std::move(expected), std::move(detail), location.file_name(), location.line()});
+        std::move(expected), std::move(detail), location.file_name(), location.line(), index});
     if (priority(status) > priority(_result.outcome)) _result.outcome = status;
 }
 
 void Context::skip(std::string_view reason, std::source_location location) {
-    record(Outcome::Skipped, reason, {}, {}, {}, location);
+    auto const index = begin_check(reason);
+    record(Outcome::Skipped, reason, {}, {}, {}, location, index);
 }
 
 void Suite::add(std::string name, std::function<void(Context&)> test) {
@@ -87,24 +105,29 @@ void Suite::add(std::string name, std::function<void(Context&)> test) {
 
 Summary Suite::run(Reporter& reporter) const {
     Summary summary;
-    for (auto const& test : _tests) {
+    for (std::size_t i = 0; i < _tests.size(); ++i) {
+        auto const& test = _tests[i];
         CaseResult result;
         result.name = test.name;
-        Context context(result);
+        result.suite_name = _name;
+        result.case_index = i + 1;
+        result.case_total = _tests.size();
+        Context context(result, &reporter);
+        reporter.case_started(result);
         auto const started = std::chrono::steady_clock::now();
         try {
             test.run(context);
         } catch (std::exception const& exception) {
             context.record(Outcome::Error, "Unhandled std::exception", {}, {}, exception.what(),
-                           std::source_location::current());
+                           std::source_location::current(), 0);
         } catch (...) {
             context.record(Outcome::Error, "Unhandled non-standard exception", {}, {}, {},
-                           std::source_location::current());
+                           std::source_location::current(), 0);
         }
         result.duration = std::chrono::steady_clock::now() - started;
         if (result.assertions.empty()) {
             context.record(Outcome::Skipped, "No assertions recorded", {}, {}, {},
-                           std::source_location::current());
+                           std::source_location::current(), 0);
         }
         switch (result.outcome) {
             case Outcome::Passed: ++summary.passed; break;

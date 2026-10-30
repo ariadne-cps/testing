@@ -28,6 +28,7 @@ struct AssertionRecord {
     std::string detail;
     std::string file;
     std::uint_least32_t line;
+    std::size_t check_index = 0;
 };
 
 struct CaseResult {
@@ -35,6 +36,9 @@ struct CaseResult {
     Outcome outcome = Outcome::Passed;
     std::vector<AssertionRecord> assertions;
     std::chrono::nanoseconds duration{};
+    std::string suite_name;
+    std::size_t case_index = 0;
+    std::size_t case_total = 0;
 };
 
 struct Summary {
@@ -49,6 +53,9 @@ struct Summary {
 class Reporter {
   public:
     virtual ~Reporter() = default;
+    // Optional lifecycle notifications, compatible with existing reporters.
+    virtual void case_started(CaseResult const&) { }
+    virtual void check_started(CaseResult const&, std::size_t, std::string_view) { }
     virtual void case_finished(CaseResult const& result) = 0;
     virtual void suite_finished(std::string_view name, Summary const& summary) = 0;
 };
@@ -56,6 +63,9 @@ class Reporter {
 class ConsoleReporter final : public Reporter {
   public:
     explicit ConsoleReporter(std::ostream& output);
+    void case_started(CaseResult const& result) override;
+    void check_started(CaseResult const& result, std::size_t index,
+                       std::string_view description) override;
     void case_finished(CaseResult const& result) override;
     void suite_finished(std::string_view name, Summary const& summary) override;
   private:
@@ -105,18 +115,21 @@ auto magnitude(T const& value) {
 
 class Context {
   public:
-    explicit Context(CaseResult& result) : _result(result) { }
+    explicit Context(CaseResult& result, Reporter* reporter = nullptr)
+        : _result(result), _reporter(reporter) { }
 
     template<class T>
     void prove(T const& predicate, std::string_view description,
                std::source_location location = std::source_location::current()) {
-        record(outcome(detail::evidence(predicate)), description, {}, {}, {}, location);
+        auto const index = begin_check(description);
+        record(outcome(detail::evidence(predicate)), description, {}, {}, {}, location, index);
     }
 
     template<class A, class B>
     void expect_equal(A const& actual, B const& expected,
                       std::string_view description = "equality",
                       std::source_location location = std::source_location::current()) {
+        auto const index = begin_check(description);
         auto const verdict = [&]() {
             using Actual = std::remove_cvref_t<A>;
             using Expected = std::remove_cvref_t<B>;
@@ -128,56 +141,70 @@ class Context {
             }
         }();
         record(outcome(verdict), description,
-               detail::render(actual), detail::render(expected), {}, location);
+               detail::render(actual), detail::render(expected), {}, location, index);
     }
 
     template<class A, class B>
     void expect_same(A const& actual, B const& expected,
                      std::string_view description = "identity",
                      std::source_location location = std::source_location::current()) {
+        auto const index = begin_check(description);
         auto const relation = same(actual, expected); // ADL: supplied by numerical domain
         record(outcome(detail::evidence(relation)), description,
-               detail::render(actual), detail::render(expected), {}, location);
+               detail::render(actual), detail::render(expected), {}, location, index);
     }
 
     template<class A, class B, class Tolerance>
     void expect_within(A const& actual, B const& expected, Tolerance const& tolerance,
                        std::string_view description = "bounded error",
                        std::source_location location = std::source_location::current()) {
+        auto const index = begin_check(description);
         auto const error = detail::magnitude(actual - expected);
         auto const relation = (error <= tolerance);
         record(outcome(detail::evidence(relation)), description,
                detail::render(actual), detail::render(expected),
-               "error=" + detail::render(error) + ", tolerance=" + detail::render(tolerance), location);
+               "error=" + detail::render(error) + ", tolerance=" + detail::render(tolerance), location, index);
     }
 
     template<class Exception, class Callable>
     void expect_throws(Callable&& action, std::string_view description = "expected exception",
                        std::source_location location = std::source_location::current()) {
+        auto const index = begin_check(description);
         try { std::invoke(std::forward<Callable>(action)); }
-        catch (Exception const&) { record(Outcome::Passed, description, {}, {}, {}, location); return; }
+        catch (Exception const&) { record(Outcome::Passed, description, {}, {}, {}, location, index); return; }
         catch (std::exception const& e) {
-            record(Outcome::Failed, description, {}, {}, std::string("unexpected exception: ") + e.what(), location); return;
+            record(Outcome::Failed, description, {}, {}, std::string("unexpected exception: ") + e.what(), location, index); return;
         }
-        catch (...) { record(Outcome::Failed, description, {}, {}, "unexpected exception type", location); return; }
-        record(Outcome::Failed, description, {}, {}, "no exception thrown", location);
+        catch (...) { record(Outcome::Failed, description, {}, {}, "unexpected exception type", location, index); return; }
+        record(Outcome::Failed, description, {}, {}, "no exception thrown", location, index);
     }
     template<class Callable>
     void expect_exception(Callable&& action, std::string_view description = "exception expected",
                           std::source_location location = std::source_location::current()) {
+        auto const index = begin_check(description);
         try { std::invoke(std::forward<Callable>(action)); }
-        catch (...) { record(Outcome::Passed, description, {}, {}, {}, location); return; }
-        record(Outcome::Failed, description, {}, {}, "no exception thrown", location);
+        catch (...) { record(Outcome::Passed, description, {}, {}, {}, location, index); return; }
+        record(Outcome::Failed, description, {}, {}, "no exception thrown", location, index);
     }
     template<class Callable>
     void expect_no_throw(Callable&& action, std::string_view description = "no exception expected",
                          std::source_location location = std::source_location::current()) {
+        auto const index = begin_check(description);
         try { std::invoke(std::forward<Callable>(action)); }
         catch (std::exception const& e) {
-            record(Outcome::Failed, description, {}, {}, e.what(), location); return;
+            record(Outcome::Failed, description, {}, {}, e.what(), location, index); return;
         }
-        catch (...) { record(Outcome::Failed, description, {}, {}, "unexpected exception", location); return; }
-        record(Outcome::Passed, description, {}, {}, {}, location);
+        catch (...) { record(Outcome::Failed, description, {}, {}, "unexpected exception", location, index); return; }
+        record(Outcome::Passed, description, {}, {}, {}, location, index);
+    }
+
+    // Deferred checker: emit progress before evaluating its potentially costly predicate.
+    template<class Callable>
+    void check(Callable&& predicate, std::string_view description,
+               std::source_location location = std::source_location::current()) {
+        auto const index = begin_check(description);
+        auto const value = std::invoke(std::forward<Callable>(predicate));
+        record(outcome(detail::evidence(value)), description, {}, {}, {}, location, index);
     }
 
     void skip(std::string_view reason,
@@ -186,9 +213,13 @@ class Context {
   private:
     friend class Suite;
     static Outcome outcome(Evidence value);
+    std::size_t begin_check(std::string_view description);
     void record(Outcome outcome, std::string_view description, std::string actual,
-                std::string expected, std::string detail, std::source_location location);
+                std::string expected, std::string detail, std::source_location location,
+                std::size_t index);
     CaseResult& _result;
+    Reporter* _reporter;
+    std::size_t _check_count = 0;
 };
 
 class Suite {
