@@ -124,4 +124,31 @@
         [&]() -> decltype(auto) { return (right); }, \
         "not " #predicate "(" #left ", " #right ")", true)
 
+
+// Evidence expectations express distinct test intentions. The proof form
+// deliberately retains Inconclusive when the result is indeterminate.
+#define ARIADNE_EXPECT_DEFINITELY(context, expression) \
+    (context).expect_evidence( \
+        [&]() -> decltype(auto) { return (expression); }, \
+        ::Ariadne::Testing::EvidenceExpectation::DefinitelyTrue, \
+        "definitely(" #expression ")")
+
+#define ARIADNE_EXPECT_POSSIBLY(context, expression) \
+    (context).expect_evidence( \
+        [&]() -> decltype(auto) { return (expression); }, \
+        ::Ariadne::Testing::EvidenceExpectation::PossiblyTrue, \
+        "possibly(" #expression ")")
+
+#define ARIADNE_EXPECT_DEFINITELY_FALSE(context, expression) \
+    (context).expect_evidence( \
+        [&]() -> decltype(auto) { return (expression); }, \
+        ::Ariadne::Testing::EvidenceExpectation::DefinitelyFalse, \
+        "definitely false(" #expression ")")
+
+#define ARIADNE_EXPECT_INDETERMINATE(context, expression) \
+    (context).expect_evidence( \
+        [&]() -> decltype(auto) { return (expression); }, \
+        ::Ariadne::Testing::EvidenceExpectation::Indeterminate, \
+        "indeterminate(" #expression ")")
+
 #endif // ARIADNE_TESTING_CHECKS_HPP

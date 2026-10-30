@@ -271,5 +271,41 @@ int main() {
     ConsoleReporter live_relation_reporter(live_comparisons);
     if (!evaluation.run(live_relation_reporter).successful() || order != 5) return 46;
     if (live_comparisons.str().find("[CHECK 1.2] ordered predicate") == std::string::npos) return 47;
+    // D02: an expected indeterminate value must not become an inconclusive test.
+    Suite expectations("evidence expectations");
+    CaptureReporter expected_capture;
+    expectations.add("exact expectations", [](Context& t) {
+        ARIADNE_EXPECT_DEFINITELY(t, TestLogic::Truth::True);
+        ARIADNE_EXPECT_POSSIBLY(t, TestLogic::Truth::True);
+        ARIADNE_EXPECT_POSSIBLY(t, TestLogic::Truth::Indeterminate);
+        ARIADNE_EXPECT_DEFINITELY_FALSE(t, TestLogic::Truth::False);
+        ARIADNE_EXPECT_INDETERMINATE(t, TestLogic::Truth::Indeterminate);
+    });
+    expectations.add("failed and inconclusive proof", [](Context& t) {
+        ARIADNE_EXPECT_DEFINITELY(t, TestLogic::Truth::False);
+        ARIADNE_EXPECT_DEFINITELY(t, TestLogic::Truth::Indeterminate);
+    });
+    expectations.add("inconclusive refutation", [](Context& t) {
+        ARIADNE_EXPECT_DEFINITELY_FALSE(t, TestLogic::Truth::Indeterminate);
+    });
+    expectations.add("false possibility and wrong expectation", [](Context& t) {
+        ARIADNE_EXPECT_POSSIBLY(t, TestLogic::Truth::False);
+        ARIADNE_EXPECT_INDETERMINATE(t, TestLogic::Truth::True);
+    });
+    auto const expected_sum = expectations.run(expected_capture);
+    if (expected_sum.passed != 1 || expected_sum.failed != 2 ||
+        expected_sum.inconclusive != 1 || expected_sum.errors != 0) return 48;
+    if (expected_capture.results.size() != 4) return 49;
+    auto const& evidence_pass = expected_capture.results[0].assertions;
+    if (evidence_pass.size() != 5) return 50;
+    for (auto const& assertion : evidence_pass)
+        if (assertion.outcome != Outcome::Passed) return 51;
+    if (evidence_pass[2].actual != "indeterminate" ||
+        evidence_pass[2].expected != "possibly true") return 52;
+    if (expected_capture.results[1].assertions[1].outcome != Outcome::Inconclusive)
+        return 53;
+    if (expected_capture.results[2].assertions[0].outcome != Outcome::Inconclusive)
+        return 54;
+    if (expected_capture.results[3].assertions[0].actual != "false") return 55;
     return 0;
 }

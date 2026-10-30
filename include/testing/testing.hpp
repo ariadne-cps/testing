@@ -48,6 +48,9 @@ enum class Outcome { Passed, Failed, Inconclusive, Skipped, Error };
 // The relation is selected at compile time; predicate evidence stays three-valued.
 enum class Comparison { NotEqual, Less, LessEqual, Greater, GreaterEqual };
 
+// Desired evidence, not an algorithm's return code or an operational outcome.
+enum class EvidenceExpectation { DefinitelyTrue, PossiblyTrue, DefinitelyFalse, Indeterminate };
+
 struct AssertionRecord {
     Outcome outcome;
     std::string description;
@@ -161,6 +164,54 @@ class Context {
                std::source_location location = std::source_location::current()) {
         auto const index = begin_check(description);
         record(outcome(detail::evidence(predicate)), description, {}, {}, {}, location, index);
+    }
+
+    // Test a specified mathematical evidence classification. A deliberately
+    // expected indeterminate result is a passing test, not a proven statement.
+    template<class PredicateFn>
+    void expect_evidence(PredicateFn&& predicate_fn, EvidenceExpectation expected,
+                         std::string_view description,
+                         std::source_location location = std::source_location::current()) {
+        auto const index = begin_check(description);
+        auto const actual = detail::evidence(std::invoke(std::forward<PredicateFn>(predicate_fn)));
+        Outcome status = Outcome::Failed;
+        switch (expected) {
+            case EvidenceExpectation::DefinitelyTrue:
+                status = outcome(actual);
+                break;
+            case EvidenceExpectation::PossiblyTrue:
+                status = actual == Evidence::False ? Outcome::Failed : Outcome::Passed;
+                break;
+            case EvidenceExpectation::DefinitelyFalse:
+                status = actual == Evidence::False ? Outcome::Passed
+                       : actual == Evidence::Indeterminate ? Outcome::Inconclusive : Outcome::Failed;
+                break;
+            case EvidenceExpectation::Indeterminate:
+                status = actual == Evidence::Indeterminate ? Outcome::Passed : Outcome::Failed;
+                break;
+            default:
+                status = Outcome::Error;
+                break;
+        }
+        auto const evidence_name = [](Evidence value) -> std::string {
+            switch (value) {
+                case Evidence::True: return "true";
+                case Evidence::False: return "false";
+                case Evidence::Indeterminate: return "indeterminate";
+                default: return "invalid";
+            }
+        };
+        auto const expected_name = [](EvidenceExpectation value) -> std::string {
+            switch (value) {
+                case EvidenceExpectation::DefinitelyTrue: return "definitely true";
+                case EvidenceExpectation::PossiblyTrue: return "possibly true";
+                case EvidenceExpectation::DefinitelyFalse: return "definitely false";
+                case EvidenceExpectation::Indeterminate: return "indeterminate";
+                default: return "invalid";
+            }
+        };
+        record(status, description, evidence_name(actual), expected_name(expected),
+               {}, location, index);
     }
 
     // Deferred operands: emit CHECK before evaluating each expression once.
