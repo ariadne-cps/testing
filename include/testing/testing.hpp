@@ -45,6 +45,9 @@ namespace Ariadne::Testing {
 enum class Evidence { False, True, Indeterminate };
 enum class Outcome { Passed, Failed, Inconclusive, Skipped, Error };
 
+// The relation is selected at compile time; predicate evidence stays three-valued.
+enum class Comparison { NotEqual, Less, LessEqual, Greater, GreaterEqual };
+
 struct AssertionRecord {
     Outcome outcome;
     std::string description;
@@ -115,6 +118,16 @@ Evidence evidence(T const& value) {
     }
 }
 
+// Negating a proof must not turn uncertainty into a boolean success.
+inline Evidence negate(Evidence value) {
+    switch (value) {
+        case Evidence::True: return Evidence::False;
+        case Evidence::False: return Evidence::True;
+        case Evidence::Indeterminate: return Evidence::Indeterminate;
+        default: throw std::logic_error("Invalid mathematical evidence");
+    }
+}
+
 template<class T>
 std::string render(T const& value) {
     if constexpr (requires(std::ostream& os) { os << value; }) {
@@ -170,6 +183,67 @@ class Context {
         }();
         record(outcome(verdict), description,
                detail::render(actual), detail::render(expected), {}, location, index);
+    }
+
+    // Each relation is selected at compile time and evaluates its operands once,
+    // left-to-right, after the live CHECK notification.
+    template<Comparison Relation, class ActualFn, class ExpectedFn>
+    void check_compare(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
+                       std::string_view description,
+                       std::source_location location = std::source_location::current()) {
+        auto const index = begin_check(description);
+        decltype(auto) actual = std::invoke(std::forward<ActualFn>(actual_fn));
+        decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
+        using A = std::remove_cvref_t<decltype(actual)>;
+        using B = std::remove_cvref_t<decltype(expected)>;
+        constexpr bool built_in_integers =
+            std::is_integral_v<A> && std::is_integral_v<B>
+            && !std::is_same_v<A,bool> && !std::is_same_v<B,bool>;
+        auto const verdict = [&]() -> Evidence {
+            if constexpr (Relation == Comparison::NotEqual) {
+                if constexpr (built_in_integers) return detail::evidence(!std::cmp_equal(actual, expected));
+                else return detail::evidence(actual != expected);
+            } else if constexpr (Relation == Comparison::Less) {
+                if constexpr (built_in_integers) return detail::evidence(std::cmp_less(actual, expected));
+                else return detail::evidence(actual < expected);
+            } else if constexpr (Relation == Comparison::LessEqual) {
+                if constexpr (built_in_integers) return detail::evidence(std::cmp_less_equal(actual, expected));
+                else return detail::evidence(actual <= expected);
+            } else if constexpr (Relation == Comparison::Greater) {
+                if constexpr (built_in_integers) return detail::evidence(std::cmp_greater(actual, expected));
+                else return detail::evidence(actual > expected);
+            } else {
+                static_assert(Relation == Comparison::GreaterEqual);
+                if constexpr (built_in_integers) return detail::evidence(std::cmp_greater_equal(actual, expected));
+                else return detail::evidence(actual >= expected);
+            }
+        }();
+        record(outcome(verdict), description,
+               detail::render(actual), detail::render(expected), {}, location, index);
+    }
+
+    template<class Predicate, class OperandFn>
+    void check_unary(Predicate&& predicate, OperandFn&& operand_fn,
+                     std::string_view description, bool negate = false,
+                     std::source_location location = std::source_location::current()) {
+        auto const index = begin_check(description);
+        decltype(auto) operand = std::invoke(std::forward<OperandFn>(operand_fn));
+        auto verdict = detail::evidence(std::invoke(std::forward<Predicate>(predicate), operand));
+        if (negate) verdict = detail::negate(verdict);
+        record(outcome(verdict), description, detail::render(operand), {}, {}, location, index);
+    }
+
+    template<class Predicate, class LeftFn, class RightFn>
+    void check_binary(Predicate&& predicate, LeftFn&& left_fn, RightFn&& right_fn,
+                      std::string_view description, bool negate = false,
+                      std::source_location location = std::source_location::current()) {
+        auto const index = begin_check(description);
+        decltype(auto) left = std::invoke(std::forward<LeftFn>(left_fn));
+        decltype(auto) right = std::invoke(std::forward<RightFn>(right_fn));
+        auto verdict = detail::evidence(std::invoke(std::forward<Predicate>(predicate), left, right));
+        if (negate) verdict = detail::negate(verdict);
+        record(outcome(verdict), description,
+               detail::render(left), detail::render(right), {}, location, index);
     }
 
     template<class A, class B>

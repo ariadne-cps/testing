@@ -44,6 +44,16 @@ struct Value { int value; };
 Truth operator==(Value a, Value b) { return a.value == b.value ? Truth::True : Truth::False; }
 Truth same(Value a, Value b) { return a == b; }
 
+Truth ordered(Value a, Value b) {
+    if (a.value == 0 || b.value == 0) return Truth::Indeterminate;
+    return a.value < b.value ? Truth::True : Truth::False;
+}
+Truth positive(Value v) {
+    if (v.value == 0) return Truth::Indeterminate;
+    return v.value > 0 ? Truth::True : Truth::False;
+}
+Truth operator<(Value a, Value b) { return ordered(a,b); }
+
 } // namespace TestLogic
 
 struct CaptureReporter final : Reporter {
@@ -190,5 +200,76 @@ int main() {
     });
     ConsoleReporter ordering_reporter(ordering_output);
     if (!ordering.run(ordering_reporter).successful()) return 38;
+    // D01: relational comparisons preserve built-in signedness and ADL evidence.
+    Suite relations("relations");
+    CaptureReporter relation_capture;
+    relations.add("built-in relations", [](Context& t) {
+        ARIADNE_EXPECT_NOT_EQUAL(t, -1, static_cast<std::size_t>(-1));
+        ARIADNE_EXPECT_LESS(t, -1, 0u);
+        ARIADNE_EXPECT_LESS_EQUAL(t, -1, 0u);
+        ARIADNE_EXPECT_GREATER(t, 0u, -1);
+        ARIADNE_EXPECT_GREATER_EQUAL(t, 0u, -1);
+        ARIADNE_EXPECT_LESS(t, 7u, 9);
+        ARIADNE_EXPECT_GREATER_EQUAL(t, 9u, 9);
+    });
+    relations.add("generic ADL", [](Context& t) {
+        ARIADNE_EXPECT_BINARY_PREDICATE(t, ordered, TestLogic::Value{1}, TestLogic::Value{2});
+        ARIADNE_EXPECT_NOT_BINARY_PREDICATE(t, ordered, TestLogic::Value{2}, TestLogic::Value{1});
+        ARIADNE_EXPECT_UNARY_PREDICATE(t, positive, TestLogic::Value{3});
+        ARIADNE_EXPECT_NOT_UNARY_PREDICATE(t, positive, TestLogic::Value{-3});
+        ARIADNE_EXPECT_LESS(t, TestLogic::Value{1}, TestLogic::Value{2});
+    });
+    relations.add("indeterminate remains indeterminate", [](Context& t) {
+        ARIADNE_EXPECT_BINARY_PREDICATE(t, ordered, TestLogic::Value{0}, TestLogic::Value{1});
+        ARIADNE_EXPECT_NOT_BINARY_PREDICATE(t, ordered, TestLogic::Value{0}, TestLogic::Value{1});
+        ARIADNE_EXPECT_UNARY_PREDICATE(t, positive, TestLogic::Value{0});
+        ARIADNE_EXPECT_NOT_UNARY_PREDICATE(t, positive, TestLogic::Value{0});
+        ARIADNE_EXPECT_LESS(t, TestLogic::Value{0}, TestLogic::Value{1});
+    });
+    relations.add("failed relation keeps operands", [](Context& t) {
+        ARIADNE_EXPECT_LESS(t, 5, 3);
+        ARIADNE_EXPECT_NOT_BINARY_PREDICATE(t, ordered, TestLogic::Value{1}, TestLogic::Value{2});
+    });
+    auto const relation_summary = relations.run(relation_capture);
+    if (relation_summary.passed != 2 || relation_summary.inconclusive != 1 ||
+        relation_summary.failed != 1 || relation_summary.errors != 0) return 40;
+    if (relation_capture.results.size() != 4) return 41;
+    auto const& indeterminate = relation_capture.results[2];
+    if (indeterminate.assertions.size() != 5) return 42;
+    for (auto const& assertion : indeterminate.assertions)
+        if (assertion.outcome != Outcome::Inconclusive) return 43;
+    auto const& failures = relation_capture.results[3].assertions;
+    if (failures.size() != 2 || failures[0].actual != "5" ||
+        failures[0].expected != "3" || failures[0].description != "5 < 3") return 44;
+    if (failures[1].description.find("not ordered(") != 0 ||
+        failures[1].outcome != Outcome::Failed) return 45;
+
+    Suite evaluation("single evaluation");
+    std::ostringstream live_comparisons;
+    int order = 0;
+    evaluation.add("left, right, predicate", [&](Context& t) {
+        ARIADNE_EXPECT_LESS(t, ([&] {
+            if (order++ != 0 || live_comparisons.str().find("[CHECK 1.1]") == std::string::npos)
+                throw std::logic_error("left operand evaluated before CHECK");
+            return 1;
+        }()), ([&] {
+            if (order++ != 1) throw std::logic_error("wrong operand order");
+            return 2;
+        }()));
+        t.check_binary([&](int left, int right) {
+            if (order++ != 4) throw std::logic_error("predicate timing");
+            return left == right;
+        }, [&] {
+            if (order++ != 2 || live_comparisons.str().find("[CHECK 1.2]") == std::string::npos)
+                throw std::logic_error("left predicate operand before CHECK");
+            return 3;
+        }, [&] {
+            if (order++ != 3) throw std::logic_error("wrong predicate argument order");
+            return 3;
+        }, "ordered predicate");
+    });
+    ConsoleReporter live_relation_reporter(live_comparisons);
+    if (!evaluation.run(live_relation_reporter).successful() || order != 5) return 46;
+    if (live_comparisons.str().find("[CHECK 1.2] ordered predicate") == std::string::npos) return 47;
     return 0;
 }
