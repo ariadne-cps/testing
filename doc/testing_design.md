@@ -617,3 +617,27 @@ The baseline and the proposed changes are distinct: a fresh coverage report
 for the new commit is needed to verify any actual metric improvement. The
 official tool summary, including template-instantiation effects, controls
 whether the file can be called fully covered.
+
+## 2026-10-30 — Coverage playbook: parameterized.hpp branch outcomes
+
+The user's latest LLVM 21 coverage attachment (after commit
+`22fc00fb1f892dd524e42d1f6a185f50210a511d`) confirms that
+`fixture.hpp` reached 7/7 functions, 29/29 lines and 6/6 branches.
+`parameterized.hpp` remained at 15/15 functions, 77/79 lines and
+5/8 branches. The per-instantiation records identify the name guard in
+`SuiteVariant::add` (line 52), the `test_` prefix guard in
+`FixtureVariant::add` (line 104), and the `FixtureCheck::NoThrow`
+dispatch (line 111). Different template instantiations individually
+exercise only one of the two outcomes.
+
+The new cases in `test_parameterized.cpp` deliberately reuse the same
+`SuiteVariant::add` callable type with an accepted and a rejected name,
+verifying that an invalid name is rejected without registering a case.
+Another fixture variant uses the identical method callable with a prefixed
+and unprefixed name, choosing Direct and NoThrow respectively, then
+checks case names, assertion counts, outcomes and the completion check.
+No framework source, fixture semantics or CMake coverage scope changed.
+
+The expected effect is improved source-level line/branch coverage in
+`parameterized.hpp`, but the numerical delta must be confirmed from
+a new official coverage report for the published commit.

@@ -188,5 +188,53 @@ int main() {
         return 12;
     } catch (std::invalid_argument const&) {}
 
+    // Reuse the identical callable specialization for both accepted and
+    // rejected names. The invalid call must not register another case.
+    Suite names("variant name validation");
+    auto named_case = [](Context& c) {
+        c.prove(true, "valid variant callback");
+    };
+    auto group = suite_variant(names, "Named");
+    group.add("accepted", named_case);
+    bool rejected_empty_name = false;
+    try {
+        group.add("", named_case);
+    } catch (std::invalid_argument const&) {
+        rejected_empty_name = true;
+    }
+    CaptureReporter names_capture;
+    auto const names_summary = names.run(names_capture);
+    if (!rejected_empty_name || names_summary.passed != 1 ||
+        names_summary.failed != 0 || names_summary.errors != 0 ||
+        names_capture.results.size() != 1 ||
+        names_capture.results[0].name != "Named / accepted" ||
+        names_capture.results[0].assertions.size() != 1)
+        return 13;
+
+    // Two uses of the SAME method callable type must cover prefix removal
+    // and preservation, and both Direct and NoThrow fixture policies.
+    Suite method_policies("variant method policies");
+    auto policies = fixture_variant<PrecisionFixture>(
+        method_policies, "Precision", [](Context& c) {
+            return PrecisionFixture(c, 96);
+        });
+    auto check_precision = [](PrecisionFixture& fixture) {
+        fixture.test_precision();
+    };
+    policies.add("test_prefixed", check_precision, FixtureCheck::Direct);
+    policies.add("manual_name", check_precision, FixtureCheck::NoThrow);
+    CaptureReporter policies_capture;
+    auto const policies_summary = method_policies.run(policies_capture);
+    if (policies_summary.passed != 2 || policies_summary.failed != 0 ||
+        policies_summary.errors != 0 || policies_capture.results.size() != 2 ||
+        policies_capture.results[0].name != "Precision / prefixed" ||
+        policies_capture.results[1].name != "Precision / manual_name" ||
+        policies_capture.results[0].assertions.size() != 1 ||
+        policies_capture.results[1].assertions.size() != 2 ||
+        policies_capture.results[1].assertions[0].outcome != Outcome::Passed ||
+        policies_capture.results[1].assertions[1].description != "operation completes" ||
+        policies_capture.results[1].assertions[1].outcome != Outcome::Passed)
+        return 14;
+
     return 0;
 }
