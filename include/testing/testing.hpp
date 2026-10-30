@@ -51,6 +51,20 @@ enum class Comparison { NotEqual, Less, LessEqual, Greater, GreaterEqual };
 // Desired evidence, not an algorithm's return code or an operational outcome.
 enum class EvidenceExpectation { DefinitelyTrue, PossiblyTrue, NotPossibly, Indeterminate };
 
+// Diagnostic events are not assertions and cannot change the test outcome.
+enum class DiagnosticKind { Scope, Note, Warning, Value, Elapsed };
+enum class ConsoleDetail { All, Concise };
+
+struct DiagnosticEvent {
+    DiagnosticKind kind;
+    std::string description;
+    std::string value;
+    std::vector<std::string> context;
+    std::chrono::nanoseconds duration{};
+    std::string file;
+    std::uint_least32_t line = 0;
+};
+
 struct AssertionRecord {
     Outcome outcome;
     std::string description;
@@ -60,6 +74,7 @@ struct AssertionRecord {
     std::string file;
     std::uint_least32_t line;
     std::size_t check_index = 0;
+    std::vector<std::string> context;
 };
 
 struct CaseResult {
@@ -70,6 +85,7 @@ struct CaseResult {
     std::string suite_name;
     std::size_t case_index = 0;
     std::size_t case_total = 0;
+    std::vector<DiagnosticEvent> diagnostics;
 };
 
 // Exit-gate policy only: assertion outcomes and summary counts never change.
@@ -103,13 +119,15 @@ class Reporter {
     // Optional lifecycle notifications, compatible with existing reporters.
     virtual void case_started(CaseResult const&) { }
     virtual void check_started(CaseResult const&, std::size_t, std::string_view) { }
+    virtual void diagnostic_emitted(CaseResult const&, DiagnosticEvent const&) { }
     virtual void case_finished(CaseResult const& result) = 0;
     virtual void suite_finished(std::string_view name, Summary const& summary) = 0;
 };
 
 class ConsoleReporter final : public Reporter {
   public:
-    explicit ConsoleReporter(std::ostream& output);
+    explicit ConsoleReporter(std::ostream& output, ConsoleDetail detail = ConsoleDetail::All);
+    void diagnostic_emitted(CaseResult const& result, DiagnosticEvent const& event) override;
     void case_started(CaseResult const& result) override;
     void check_started(CaseResult const& result, std::size_t index,
                        std::string_view description) override;
@@ -117,6 +135,7 @@ class ConsoleReporter final : public Reporter {
     void suite_finished(std::string_view name, Summary const& summary) override;
   private:
     std::ostream& _output;
+    ConsoleDetail _detail;
 };
 
 namespace detail {
@@ -172,8 +191,64 @@ auto magnitude(T const& value) {
 
 class Context {
   public:
+    // Move-only guard: a nested diagnostic scope always restores its parent.
+    class Scope {
+      public:
+        Scope(Scope const&) = delete;
+        Scope& operator=(Scope const&) = delete;
+        Scope(Scope&& other) noexcept;
+        Scope& operator=(Scope&&) = delete;
+        ~Scope() noexcept;
+      private:
+        friend class Context;
+        Scope(Context& context, std::string label, std::source_location location);
+        Context* _context;
+        std::size_t _depth;
+        int _uncaught;
+    };
+
     explicit Context(CaseResult& result, Reporter* reporter = nullptr)
         : _result(result), _reporter(reporter) { }
+
+    Scope scope(std::string label,
+                std::source_location location = std::source_location::current());
+
+    template<class T>
+    Scope scope(std::string name, T const& value,
+                std::source_location location = std::source_location::current()) {
+        return scope(std::move(name) + "=" + detail::render(value), location);
+    }
+
+    void note(std::string description,
+              std::source_location location = std::source_location::current());
+    void warning(std::string description,
+                 std::source_location location = std::source_location::current());
+
+    template<class T>
+    void inspect(std::string name, T const& value,
+                 std::source_location location = std::source_location::current()) {
+        emit(DiagnosticKind::Value, std::move(name), detail::render(value), {}, location);
+    }
+
+    void elapsed(std::string description, std::chrono::nanoseconds duration,
+                 std::source_location location = std::source_location::current());
+
+    // For an arbitrary operation, emit its duration even if it throws.
+    // A hanging operation is diagnosed by the preceding scope event.
+    template<class Callable>
+    void measure(std::string description, Callable&& operation,
+                 std::source_location location = std::source_location::current()) {
+        static_assert(std::is_void_v<std::invoke_result_t<Callable&>>,
+                      "measure() requires a void callable");
+        auto const start = std::chrono::steady_clock::now();
+        try {
+            std::invoke(std::forward<Callable>(operation));
+        } catch (...) {
+            elapsed(description, std::chrono::steady_clock::now() - start, location);
+            throw;
+        }
+        elapsed(description, std::chrono::steady_clock::now() - start, location);
+    }
 
     template<class T>
     void prove(T const& predicate, std::string_view description,
@@ -412,6 +487,10 @@ class Context {
   private:
     friend class Suite;
     static Outcome outcome(Evidence value);
+    std::size_t enter_scope(std::string label, std::source_location location);
+    void leave_scope(std::size_t depth, int uncaught_at_entry) noexcept;
+    void emit(DiagnosticKind kind, std::string description, std::string value,
+              std::chrono::nanoseconds duration, std::source_location location);
     std::size_t begin_check(std::string_view description);
     void record(Outcome outcome, std::string_view description, std::string actual,
                 std::string expected, std::string detail, std::source_location location,
@@ -419,6 +498,8 @@ class Context {
     CaseResult& _result;
     Reporter* _reporter;
     std::size_t _check_count = 0;
+    std::vector<std::string> _scopes;
+    std::vector<std::string> _unwinding_scopes;
 };
 
 class Suite {
