@@ -376,3 +376,27 @@ factory errors, counter reset and pre-factory RUN flush. Added to CTest
 on every supported platform. No dependencies on Integration, Numeric or
 Function were introduced. Explicit shared-fixture lifetime and migration of
 actual consumer tests remain outside this implemented API.
+
+## 2026-10-30 — D04: scoped diagnostic events (implementation)
+
+Added `Context::Scope` (RAII, move-only) and `Context::scope(label)` /
+`Context::scope(key,value)`, which record and flush a scoped progress event
+before executing user code. Nesting is captured in each `AssertionRecord`
+without changing the two-level case.check numbering. Scope destruction
+restores the parent context; when stack unwinding reaches `Suite::run`,
+its error assertion receives the captured deepest active scope.
+
+`DiagnosticKind` and `DiagnosticEvent` separate non-asserting Scope,
+Note, Warning, Value and Elapsed events from evidence checking. The
+`Context::note`, `warning`, `inspect`, `elapsed` and `measure` APIs
+store provenance and produce events through an optional reporter callback.
+`measure` records elapsed time even when its callable throws, but cannot
+bound or cancel a hanging operation. Warning and Scope events are always
+flushed by ConsoleReporter; `ConsoleDetail::Concise` defers Note/Value/
+Elapsed details until a case fails and never suppresses failed assertions.
+There is no dependency on Logging or domain-specific TSV data readers.
+
+Self-tests cover nested scopes, pre-work flush, warning visibility,
+notes and elapsed diagnostics on failure, captured context on failure
+and exception, and independence across cases. This change does not
+alter mathematical assertion outcomes or the Suite summary semantics.

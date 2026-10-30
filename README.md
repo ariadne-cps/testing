@@ -94,3 +94,17 @@ Variants are part of case names, not a third numeric progress counter.
 `suite_variant(suite, "Validated").add_typed<ValidatedTag>("api", callback)`
 supports compile-time paradigm variants. Factory errors are reported as
 test Error, while normal fixture methods remain standard C++.
+
+## Structured diagnostic scopes
+
+Use `auto file = ctx().scope("oracle", "floatmp_rounding.tsv");` and
+`auto row = ctx().scope("row", 21);` for nested case/row labels. The console
+prints and flushes SCOPE events before the next operation, and failures
+include their full active context. Scope destruction restores the parent.
+`ctx().note(text)`, `ctx().warning(text)`, `ctx().inspect("value", x)`,
+`ctx().elapsed("phase", duration)`, and
+`ctx().measure("phase", [&] { operation(); });` create diagnostic events
+that do not increment assertion counters or count as successful checks.
+`ConsoleReporter(output, ConsoleDetail::Concise)` hides successful
+notes and measurements, but preserves warnings/scopes and displays
+additional details if the case fails.

@@ -132,17 +132,17 @@ runs Approximate/Validated/Effective type variants.
 
 ### D04. Scoped runtime diagnostics and parameter/row provenance
 
-- [ ] Associate zero or more nested diagnostic *labels* with the current
+- [x] Associate zero or more nested diagnostic *labels* with the current
       case: algorithm, precision, iteration, row key, oracle filename,
       source line, input seed, rounding mode, subscenario, etc.; attach
       labels to each failure. Scoped RAII push/pop should survive exceptions.
-- [ ] Emit/flush the case/row context **before** potentially hanging work
+- [x] Emit/flush the case/row context **before** potentially hanging work
       without requiring manual \`std::cout\` calls.
-- [ ] Provide non-asserting \`note\`, \`warning\`, \`value\`/inspection and
+- [x] Provide non-asserting \`note\`, \`warning\`, \`value\`/inspection and
       elapsed-duration events; avoid treating printing as proof.
       Warnings must not be lost when output is muted; failure events remain
       authoritative and independent of the Logging singleton.
-- [ ] Allow selecting how much successful-case detail to display, without
+- [x] Allow selecting how much successful-case detail to display, without
       ever suppressing actionable failure diagnostics.
 
 **Evidence:** [paving/test_grid_paving.cpp](https://github.com/ariadne-cps/paving/blob/main/tests/test_grid_paving.cpp)
@@ -152,6 +152,9 @@ uses manual phases; [smt/test_smt_solver.cpp](https://github.com/ariadne-cps/smt
 uses detailed \`std::cout\` markers;
 [paving/test_affine_set_approximation.cpp](https://github.com/ariadne-cps/paving/blob/main/tests/test_affine_set_approximation.cpp)
 manually measures durations; numeric test files annotate frozen TSV cases.
+
+
+**Remaining follow-up:** richer key/value provenance attachments, source-specific TSV row helpers, and structured reporter export belong to later work; no domain-specific reader was added.
 
 ## P1 — Newly evidenced outside numeric/function/integration
 
