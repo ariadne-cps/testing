@@ -6,5 +6,12 @@ if(WIN32)
     set_tests_properties(test_testing PROPERTIES
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:ariadne-testing>")
 endif()
+add_executable(test_parameterized test_parameterized.cpp)
+target_link_libraries(test_parameterized PRIVATE ariadne-testing testing)
+add_test(NAME test_parameterized COMMAND $<TARGET_FILE:test_parameterized>)
+if(WIN32)
+    set_tests_properties(test_parameterized PROPERTIES
+        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:ariadne-testing>")
+endif()
 add_custom_target(tests)
-add_dependencies(tests test_testing)
+add_dependencies(tests test_testing test_parameterized)
