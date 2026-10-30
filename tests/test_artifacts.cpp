@@ -4,7 +4,7 @@
 #include <sstream>
 #include <iostream>
 #include <vector>
-using namespace Ariadne;
+using namespace Ariadne::Testing;
 struct Capture : Reporter {
     std::vector<CaseResult> cases;
     void case_finished(CaseResult const& r) override { cases.push_back(r); }

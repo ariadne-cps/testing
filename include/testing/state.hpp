@@ -29,7 +29,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace Ariadne {
+namespace Ariadne::Testing {
 
 // A scoped snapshot of caller-managed state. Restoration must not throw:
 // destructors run during both ordinary exit and exception unwinding.
@@ -81,6 +81,6 @@ template<class State>
                           [&value](State const& original) noexcept { value = original; });
 }
 
-} // namespace Ariadne
+} // namespace Ariadne::Testing
 
 #endif // ARIADNE_TESTING_STATE_HPP

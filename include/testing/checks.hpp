@@ -50,13 +50,13 @@
 #define ARIADNE_EXPECT_RANGES_BY_CTX(context, actual, expected, comparator) \
     (context).check_ranges([&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
-        [&]() { return ::Ariadne::detail::capture_callable(comparator); }, #actual " ranges by " #expected)
+        [&]() { return ::Ariadne::Testing::detail::capture_callable(comparator); }, #actual " ranges by " #expected)
 
 #define ARIADNE_EXPECT_RANGES_AT_CTX(context, actual, expected, comparator, path) \
     (context).check_ranges([&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
-        [&]() { return ::Ariadne::detail::capture_callable(comparator); }, \
-        [&]() { return ::Ariadne::detail::capture_callable(path); }, #actual " ranges at " #expected)
+        [&]() { return ::Ariadne::Testing::detail::capture_callable(comparator); }, \
+        [&]() { return ::Ariadne::Testing::detail::capture_callable(path); }, #actual " ranges at " #expected)
 
 #define ARIADNE_EXPECT_SAME_CTX(context, actual, expected) \
     (context).check_same( \
@@ -95,31 +95,31 @@
 // Comparators capture each expression only once, after [CHECK], including
 // mixed signed/unsigned integral comparison using std::cmp_*.
 #define ARIADNE_EXPECT_NOT_EQUAL_CTX(context, actual, expected) \
-    (context).check_compare<::Ariadne::Comparison::NotEqual>( \
+    (context).check_compare<::Ariadne::Testing::Comparison::NotEqual>( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         #actual " != " #expected)
 
 #define ARIADNE_EXPECT_LESS_CTX(context, actual, expected) \
-    (context).check_compare<::Ariadne::Comparison::Less>( \
+    (context).check_compare<::Ariadne::Testing::Comparison::Less>( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         #actual " < " #expected)
 
 #define ARIADNE_EXPECT_LESS_EQUAL_CTX(context, actual, expected) \
-    (context).check_compare<::Ariadne::Comparison::LessEqual>( \
+    (context).check_compare<::Ariadne::Testing::Comparison::LessEqual>( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         #actual " <= " #expected)
 
 #define ARIADNE_EXPECT_GREATER_CTX(context, actual, expected) \
-    (context).check_compare<::Ariadne::Comparison::Greater>( \
+    (context).check_compare<::Ariadne::Testing::Comparison::Greater>( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         #actual " > " #expected)
 
 #define ARIADNE_EXPECT_GREATER_EQUAL_CTX(context, actual, expected) \
-    (context).check_compare<::Ariadne::Comparison::GreaterEqual>( \
+    (context).check_compare<::Ariadne::Testing::Comparison::GreaterEqual>( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         #actual " >= " #expected)
@@ -158,25 +158,25 @@
 #define ARIADNE_EXPECT_DEFINITELY_CTX(context, expression) \
     (context).expect_evidence( \
         [&]() -> decltype(auto) { return (expression); }, \
-        ::Ariadne::EvidenceExpectation::DefinitelyTrue, \
+        ::Ariadne::Testing::EvidenceExpectation::DefinitelyTrue, \
         "definitely(" #expression ")")
 
 #define ARIADNE_EXPECT_POSSIBLY_CTX(context, expression) \
     (context).expect_evidence( \
         [&]() -> decltype(auto) { return (expression); }, \
-        ::Ariadne::EvidenceExpectation::PossiblyTrue, \
+        ::Ariadne::Testing::EvidenceExpectation::PossiblyTrue, \
         "possibly(" #expression ")")
 
 #define ARIADNE_EXPECT_NOT_POSSIBLY_CTX(context, expression) \
     (context).expect_evidence( \
         [&]() -> decltype(auto) { return (expression); }, \
-        ::Ariadne::EvidenceExpectation::NotPossibly, \
+        ::Ariadne::Testing::EvidenceExpectation::NotPossibly, \
         "not possibly(" #expression ")")
 
 #define ARIADNE_EXPECT_INDETERMINATE_CTX(context, expression) \
     (context).expect_evidence( \
         [&]() -> decltype(auto) { return (expression); }, \
-        ::Ariadne::EvidenceExpectation::Indeterminate, \
+        ::Ariadne::Testing::EvidenceExpectation::Indeterminate, \
         "indeterminate(" #expression ")")
 
 

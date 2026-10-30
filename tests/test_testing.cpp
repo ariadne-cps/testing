@@ -34,7 +34,7 @@
 #include <string>
 #include <vector>
 
-using namespace Ariadne;
+using namespace Ariadne::Testing;
 
 namespace TestLogic {
 
@@ -66,9 +66,6 @@ struct CaptureReporter final : Reporter {
 };
 
 int main() {
-    // Public evidence enumerators must not collide with Utility's
-    // Ariadne::True and Ariadne::False type aliases.
-    static_assert(Evidence::Refuted != Evidence::Proven);
     Suite suite("self-test");
     suite.add("bool pass", [](Context& t) { t.prove(true, "true"); });
     suite.add("validated pass", [](Context& t) { t.prove(TestLogic::Truth::True, "proved"); });
@@ -465,7 +462,7 @@ int main() {
         ARIADNE_ADD_TEST(CompactFixture, test_compact);
         ARIADNE_ADD_TEST_NO_THROW(CompactFixture, test_no_throw);
         std::ostringstream compact_output;
-        if (::Ariadne::run_suite(ariadne_test_suite, compact_output) != 0) return 77;
+        if (::Ariadne::Testing::run_suite(ariadne_test_suite, compact_output) != 0) return 77;
         if (compact_output.str().find("[PASS] compact") == std::string::npos) return 78;
 
         // Preserve the conventional registration above, and separately verify

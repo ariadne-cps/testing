@@ -31,7 +31,7 @@
 #include <sstream>
 
 
-namespace Ariadne {
+namespace Ariadne::Testing {
 namespace {
 
 std::string_view outcome_name(Outcome result) {
@@ -319,8 +319,8 @@ void Context::elapsed(std::string description, std::chrono::nanoseconds duration
 
 Outcome Context::outcome(Evidence value) {
     switch (value) {
-        case Evidence::Proven: return Outcome::Passed;
-        case Evidence::Refuted: return Outcome::Failed;
+        case Evidence::True: return Outcome::Passed;
+        case Evidence::False: return Outcome::Failed;
         case Evidence::Indeterminate: return Outcome::Inconclusive;
         default: return Outcome::Error;
     }
@@ -397,4 +397,4 @@ Summary Suite::run(Reporter& reporter) const {
     return summary;
 }
 
-} // namespace Ariadne
+} // namespace Ariadne::Testing

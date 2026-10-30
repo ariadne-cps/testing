@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-using namespace Ariadne;
+using namespace Ariadne::Testing;
 
 struct PayloadError : std::runtime_error {
     int code;
