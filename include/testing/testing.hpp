@@ -49,7 +49,7 @@ enum class Outcome { Passed, Failed, Inconclusive, Skipped, Error };
 enum class Comparison { NotEqual, Less, LessEqual, Greater, GreaterEqual };
 
 // Desired evidence, not an algorithm's return code or an operational outcome.
-enum class EvidenceExpectation { DefinitelyTrue, PossiblyTrue, DefinitelyFalse, Indeterminate };
+enum class EvidenceExpectation { DefinitelyTrue, PossiblyTrue, NotPossibly, Indeterminate };
 
 struct AssertionRecord {
     Outcome outcome;
@@ -182,7 +182,7 @@ class Context {
             case EvidenceExpectation::PossiblyTrue:
                 status = actual == Evidence::False ? Outcome::Failed : Outcome::Passed;
                 break;
-            case EvidenceExpectation::DefinitelyFalse:
+            case EvidenceExpectation::NotPossibly:
                 status = actual == Evidence::False ? Outcome::Passed
                        : actual == Evidence::Indeterminate ? Outcome::Inconclusive : Outcome::Failed;
                 break;
@@ -205,7 +205,7 @@ class Context {
             switch (value) {
                 case EvidenceExpectation::DefinitelyTrue: return "definitely true";
                 case EvidenceExpectation::PossiblyTrue: return "possibly true";
-                case EvidenceExpectation::DefinitelyFalse: return "definitely false";
+                case EvidenceExpectation::NotPossibly: return "not possibly true";
                 case EvidenceExpectation::Indeterminate: return "indeterminate";
                 default: return "invalid";
             }

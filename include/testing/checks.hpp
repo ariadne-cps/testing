@@ -139,11 +139,11 @@
         ::Ariadne::Testing::EvidenceExpectation::PossiblyTrue, \
         "possibly(" #expression ")")
 
-#define ARIADNE_EXPECT_DEFINITELY_FALSE(context, expression) \
+#define ARIADNE_EXPECT_NOT_POSSIBLY(context, expression) \
     (context).expect_evidence( \
         [&]() -> decltype(auto) { return (expression); }, \
-        ::Ariadne::Testing::EvidenceExpectation::DefinitelyFalse, \
-        "definitely false(" #expression ")")
+        ::Ariadne::Testing::EvidenceExpectation::NotPossibly, \
+        "not possibly(" #expression ")")
 
 #define ARIADNE_EXPECT_INDETERMINATE(context, expression) \
     (context).expect_evidence( \

@@ -287,7 +287,7 @@ separately.
 ## 2026-10-30 — D02 (partial): explicit mathematical evidence expectations
 
 Added `EvidenceExpectation` with `DefinitelyTrue`, `PossiblyTrue`,
-`DefinitelyFalse` and `Indeterminate`, and deferred
+`NotPossibly` and `Indeterminate`, and deferred
 `Context::expect_evidence(callable, expectation, description)`.
 The helper records the **observed evidence** and **expected evidence
 intention** separately. In particular, `Indeterminate` is a passing
@@ -299,7 +299,7 @@ UNSAT and UNKNOWN are ordinary domain values, not automatically mapped to
 Testing's `Inconclusive` outcome.
 
 Optional `ARIADNE_EXPECT_DEFINITELY`, `ARIADNE_EXPECT_POSSIBLY`,
-`ARIADNE_EXPECT_DEFINITELY_FALSE` and `ARIADNE_EXPECT_INDETERMINATE`
+`ARIADNE_EXPECT_NOT_POSSIBLY` and `ARIADNE_EXPECT_INDETERMINATE`
 macros use deferred lambdas and expression stringification. Existing
 `Context::prove` and `ARIADNE_PROVE` retain strict proof semantics.
 Self-tests verify passing expectations, unsuccessful possibility,
@@ -307,3 +307,14 @@ inconclusive proof/refutation, failed mismatched expectation and the
 recorded evidence labels. Policy configuration, legacy equivalence
 mapping and domain-status adapters remain on the development backlog.
 The new implementation was published for the GitHub Actions CI matrix.
+
+## 2026-10-30 — Rename definitive falsity to NotPossibly
+
+The fourth logical expectation is now expressed using the dual of
+`possibly(proposition)`: `EvidenceExpectation::NotPossibly` and
+`ARIADNE_EXPECT_NOT_POSSIBLY(context, proposition)`. For a proposition
+whose evidence is False, this expectation passes; when the evidence is
+Indeterminate it remains Inconclusive, and when it is True it fails.
+This is a terminology-only change to the public API; the previous
+falsity-oriented name was removed rather than retained as a second alias.
+Self-tests assert the observed/expected labels and all three outcomes.

@@ -72,7 +72,7 @@ relations, such as `refines`, can be supplied by their owner via ADL.
 Include `testing/checks.hpp` and use
 `ARIADNE_EXPECT_DEFINITELY(ctx(), proposition)`,
 `ARIADNE_EXPECT_POSSIBLY(ctx(), proposition)`,
-`ARIADNE_EXPECT_DEFINITELY_FALSE(ctx(), proposition)`, or
+`ARIADNE_EXPECT_NOT_POSSIBLY(ctx(), proposition)`, or
 `ARIADNE_EXPECT_INDETERMINATE(ctx(), proposition)`.
 An indeterminate proposition *expected* to be indeterminate passes; an
 indeterminate result under a requested definite proof remains inconclusive.

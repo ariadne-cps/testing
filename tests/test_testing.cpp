@@ -278,7 +278,7 @@ int main() {
         ARIADNE_EXPECT_DEFINITELY(t, TestLogic::Truth::True);
         ARIADNE_EXPECT_POSSIBLY(t, TestLogic::Truth::True);
         ARIADNE_EXPECT_POSSIBLY(t, TestLogic::Truth::Indeterminate);
-        ARIADNE_EXPECT_DEFINITELY_FALSE(t, TestLogic::Truth::False);
+        ARIADNE_EXPECT_NOT_POSSIBLY(t, TestLogic::Truth::False);
         ARIADNE_EXPECT_INDETERMINATE(t, TestLogic::Truth::Indeterminate);
     });
     expectations.add("failed and inconclusive proof", [](Context& t) {
@@ -286,10 +286,11 @@ int main() {
         ARIADNE_EXPECT_DEFINITELY(t, TestLogic::Truth::Indeterminate);
     });
     expectations.add("inconclusive refutation", [](Context& t) {
-        ARIADNE_EXPECT_DEFINITELY_FALSE(t, TestLogic::Truth::Indeterminate);
+        ARIADNE_EXPECT_NOT_POSSIBLY(t, TestLogic::Truth::Indeterminate);
     });
     expectations.add("false possibility and wrong expectation", [](Context& t) {
         ARIADNE_EXPECT_POSSIBLY(t, TestLogic::Truth::False);
+        ARIADNE_EXPECT_NOT_POSSIBLY(t, TestLogic::Truth::True);
         ARIADNE_EXPECT_INDETERMINATE(t, TestLogic::Truth::True);
     });
     auto const expected_sum = expectations.run(expected_capture);
@@ -307,5 +308,10 @@ int main() {
     if (expected_capture.results[2].assertions[0].outcome != Outcome::Inconclusive)
         return 54;
     if (expected_capture.results[3].assertions[0].actual != "false") return 55;
+    if (expected_capture.results[0].assertions[3].expected != "not possibly true") return 56;
+    if (expected_capture.results[2].assertions[0].expected != "not possibly true") return 57;
+    if (expected_capture.results[3].assertions.size() != 3 ||
+        expected_capture.results[3].assertions[1].actual != "true" ||
+        expected_capture.results[3].assertions[1].outcome != Outcome::Failed) return 58;
     return 0;
 }
