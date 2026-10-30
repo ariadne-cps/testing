@@ -512,3 +512,23 @@ indeterminate, wrong and missing exception, throwing projector/expected
 expression, mixed signedness and fixture shorthand. No new dependency,
 production linkage or install rule is introduced. The remaining D09 work
 concerns normal C++ replacements for legacy construction/evaluation macros.
+
+## 2026-10-30 — D07: range equality and structured mismatch paths
+
+Added `Context::check_ranges` with default evidence-preserving equality,
+user-supplied binary comparator and optional index-to-path projector. Its
+`ARIADNE_EXPECT_RANGES`, `_BY`, `_AT` macros and explicit `_CTX` forms
+defer range/comparator evaluation until after the indexed CHECK event.
+Input ranges, including single-pass iterator ranges, are visited once and
+compared without copying elements. Diagnostics record complete actual and
+expected element counts, the first mismatch index and optional structured
+path plus rendered snippets truncated to 96 characters. If an earlier
+comparison is indeterminate and no definite mismatch occurs, the case stays
+Inconclusive; a later false comparison or size mismatch makes it Failed.
+Comparer exceptions are ordinary case Errors and are not concealed. No
+unbounded artifact dumps, domain-specific tree dependencies, or source
+installation requirements are introduced. A separate `test_ranges.cpp`
+exercises equal/mismatched lengths, singleton and missing elements,
+heterogeneous integral equality, indeterminate comparator, path selection,
+input iterators and fixture shorthand. Concrete tree adapters are delegated
+to downstream repositories rather than included in the framework.

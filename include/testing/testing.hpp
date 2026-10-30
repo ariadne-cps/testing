@@ -33,6 +33,10 @@
 #include <future>
 #include <condition_variable>
 #include <mutex>
+#include <algorithm>
+#include <iterator>
+#include <optional>
+#include <ranges>
 #include <iosfwd>
 #include <source_location>
 #include <sstream>
@@ -336,6 +340,123 @@ class Context {
         auto const verdict = detail::equal_evidence(actual, expected);
         record(outcome(verdict), description,
                detail::render(actual), detail::render(expected), {}, location, index);
+    }
+
+    // Compare two input ranges without copying their elements. Both ranges
+    // and the comparator/path selectors are evaluated once after CHECK.
+    // A non-true predicate is retained as evidence, not coerced to bool.
+    template<class ActualFn, class ExpectedFn, class ComparatorFn, class PathFn>
+    void check_ranges(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
+                      ComparatorFn&& comparator_fn, PathFn&& path_fn,
+                      std::string_view description,
+                      std::source_location location = std::source_location::current()) {
+        auto const check_index = begin_check(description);
+        decltype(auto) actual = std::invoke(std::forward<ActualFn>(actual_fn));
+        decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
+        static_assert(std::ranges::input_range<decltype(actual)>);
+        static_assert(std::ranges::input_range<decltype(expected)>);
+        decltype(auto) comparator = std::invoke(std::forward<ComparatorFn>(comparator_fn));
+        decltype(auto) path = std::invoke(std::forward<PathFn>(path_fn));
+
+        auto a = std::ranges::begin(actual);
+        auto e = std::ranges::begin(expected);
+        auto const a_end = std::ranges::end(actual);
+        auto const e_end = std::ranges::end(expected);
+        std::size_t actual_count = 0;
+        std::size_t expected_count = 0;
+        std::optional<std::size_t> first_failure;
+        std::optional<std::size_t> first_unknown;
+        std::string failure_actual;
+        std::string failure_expected;
+        std::string unknown_actual;
+        std::string unknown_expected;
+        auto snippet = [](auto const& value) {
+            std::string text = detail::render(value);
+            constexpr std::size_t max_length = 96;
+            if (text.size() > max_length) {
+                text.resize(max_length - 3);
+                text += "...";
+            }
+            return text;
+        };
+        while (a != a_end && e != e_end) {
+            auto const comparison = std::invoke(comparator, *a, *e);
+            auto const verdict = [&] {
+                if constexpr (std::is_same_v<std::remove_cvref_t<decltype(comparison)>, Evidence>)
+                    return comparison;
+                else return detail::evidence(comparison);
+            }();
+            if (verdict == Evidence::False && !first_failure) {
+                first_failure = actual_count;
+                failure_actual = snippet(*a);
+                failure_expected = snippet(*e);
+            } else if (verdict == Evidence::Indeterminate && !first_unknown) {
+                first_unknown = actual_count;
+                unknown_actual = snippet(*a);
+                unknown_expected = snippet(*e);
+            }
+            ++a;
+            ++e;
+            ++actual_count;
+            ++expected_count;
+        }
+        if (a != a_end && !first_failure) {
+            first_failure = actual_count;
+            failure_actual = snippet(*a);
+            failure_expected = "<end>";
+        }
+        if (e != e_end && !first_failure) {
+            first_failure = expected_count;
+            failure_actual = "<end>";
+            failure_expected = snippet(*e);
+        }
+        for (; a != a_end; ++a) ++actual_count;
+        for (; e != e_end; ++e) ++expected_count;
+
+        // Count mismatches always fail, even when earlier elements are
+        // mathematically indeterminate.
+        auto const status = first_failure || actual_count != expected_count
+            ? Outcome::Failed : first_unknown ? Outcome::Inconclusive
+            : Outcome::Passed;
+        std::string info = "actual_count=" + std::to_string(actual_count)
+                         + ", expected_count=" + std::to_string(expected_count);
+        auto const mismatch = first_failure ? first_failure : first_unknown;
+        std::string actual_detail = "count=" + std::to_string(actual_count);
+        std::string expected_detail = "count=" + std::to_string(expected_count);
+        if (mismatch) {
+            info += ", first_mismatch_index=" + std::to_string(*mismatch);
+            info += ", path=" + detail::render(std::invoke(path, *mismatch));
+            actual_detail += ", value=" + (first_failure ? failure_actual : unknown_actual);
+            expected_detail += ", value=" + (first_failure ? failure_expected : unknown_expected);
+        }
+        if (first_unknown && first_failure) {
+            info += ", first_indeterminate_index=" + std::to_string(*first_unknown);
+        }
+        record(status, description, std::move(actual_detail),
+               std::move(expected_detail), std::move(info), location, check_index);
+    }
+
+    template<class ActualFn, class ExpectedFn, class ComparatorFn>
+    void check_ranges(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
+                      ComparatorFn&& comparator_fn, std::string_view description,
+                      std::source_location location = std::source_location::current()) {
+        check_ranges(std::forward<ActualFn>(actual_fn),
+                     std::forward<ExpectedFn>(expected_fn),
+                     std::forward<ComparatorFn>(comparator_fn),
+                     [] { return [](std::size_t index) { return std::to_string(index); }; },
+                     description, location);
+    }
+
+    template<class ActualFn, class ExpectedFn>
+    void check_ranges(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
+                      std::string_view description,
+                      std::source_location location = std::source_location::current()) {
+        check_ranges(std::forward<ActualFn>(actual_fn),
+                     std::forward<ExpectedFn>(expected_fn),
+                     [] { return [](auto const& a, auto const& b) {
+                         return detail::equal_evidence(a, b);
+                     }; },
+                     description, location);
     }
 
     // Each relation is selected at compile time and evaluates its operands once,

@@ -202,10 +202,10 @@ emits plots and checks drawing signatures.
 
 ### D07. Collection/tree/iterator comparison with location of first mismatch
 
-- [ ] Support element-wise checks for ranges/iterators/structured trees,
+- [x] Support element-wise checks for ranges/iterators/structured trees,
       including expected count, actual count, first differing index/path,
       and short value snippets, while evaluating inputs once.
-- [ ] Permit a custom comparator for semantic relations (e.g. cell
+- [x] Permit a custom comparator for semantic relations (e.g. cell
       equality or refinement); use adapters for domain-specific traversals
       rather than hard-coding GridTreePaving into Testing.
 

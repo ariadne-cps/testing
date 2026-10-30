@@ -43,6 +43,21 @@
         [&]() -> decltype(auto) { return (expected); }, \
         #actual " == " #expected)
 
+#define ARIADNE_EXPECT_RANGES_CTX(context, actual, expected) \
+    (context).check_ranges([&]() -> decltype(auto) { return (actual); }, \
+        [&]() -> decltype(auto) { return (expected); }, #actual " ranges equal " #expected)
+
+#define ARIADNE_EXPECT_RANGES_BY_CTX(context, actual, expected, comparator) \
+    (context).check_ranges([&]() -> decltype(auto) { return (actual); }, \
+        [&]() -> decltype(auto) { return (expected); }, \
+        [&]() -> decltype(auto) { return (comparator); }, #actual " ranges by " #expected)
+
+#define ARIADNE_EXPECT_RANGES_AT_CTX(context, actual, expected, comparator, path) \
+    (context).check_ranges([&]() -> decltype(auto) { return (actual); }, \
+        [&]() -> decltype(auto) { return (expected); }, \
+        [&]() -> decltype(auto) { return (comparator); }, \
+        [&]() -> decltype(auto) { return (path); }, #actual " ranges at " #expected)
+
 #define ARIADNE_EXPECT_SAME_CTX(context, actual, expected) \
     (context).check_same( \
         [&]() -> decltype(auto) { return (actual); }, \
@@ -174,6 +189,15 @@
 
 #define ARIADNE_EXPECT_EQUAL(actual, expected) \
     ARIADNE_EXPECT_EQUAL_CTX(this->ctx(), actual, expected)
+
+#define ARIADNE_EXPECT_RANGES(actual, expected) \
+    ARIADNE_EXPECT_RANGES_CTX(this->ctx(), actual, expected)
+
+#define ARIADNE_EXPECT_RANGES_BY(actual, expected, comparator) \
+    ARIADNE_EXPECT_RANGES_BY_CTX(this->ctx(), actual, expected, comparator)
+
+#define ARIADNE_EXPECT_RANGES_AT(actual, expected, comparator, path) \
+    ARIADNE_EXPECT_RANGES_AT_CTX(this->ctx(), actual, expected, comparator, path)
 
 #define ARIADNE_EXPECT_SAME(actual, expected) \
     ARIADNE_EXPECT_SAME_CTX(this->ctx(), actual, expected)

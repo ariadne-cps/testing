@@ -140,3 +140,16 @@ against `expected`. For example, a lambda can extract `error.code`.
 Both operands are evaluated after the numbered CHECK, retain their rendered
 values, and preserve three-valued equality evidence. A projector that throws
 is reported as a test Error, not confused with the operation's exception.
+
+## Range comparisons
+
+Use `ARIADNE_EXPECT_RANGES(actual, expected)` within a fixture, or
+`ARIADNE_EXPECT_RANGES_CTX(context, actual, expected)` outside one.
+`ARIADNE_EXPECT_RANGES_BY(actual, expected, comparator)` accepts a
+custom evidence-preserving comparison; `ARIADNE_EXPECT_RANGES_AT(actual,
+expected, comparator, path)` additionally maps a zero-based index to a
+semantic path such as `node/3`. All have explicit-context `_CTX` variants.
+They accept C++20 input ranges, count both sequences, and report the first
+difference with short value excerpts. Pairwise indeterminate evidence yields
+an Inconclusive check unless another pair definitely differs or counts differ.
+Parenthesize macro arguments containing commas, such as braced sequences.
