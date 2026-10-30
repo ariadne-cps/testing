@@ -313,5 +313,47 @@ int main() {
     if (expected_capture.results[3].assertions.size() != 3 ||
         expected_capture.results[3].assertions[1].actual != "true" ||
         expected_capture.results[3].assertions[1].outcome != Outcome::Failed) return 58;
+    Suite gate_cases("exit policy");
+    CaptureReporter gate_reporter;
+    gate_cases.add("valid proof", [](Context& c) { c.prove(true, "certain"); });
+    gate_cases.add("unproved assertion", [](Context& c) {
+        c.prove(TestLogic::Truth::Indeterminate, "not decided");
+    });
+    gate_cases.add("not executed", [](Context& c) { c.skip("environment unavailable"); });
+    auto const gate_summary = gate_cases.run(gate_reporter);
+    if (gate_summary.passed != 1 || gate_summary.inconclusive != 1 ||
+        gate_summary.skipped != 1 || gate_summary.successful()) return 59;
+    if (gate_summary.acceptable({})) return 60;
+    AcceptancePolicy permit_inconclusive;
+    permit_inconclusive.inconclusive = InconclusivePolicy::NonBlocking;
+    if (!gate_summary.acceptable(permit_inconclusive)) return 61;
+    permit_inconclusive.skipped = SkippedPolicy::Blocking;
+    if (gate_summary.acceptable(permit_inconclusive)) return 62;
+    if (gate_reporter.results[1].outcome != Outcome::Inconclusive ||
+        gate_reporter.results[2].outcome != Outcome::Skipped) return 63;
+    Summary only_inconclusive;
+    only_inconclusive.inconclusive = 1;
+    if (only_inconclusive.acceptable(permit_inconclusive)) return 64;
+    Summary with_failure = gate_summary;
+    with_failure.failed = 1;
+    if (with_failure.acceptable({InconclusivePolicy::NonBlocking, SkippedPolicy::NonBlocking})) return 65;
+    Summary with_error = gate_summary;
+    with_error.errors = 1;
+    if (with_error.acceptable({InconclusivePolicy::NonBlocking, SkippedPolicy::NonBlocking})) return 66;
+    // A successfully checked solver status UNKNOWN is not test Inconclusive.
+    enum class SolverState { Sat, Unsat, Unknown };
+    enum class UnknownReason { None, ResourceExhausted };
+    Suite solver_states("solver states");
+    CaptureReporter solver_state_reporter;
+    solver_states.add("expected UNKNOWN due to budget", [](Context& c) {
+        auto const state = SolverState::Unknown;
+        auto const reason = UnknownReason::ResourceExhausted;
+        c.expect_equal(state, SolverState::Unknown, "solver returned UNKNOWN");
+        c.expect_equal(reason, UnknownReason::ResourceExhausted, "reason is resource exhaustion");
+    });
+    auto const solver_summary = solver_states.run(solver_state_reporter);
+    if (!solver_summary.successful() || solver_state_reporter.results.size() != 1 ||
+        solver_state_reporter.results[0].assertions.size() != 2 ||
+        solver_state_reporter.results[0].assertions[0].outcome != Outcome::Passed) return 67;
     return 0;
 }

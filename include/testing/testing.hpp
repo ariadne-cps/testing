@@ -72,13 +72,29 @@ struct CaseResult {
     std::size_t case_total = 0;
 };
 
+// Exit-gate policy only: assertion outcomes and summary counts never change.
+enum class InconclusivePolicy { Blocking, NonBlocking };
+enum class SkippedPolicy { NonBlocking, Blocking };
+
+struct AcceptancePolicy {
+    InconclusivePolicy inconclusive = InconclusivePolicy::Blocking;
+    SkippedPolicy skipped = SkippedPolicy::NonBlocking;
+};
+
 struct Summary {
     std::size_t passed = 0;
     std::size_t failed = 0;
     std::size_t inconclusive = 0;
     std::size_t skipped = 0;
     std::size_t errors = 0;
-    bool successful() const { return passed > 0 && failed == 0 && inconclusive == 0 && errors == 0; }
+
+    // Even an opt-in permissive exit gate requires at least one actual pass.
+    bool acceptable(AcceptancePolicy policy) const {
+        return passed > 0 && failed == 0 && errors == 0
+            && (inconclusive == 0 || policy.inconclusive == InconclusivePolicy::NonBlocking)
+            && (skipped == 0 || policy.skipped == SkippedPolicy::NonBlocking);
+    }
+    bool successful() const { return acceptable({}); }
 };
 
 class Reporter {
