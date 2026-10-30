@@ -125,16 +125,19 @@ class Context {
         record(outcome(detail::evidence(predicate)), description, {}, {}, {}, location, index);
     }
 
-    template<class A, class B>
-    void expect_equal(A const& actual, B const& expected,
-                      std::string_view description = "equality",
-                      std::source_location location = std::source_location::current()) {
+    // Deferred operands: emit CHECK before evaluating each expression once.
+    template<class ActualFn, class ExpectedFn>
+    void check_equal(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
+                     std::string_view description,
+                     std::source_location location = std::source_location::current()) {
         auto const index = begin_check(description);
+        decltype(auto) actual = std::invoke(std::forward<ActualFn>(actual_fn));
+        decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
         auto const verdict = [&]() {
-            using Actual = std::remove_cvref_t<A>;
-            using Expected = std::remove_cvref_t<B>;
-            if constexpr (std::is_integral_v<Actual> && std::is_integral_v<Expected>
-                          && !std::is_same_v<Actual,bool> && !std::is_same_v<Expected,bool>) {
+            using A = std::remove_cvref_t<decltype(actual)>;
+            using B = std::remove_cvref_t<decltype(expected)>;
+            if constexpr (std::is_integral_v<A> && std::is_integral_v<B>
+                          && !std::is_same_v<A,bool> && !std::is_same_v<B,bool>) {
                 return detail::evidence(std::cmp_equal(actual,expected));
             } else {
                 return detail::evidence(actual == expected);
@@ -145,25 +148,55 @@ class Context {
     }
 
     template<class A, class B>
+    void expect_equal(A const& actual, B const& expected,
+                      std::string_view description = "equality",
+                      std::source_location location = std::source_location::current()) {
+        check_equal([&]() -> A const& { return actual; },
+                    [&]() -> B const& { return expected; }, description, location);
+    }
+
+    template<class ActualFn, class ExpectedFn>
+    void check_same(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
+                    std::string_view description,
+                    std::source_location location = std::source_location::current()) {
+        auto const index = begin_check(description);
+        decltype(auto) actual = std::invoke(std::forward<ActualFn>(actual_fn));
+        decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
+        auto const relation = same(actual, expected); // ADL: numerical domain
+        record(outcome(detail::evidence(relation)), description,
+               detail::render(actual), detail::render(expected), {}, location, index);
+    }
+
+    template<class A, class B>
     void expect_same(A const& actual, B const& expected,
                      std::string_view description = "identity",
                      std::source_location location = std::source_location::current()) {
+        check_same([&]() -> A const& { return actual; },
+                   [&]() -> B const& { return expected; }, description, location);
+    }
+
+    template<class ActualFn, class ExpectedFn, class ToleranceFn>
+    void check_within(ActualFn&& actual_fn, ExpectedFn&& expected_fn, ToleranceFn&& tolerance_fn,
+                      std::string_view description,
+                      std::source_location location = std::source_location::current()) {
         auto const index = begin_check(description);
-        auto const relation = same(actual, expected); // ADL: supplied by numerical domain
+        decltype(auto) actual = std::invoke(std::forward<ActualFn>(actual_fn));
+        decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
+        decltype(auto) tolerance = std::invoke(std::forward<ToleranceFn>(tolerance_fn));
+        auto const error = detail::magnitude(actual - expected);
+        auto const relation = (error <= tolerance);
         record(outcome(detail::evidence(relation)), description,
-               detail::render(actual), detail::render(expected), {}, location, index);
+               detail::render(actual), detail::render(expected),
+               "error=" + detail::render(error) + ", tolerance=" + detail::render(tolerance), location, index);
     }
 
     template<class A, class B, class Tolerance>
     void expect_within(A const& actual, B const& expected, Tolerance const& tolerance,
                        std::string_view description = "bounded error",
                        std::source_location location = std::source_location::current()) {
-        auto const index = begin_check(description);
-        auto const error = detail::magnitude(actual - expected);
-        auto const relation = (error <= tolerance);
-        record(outcome(detail::evidence(relation)), description,
-               detail::render(actual), detail::render(expected),
-               "error=" + detail::render(error) + ", tolerance=" + detail::render(tolerance), location, index);
+        check_within([&]() -> A const& { return actual; },
+                     [&]() -> B const& { return expected; },
+                     [&]() -> Tolerance const& { return tolerance; }, description, location);
     }
 
     template<class Exception, class Callable>
