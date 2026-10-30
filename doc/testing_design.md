@@ -344,3 +344,35 @@ Source: `ariadne-cps/macro/include/macro/testing.hpp` on main; `function/tests/t
 | `EXECUTE`, `TRY`, `CONSTRUCT`, `ASSIGN`, `PRINT`, `WARN` | Explicit C++ with check/notes | These have differing scope, side-effect and exception semantics; do not automatically replace. |
 
 The table is guidance, **not a proof that all consumer call sites are equivalent**. Preserve test behavior during migration and review any intentional increase in proof strictness.
+
+## 2026-10-30 — D03: suite variants and fixture factories
+
+Added `testing/parameterized.hpp` with `SuiteVariant` (named cases
+under a variant prefix), `fixture_variant<Fixture>(suite, name, factory)`
+and the Context-only factory overload. Each `FixtureVariant::add`
+registers a separate normal `Suite` case; a factory is invoked freshly at
+**execution** rather than registration and supplies a full `Fixture` by
+value, which can own a cloned or newly constructed implementation, a
+runtime precision or other parameters. The factory is shared by owned
+pointer for copyability of `std::function` case records, so move-only
+factory captures are allowed. Non-movable fixture prvalues use guaranteed
+copy elision in C++20. Methods are invoked exactly once; unexpected
+factory exceptions are classified `Error` by the existing runner. No
+fixture state is shared between cases unless the user deliberately shares
+external state in the factory.
+
+`SuiteVariant::add_typed<Tag>` instantiates a generic callback separately
+for each compile-time tag (such as Approximate, Validated, Effective).
+`ARIADNE_ADD_VARIANT_TEST(group, method)` and its `NO_THROW` form
+stringify the method token and delegate to C++ member invocation.
+The optional prefix `test_` is stripped from display names, preserving
+current fixture conventions. Variant names appear in full case paths;
+the existing one-based RUN index and per-case CHECK index are unchanged.
+
+A dedicated `test_parameterized.cpp` executable exercises multiple
+implementations with an Affine-style subset, runtime precision, move-only
+factory, non-movable fixture, compile-time paradigms, empty-name rejection,
+factory errors, counter reset and pre-factory RUN flush. Added to CTest
+on every supported platform. No dependencies on Integration, Numeric or
+Function were introduced. Explicit shared-fixture lifetime and migration of
+actual consumer tests remain outside this implemented API.

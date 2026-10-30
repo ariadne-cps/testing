@@ -98,20 +98,20 @@ has indeterminate evidence, unlike Testing's \`Inconclusive\` outcome.
 
 ### D03. Parameterized suites, interfaces and fixture factories
 
-- [ ] Register one method over multiple runtime implementations of a
+- [x] Register one method over multiple runtime implementations of a
       common interface, with named implementation, fresh factory/clone
       semantics and optional subsets of methods per implementation.
-- [ ] Register one method over compile-time types, paradigms, rounding
+- [x] Register one method over compile-time types, paradigms, rounding
       variants and runtime precision values. Each combination needs a
       stable, explicit display name and reproducible parameters.
-- [ ] Support fixture constructors taking \`Context&\` plus arbitrary
+- [x] Support fixture constructors taking \`Context&\` plus arbitrary
       factory-supplied arguments/state; do not force storing nullable
       context pointers. Distinguish *fresh per test* from explicitly
       requested shared setup/state, checking whether original suites
       have dependencies between methods.
-- [ ] Keep the two-level numeric progress \`case.check\` and case total;
+- [x] Keep the two-level numeric progress \`case.check\` and case total;
       put variant names in case paths, not a third counter.
-- [ ] Ensure a failed fixture construction is an \`Error\` and does not
+- [x] Ensure a failed fixture construction is an \`Error\` and does not
       silently skip every case.
 
 **Evidence:** [integration/test_integrator.cpp](https://github.com/ariadne-cps/integration/blob/main/tests/test_integrator.cpp)
@@ -126,6 +126,9 @@ runs a common solver fixture over different algorithms;
 runs several precision configurations;
 [function/test_function_interface.cpp](https://github.com/ariadne-cps/function/blob/main/tests/test_function_interface.cpp)
 runs Approximate/Validated/Effective type variants.
+
+
+**Remaining:** explicit shared-fixture lifetime/setup semantics and concrete consumer migrations are separate work; D03 defaults to one fixture per registered case execution.
 
 ### D04. Scoped runtime diagnostics and parameter/row provenance
 

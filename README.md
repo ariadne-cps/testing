@@ -82,3 +82,15 @@ with a definite mathematical proof. The report retains observed evidence.
 ## Exit-gate policy
 
 `Summary::successful()` is strict; explicit `summary.acceptable(AcceptancePolicy{InconclusivePolicy::NonBlocking, SkippedPolicy::NonBlocking})` allows a caller to tolerate inconclusives only when choosing an exit status. It does not change stored outcomes, reporter labels or counters, does not allow failures/errors, and still requires at least one genuinely passing case. Solver UNKNOWN is an ordinary domain value, not automatically a testing Inconclusive.
+
+## Parameterized suites and fixture factories
+
+Include `testing/parameterized.hpp` for implementation/precision variants.
+For each case, `fixture_variant<Fixture>(suite, "implementation", factory)`
+constructs a fresh fixture using the supplied `Context&`, with an
+implementation owned or cloned by the factory. Register a subset of test
+methods per implementation with `ARIADNE_ADD_VARIANT_TEST(group, test_method)`.
+Variants are part of case names, not a third numeric progress counter.
+`suite_variant(suite, "Validated").add_typed<ValidatedTag>("api", callback)`
+supports compile-time paradigm variants. Factory errors are reported as
+test Error, while normal fixture methods remain standard C++.
