@@ -493,3 +493,22 @@ new installation rules, or changes to existing tests are introduced.
 
 The README now exposes the same six status/coverage badges as other Ariadne
 repositories, pointing to Testing's own workflows and Codecov page.
+
+## 2026-10-30 — D09: generic typed exception payload checks
+
+Added `Context::expect_throws_payload<Exception>(action, projector, expected, description)`
+with fixture and `_CTX` macros. The action is evaluated after CHECK; on a
+matching `std::exception`-derived type a caller-supplied projection extracts
+the payload, then the expected expression is evaluated. Each expression is
+invoked once, and both are formatted into the normal assertion record.
+Built-in mixed-sign integral equality uses the same safe comparison rules as
+ordinary equality checks; domain comparisons preserve indeterminate evidence.
+Wrong exception type or no exception is Failed; errors evaluating the
+projection/expectation are Error, retaining the exception diagnostic. Internal
+fatal-requirement aborts propagate rather than being counted as an exception.
+
+Added dedicated `test_payload.cpp` self-tests for matching, mismatching,
+indeterminate, wrong and missing exception, throwing projector/expected
+expression, mixed signedness and fixture shorthand. No new dependency,
+production linkage or install rule is introduced. The remaining D09 work
+concerns normal C++ replacements for legacy construction/evaluation macros.

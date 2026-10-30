@@ -180,6 +180,20 @@ std::string render(T const& value) {
     }
 }
 
+// Use the same evidence-preserving equality and integral signedness rules
+// for ordinary checks and exception payload comparisons.
+template<class Actual, class Expected>
+Evidence equal_evidence(Actual const& actual, Expected const& expected) {
+    using A = std::remove_cvref_t<Actual>;
+    using B = std::remove_cvref_t<Expected>;
+    if constexpr (std::is_integral_v<A> && std::is_integral_v<B>
+                  && !std::is_same_v<A, bool> && !std::is_same_v<B, bool>) {
+        return evidence(std::cmp_equal(actual, expected));
+    } else {
+        return evidence(actual == expected);
+    }
+}
+
 template<class T>
 auto magnitude(T const& value) {
     if constexpr (requires { mag(value); }) {
@@ -319,16 +333,7 @@ class Context {
         auto const index = begin_check(description);
         decltype(auto) actual = std::invoke(std::forward<ActualFn>(actual_fn));
         decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
-        auto const verdict = [&]() {
-            using A = std::remove_cvref_t<decltype(actual)>;
-            using B = std::remove_cvref_t<decltype(expected)>;
-            if constexpr (std::is_integral_v<A> && std::is_integral_v<B>
-                          && !std::is_same_v<A,bool> && !std::is_same_v<B,bool>) {
-                return detail::evidence(std::cmp_equal(actual,expected));
-            } else {
-                return detail::evidence(actual == expected);
-            }
-        }();
+        auto const verdict = detail::equal_evidence(actual, expected);
         record(outcome(verdict), description,
                detail::render(actual), detail::render(expected), {}, location, index);
     }
@@ -500,6 +505,54 @@ class Context {
             return;
         }
         record(Outcome::Failed, description, {}, std::string(substring),
+               "no exception thrown", location, index);
+    }
+
+    // Extract one caller-selected field from a typed exception and compare
+    // it with a separately evaluated expectation. Both are deferred until
+    // after CHECK and the tested operation; no domain dependency is needed.
+    template<class Exception, class Action, class ProjectorFn, class ExpectedFn>
+    void expect_throws_payload(Action&& action, ProjectorFn&& projector_fn,
+                               ExpectedFn&& expected_fn, std::string_view description,
+                               std::source_location location = std::source_location::current()) {
+        static_assert(std::is_base_of_v<std::exception, Exception>,
+                      "Payload checking requires a std::exception-derived type");
+        auto const index = begin_check(description);
+        try { std::invoke(std::forward<Action>(action)); }
+        catch (detail::AbortCase const&) { throw; }
+        catch (Exception const& exception) {
+            try {
+                decltype(auto) projector =
+                    std::invoke(std::forward<ProjectorFn>(projector_fn));
+                decltype(auto) actual = std::invoke(projector, exception);
+                decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
+                auto const verdict = detail::equal_evidence(actual, expected);
+                record(outcome(verdict), description, detail::render(actual),
+                       detail::render(expected), {}, location, index);
+            } catch (detail::AbortCase const&) {
+                throw;
+            } catch (std::exception const& error) {
+                record(Outcome::Error, description, {}, {},
+                       std::string("payload verification threw: ") + error.what(),
+                       location, index);
+            } catch (...) {
+                record(Outcome::Error, description, {}, {},
+                       "payload verification threw a non-standard exception",
+                       location, index);
+            }
+            return;
+        }
+        catch (std::exception const& error) {
+            record(Outcome::Failed, description, error.what(), {},
+                   "unexpected exception type", location, index);
+            return;
+        }
+        catch (...) {
+            record(Outcome::Failed, description, {}, {},
+                   "unexpected non-standard exception", location, index);
+            return;
+        }
+        record(Outcome::Failed, description, {}, {},
                "no exception thrown", location, index);
     }
 

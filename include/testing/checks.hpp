@@ -64,6 +64,12 @@
     (context).expect_throws_message<exception_type>([&] { statement; }, (substring), \
         #statement " throws " #exception_type " containing " #substring)
 
+#define ARIADNE_EXPECT_THROWS_PAYLOAD_CTX(context, exception_type, statement, projector, expected) \
+    (context).expect_throws_payload<exception_type>([&] { statement; }, \
+        [&]() -> decltype(auto) { return (projector); }, \
+        [&]() -> decltype(auto) { return (expected); }, \
+        #statement " throws " #exception_type " with " #projector " == " #expected)
+
 #define ARIADNE_EXPECT_EXCEPTION_CTX(context, statement) \
     (context).expect_exception([&] { statement; }, #statement " throws")
 
@@ -180,6 +186,9 @@
 
 #define ARIADNE_EXPECT_THROWS_MESSAGE(exception_type, statement, substring) \
     ARIADNE_EXPECT_THROWS_MESSAGE_CTX(this->ctx(), exception_type, statement, substring)
+
+#define ARIADNE_EXPECT_THROWS_PAYLOAD(exception_type, statement, projector, expected) \
+    ARIADNE_EXPECT_THROWS_PAYLOAD_CTX(this->ctx(), exception_type, statement, projector, expected)
 
 #define ARIADNE_EXPECT_EXCEPTION(statement) \
     ARIADNE_EXPECT_EXCEPTION_CTX(this->ctx(), statement)

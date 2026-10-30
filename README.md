@@ -130,3 +130,13 @@ this internal control-flow signal in a test's user-defined catch-all handler.
 checks both a `std::exception`-derived type and a substring of `what()`.
 A `_CTX(context, ...)` form is available outside fixtures. The action is
 executed only after the numbered CHECK notification.
+
+## Exception payload verification
+
+Use `ARIADNE_EXPECT_THROWS_PAYLOAD(Exception, statement, projector, expected)`
+inside a fixture, or the `_CTX(context, ...)` form elsewhere. `projector`
+is a callable applied to the caught typed exception; the result is checked
+against `expected`. For example, a lambda can extract `error.code`.
+Both operands are evaluated after the numbered CHECK, retain their rendered
+values, and preserve three-valued equality evidence. A projector that throws
+is reported as a test Error, not confused with the operation's exception.
