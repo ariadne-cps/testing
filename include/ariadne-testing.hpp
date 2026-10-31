@@ -33,5 +33,6 @@
 #include "testing/state.hpp"
 #include "testing/worker.hpp"
 #include "testing/oracle.hpp"
+#include "testing/reporters.hpp"
 
 #endif // ARIADNE_TESTING_UMBRELLA_HPP
