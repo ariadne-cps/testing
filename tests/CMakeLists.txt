@@ -145,6 +145,20 @@ ariadne_add_compile_check(NAME compile_negative_type
  SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/compile/negative_type.cpp"
  LINK_LIBRARIES testing EXPECT_FAILURE
  EXPECTED_DIAGNOSTIC "ARIADNE compile-time type identity failed" LABELS d11)
+# Compile each public layer as the FIRST (and only Testing) include.
+# These tests catch transitive-include dependencies and header cycles.
+ariadne_add_compile_check(NAME compile_header_results
+ SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/compile/header_results.cpp"
+ LINK_LIBRARIES testing LABELS d11)
+ariadne_add_compile_check(NAME compile_header_reporters
+ SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/compile/header_reporters.cpp"
+ LINK_LIBRARIES testing LABELS d11)
+ariadne_add_compile_check(NAME compile_header_testing
+ SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/compile/header_testing.cpp"
+ LINK_LIBRARIES testing LABELS d11)
+ariadne_add_compile_check(NAME compile_header_macros
+ SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/compile/header_macros.cpp"
+ LINK_LIBRARIES testing LABELS d11)
 ariadne_add_cmake_script_test(NAME cmake_compile_driver
  SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_compile_driver.cmake" LABELS d11)
 ariadne_add_python_unittest_test(NAME python_compile_interface

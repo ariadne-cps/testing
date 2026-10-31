@@ -1263,3 +1263,25 @@ JUnitReporter is preserved for consumers that emit deeper per-case XML.
 JsonReporter is retained without change. No outcome policy, test
 coverage selection, test watchdog or external framework dependency
 changed. Full GitHub Actions CI remains the acceptance gate.
+
+## 2026-10-31 — D11 regression after public header organization
+
+The header refactor intentionally removed `testing/compile.hpp` and
+`testing/checks.hpp`, merging all 86 canonical macros into
+`testing/macros.hpp`. The C++ compile checks remained green, but the
+Python `python_compile_interface` regression still asserted the old
+`compile.hpp` include path and therefore failed on macOS. This was a
+test expectation made obsolete by the structural refactor, not a compiler
+or macro semantics defect. The CTest failure propagated correctly into
+the JUnit report and then dorny/test-reporter, whose default failure gate
+must NOT be disabled.
+
+Updated the Python regression to assert the new authoritative umbrella
+include, the absence of obsolete headers, the presence of compile-time
+and runtime and registration macros, uniqueness and single-location
+ownership of all public macro definitions. Added independent compile-only
+smoke tests for `results.hpp`, `reporters.hpp`, `testing.hpp` and
+`macros.hpp`, each included first with no other Testing header. The
+C++ positive/negative concept/type tests remain unchanged. All checks
+are cross-platform without warning exclusions. This correction requires
+its own green CI matrix before the refactor can be considered verified.
