@@ -5,6 +5,7 @@
 #include <fstream>
 #include <filesystem>
 #include <functional>
+#include <optional>
 #include <future>
 #include <iostream>
 #include <stdexcept>
@@ -308,6 +309,40 @@ int main() {
                 ok &= verify(result.assertions[j].outcome == expected,
                     "incorrect relation " + std::to_string(j) + " in " + result.name);
             }
+        }
+    }
+
+    // A moved Scope can outlive an enclosing Scope when the owners are
+    // stored independently. Releasing the outer owner first must not
+    // resurrect an already-closed context or grow the scope stack.
+    Suite moved_scopes("moved diagnostic scope lifetimes");
+    moved_scopes.add("out-of-order owner destruction", [](Context& c) {
+        std::optional<Context::Scope> outer;
+        std::optional<Context::Scope> inner;
+        outer.emplace(c.scope("outer"));
+        inner.emplace(c.scope("inner"));
+        c.prove(true, "nested context is active");
+        outer.reset();
+        c.prove(true, "closed outer scope is not resurrected");
+        inner.reset();
+        c.prove(true, "late inner scope cleanup is harmless");
+    });
+    Capture scopes_report;
+    auto const scopes_summary = moved_scopes.run(scopes_report);
+    ok &= verify(scopes_summary.passed == 1 && scopes_summary.errors == 0 &&
+                 scopes_report.cases.size() == 1,
+                 "moved scopes: incorrect summary");
+    if (scopes_report.cases.size() == 1) {
+        auto const& assertions = scopes_report.cases[0].assertions;
+        ok &= verify(assertions.size() == 3,
+                     "moved scopes: unexpected assertion count");
+        if (assertions.size() == 3) {
+            ok &= verify(assertions[0].context.size() == 2 &&
+                         assertions[0].context[0] == "outer" &&
+                         assertions[0].context[1] == "inner" &&
+                         assertions[1].context.empty() &&
+                         assertions[2].context.empty(),
+                         "moved scopes: stale or resurrected context");
         }
     }
 

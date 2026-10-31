@@ -272,5 +272,54 @@ int main() {
     }
     std::filesystem::remove_all(retained,error);
     std::filesystem::remove(reference,error);
+#if !defined(_WIN32)
+    // Managed artifacts must not escape through an in-tree symbolic link.
+    // The canonical target, not the lexical prefix, determines ownership.
+    std::filesystem::path external_directory;
+    Suite managed_symlinks("managed artifact canonical containment");
+    managed_symlinks.add("reject symlink escape, accept nested path", [&](Context& c) {
+        auto const root = c.work_directory();
+        external_directory = std::filesystem::temp_directory_path() /
+                             ("ariadne-external-" + root.filename().string());
+        if (!std::filesystem::create_directory(external_directory))
+            throw std::runtime_error("cannot reserve an external fixture directory");
+        std::filesystem::create_directory_symlink(
+            external_directory, root / "external-link");
+        bool rejected = false;
+        try {
+            c.artifact(root / "external-link" / "escaped.bin", "outside",
+                       "application/octet-stream", ArtifactKind::Output,
+                       ArtifactLifetime::KeepAlways);
+        } catch (std::invalid_argument const&) {
+            rejected = true;
+        }
+        c.prove(rejected, "managed output through symlink must be rejected");
+        c.prove(std::filesystem::is_directory(external_directory),
+                "external directory must remain untouched");
+        auto const internal = root / "nested";
+        std::filesystem::create_directory(internal);
+        c.artifact(internal / "accepted.bin", "inside",
+                   "application/octet-stream", ArtifactKind::Output,
+                   ArtifactLifetime::Temporary);
+        c.prove(true, "nested managed output is accepted");
+    });
+    Capture symlinks_capture;
+    auto const symlinks_summary = managed_symlinks.run(symlinks_capture);
+    verify(symlinks_summary.passed == 1 && symlinks_summary.errors == 0 &&
+           symlinks_capture.cases.size() == 1,
+           "managed symlink containment outcome changed");
+    if (symlinks_capture.cases.size() == 1) {
+        auto const& result = symlinks_capture.cases[0];
+        verify(result.assertions.size() == 3 && result.artifacts.size() == 1,
+               "rejected symlink output was registered");
+        for (auto const& assertion : result.assertions)
+            verify(assertion.outcome == Outcome::Passed,
+                   "managed symlink containment assertion failed");
+    }
+    std::error_code symlink_cleanup_error;
+    std::filesystem::remove_all(external_directory, symlink_cleanup_error);
+    verify(!symlink_cleanup_error, "external fixture cleanup failed");
+#endif
+
     return ok ? 0 : 1;
 }
