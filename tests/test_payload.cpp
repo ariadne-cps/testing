@@ -87,5 +87,34 @@ int main() {
         r.cases[4].assertions[0].detail!="no exception thrown") return 5;
     if (r.cases[5].assertions[0].outcome!=Outcome::Error ||
         r.cases[6].assertions[0].outcome!=Outcome::Error) return 6;
+
+    // Distinguish an operation throwing a non-standard type (Failed)
+    // from a payload projector throwing it after the right type (Error).
+    Suite exception_boundaries("payload exception boundaries");
+    exception_boundaries.add("operation throws nonstandard", [](Context& c) {
+        ARIADNE_EXPECT_THROWS_PAYLOAD_CTX(c, PayloadError,
+            throw 42, [](PayloadError const& e) { return e.code; }, 17);
+    });
+    exception_boundaries.add("projector throws nonstandard", [](Context& c) {
+        ARIADNE_EXPECT_THROWS_PAYLOAD_CTX(c, PayloadError,
+            throw PayloadError(17, "payload"),
+            [](PayloadError const&) -> int { throw 42; }, 17);
+    });
+    exception_boundaries.add("subsequent case still passes", [](Context& c) {
+        c.prove(true, "later payload check still executes");
+    });
+    Capture boundary_capture;
+    auto const boundary_summary = exception_boundaries.run(boundary_capture);
+    if (boundary_summary.passed != 1 || boundary_summary.failed != 1 ||
+        boundary_summary.errors != 1 || boundary_capture.cases.size() != 3)
+        return 7;
+    if (boundary_capture.cases[0].assertions[0].outcome != Outcome::Failed ||
+        boundary_capture.cases[0].assertions[0].detail != "unexpected non-standard exception" ||
+        boundary_capture.cases[1].assertions[0].outcome != Outcome::Error ||
+        boundary_capture.cases[1].assertions[0].detail !=
+            "payload verification threw a non-standard exception" ||
+        boundary_capture.cases[2].outcome != Outcome::Passed)
+        return 8;
+
     return 0;
 }

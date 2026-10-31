@@ -100,5 +100,33 @@ int main() {
         named_capture.results[0].assertions.size() != 3 ||
         named_capture.results[0].assertions[2].outcome != Outcome::Passed)
         return 10;
+
+    // An expected exception type must reject both an absent exception and
+    // a non-standard exception. Message checks must do the same.
+    Suite exception_failures("exception type boundaries");
+    exception_failures.add("typed exception absent", [](Context& c) {
+        ARIADNE_EXPECT_THROWS_CTX(c, std::runtime_error, (void)0);
+    });
+    exception_failures.add("typed exception nonstandard", [](Context& c) {
+        ARIADNE_EXPECT_THROWS_CTX(c, std::runtime_error, throw 42);
+    });
+    exception_failures.add("message exception nonstandard", [](Context& c) {
+        ARIADNE_EXPECT_THROWS_MESSAGE_CTX(c, std::runtime_error,
+                                          throw 42, "message");
+    });
+    exception_failures.add("follow-up still executes", [](Context& c) {
+        c.prove(true, "unrelated test passes");
+    });
+    Captured boundary_capture;
+    auto const boundary_sum = exception_failures.run(boundary_capture);
+    if (boundary_sum.passed != 1 || boundary_sum.failed != 3 ||
+        boundary_sum.errors != 0 || boundary_capture.results.size() != 4)
+        return 11;
+    if (boundary_capture.results[0].assertions[0].detail != "no exception thrown" ||
+        boundary_capture.results[1].assertions[0].detail != "unexpected exception type" ||
+        boundary_capture.results[2].assertions[0].detail != "unexpected non-standard exception" ||
+        boundary_capture.results[3].outcome != Outcome::Passed)
+        return 12;
+
     return 0;
 }

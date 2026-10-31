@@ -725,3 +725,35 @@ The allocator's exhaustion and exceptional filesystem branches, invalid
 internal enum defaults and other practically unreachable paths are not
 targeted merely to increase branch counts. A new official LLVM report
 is required before claiming a coverage increase from this test change.
+
+## 2026-10-31 — LLVM 21 coverage update and real error-path checks
+
+The user-supplied archive `Archivio 6(5).zip` contains a macOS LLVM 21 report
+for the test-only D06 increment `0e7fc96`: 172/172 functions (100%),
+906/1001 lines (90.51%), 524/616 regions (85.06%) and 276/370
+branches (74.59%). Against the previous report for `bf9d7ba`,
+this represents +8 covered lines and +11 covered branches without
+adding production code. In `src/testing.cpp`, the report shows 31/31
+functions, 284/301 lines and 174/206 branches. The D06 checks for
+registration, retention and file comparison have materially improved
+the corresponding branch counts.
+
+Inspection of `coverage/branches.txt` now identifies actionable
+`include/testing/testing.hpp` gaps in negative-duration handling for
+`expect_ready` and `expect_eventually` (lines 765-767, 808-810),
+typed exception absence and nonstandard exception classification
+(lines 654, 680-682, 716-718, 728-730), and range diagnostics for
+the first indeterminate element followed by a definite mismatch
+(line 489) and truncated long values (lines 433-434).
+The new self-tests exercise these through the public APIs, verifying
+their observable outcomes, non-evaluation of rejected wait predicates,
+diagnostic strings, preserved mismatch/indeterminate indices,
+bounded output length, empty-range equality and continuation to
+subsequent cases. No framework code, baseline expectations or
+coverage selection has changed.
+
+Other unexecuted branches include impossible enum switch defaults,
+allocator exhaustion and toolchain-specific per-instantiation
+branches. These are not targeted with artificial tests merely to
+satisfy coverage metrics. A fresh official LLVM report is needed
+to confirm the effect of the newly published tests.

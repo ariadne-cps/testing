@@ -541,5 +541,41 @@ int main() {
         contract_reporter.results[1].assertions.size() != 1 ||
         contract_reporter.results[1].assertions[0].description != "runner continued")
         return 86;
+
+    // Negative wait durations are invalid arguments and must be reported
+    // without invoking a condition predicate or blocking on the future.
+    Suite invalid_waits("negative wait durations");
+    bool evaluated_condition = false;
+    std::promise<int> unresolved;
+    auto unresolved_future = unresolved.get_future();
+    invalid_waits.add("reject negative timeouts", [&](Context& c) {
+        c.expect_ready(unresolved_future, std::chrono::milliseconds(-1),
+                       "negative future timeout");
+        std::condition_variable_any cv;
+        std::mutex mutex;
+        std::unique_lock<std::mutex> lock(mutex);
+        c.expect_eventually(cv, lock, [&] {
+            evaluated_condition = true;
+            return true;
+        }, std::chrono::milliseconds(-1), "negative condition timeout");
+    });
+    invalid_waits.add("continue after invalid timeout", [](Context& c) {
+        c.prove(true, "later case still runs");
+    });
+    CaptureReporter invalid_waits_capture;
+    auto const invalid_waits_summary = invalid_waits.run(invalid_waits_capture);
+    if (invalid_waits_summary.passed != 1 || invalid_waits_summary.errors != 1 ||
+        invalid_waits_summary.failed != 0 || invalid_waits_capture.results.size() != 2 ||
+        evaluated_condition)
+        return 87;
+    auto const& invalid_wait_assertions = invalid_waits_capture.results[0].assertions;
+    if (invalid_wait_assertions.size() != 2 ||
+        invalid_wait_assertions[0].outcome != Outcome::Error ||
+        invalid_wait_assertions[1].outcome != Outcome::Error ||
+        invalid_wait_assertions[0].detail != "negative timeout" ||
+        invalid_wait_assertions[1].detail != "negative timeout" ||
+        invalid_waits_capture.results[1].outcome != Outcome::Passed)
+        return 88;
+
     return 0;
 }

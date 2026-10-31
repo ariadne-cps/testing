@@ -85,5 +85,51 @@ int main() {
     if(report.cases[3].assertions[0].detail.find("actual_count=1, expected_count=3")==std::string::npos) return 4;
     if(report.cases[4].assertions[0].outcome!=Outcome::Inconclusive) return 5;
     if(report.cases[5].assertions[0].detail.find("path=node/1")==std::string::npos) return 6;
+
+    // An indeterminate early element cannot hide a later definite mismatch.
+    // Both locations must be retained for a useful diagnostic.
+    Suite range_boundaries("range diagnostic boundaries");
+    range_boundaries.add("unknown before definite mismatch", [](Context& c) {
+        ARIADNE_EXPECT_RANGES_BY_CTX(c, (std::vector<int>{0,7,5}),
+            (std::vector<int>{0,2,5}),
+            [](int actual, int expected) -> Evidence {
+                if (actual == 0) return Evidence::Indeterminate;
+                return actual == expected ? Evidence::True : Evidence::False;
+            });
+    });
+    range_boundaries.add("long values bounded in diagnostics", [](Context& c) {
+        ARIADNE_EXPECT_RANGES_CTX(c,
+            (std::vector<std::string>{std::string(120, 'a')}),
+            (std::vector<std::string>{std::string(120, 'b')}));
+    });
+    range_boundaries.add("two empty ranges compare equal", [](Context& c) {
+        ARIADNE_EXPECT_RANGES_CTX(c, (std::vector<int>{}),
+                                  (std::vector<int>{}));
+    });
+    Capture boundary_capture;
+    auto const boundary_summary = range_boundaries.run(boundary_capture);
+    if (boundary_summary.passed != 1 || boundary_summary.failed != 2 ||
+        boundary_summary.errors != 0 || boundary_capture.cases.size() != 3)
+        return 7;
+    auto const& mixed_assertion = boundary_capture.cases[0].assertions[0];
+    if (mixed_assertion.outcome != Outcome::Failed ||
+        mixed_assertion.detail.find("first_mismatch_index=1") == std::string::npos ||
+        mixed_assertion.detail.find("first_indeterminate_index=0") == std::string::npos ||
+        mixed_assertion.actual.find("value=7") == std::string::npos ||
+        mixed_assertion.expected.find("value=2") == std::string::npos)
+        return 8;
+    auto const& long_assertion = boundary_capture.cases[1].assertions[0];
+    if (long_assertion.outcome != Outcome::Failed ||
+        long_assertion.actual.find(std::string(93, 'a') + "...") == std::string::npos ||
+        long_assertion.expected.find(std::string(93, 'b') + "...") == std::string::npos ||
+        long_assertion.actual.find(std::string(94, 'a')) != std::string::npos ||
+        long_assertion.expected.find(std::string(94, 'b')) != std::string::npos)
+        return 9;
+    auto const& empty_assertion = boundary_capture.cases[2].assertions[0];
+    if (empty_assertion.outcome != Outcome::Passed ||
+        empty_assertion.detail.find("actual_count=0, expected_count=0") == std::string::npos ||
+        empty_assertion.detail.find("first_mismatch_index") != std::string::npos)
+        return 10;
+
     return 0;
 }
