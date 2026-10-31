@@ -1024,3 +1024,17 @@ both deadline modes, budget preservation and separation from elapsed notes.
 Existing assertion construction remains source-compatible because the new
 field is optional with a default. No platform-specific tests were excluded.
 This increment requires CI verification.
+
+## 2026-10-31 — D01: domain relation separation
+
+The existing generic checks already distinguish structural equality,
+ADL-based identity via `same`, named unary/binary relations, negated
+relations and numerical tolerance. D01 does not warrant a domain-specific
+library dependency or additional macros. The new standalone regression
+`test_relations.cpp` verifies structural equality versus identity in both
+directions, mathematical `equal` with indeterminate evidence, directional
+containment, intersection and disjointness, refinement, consistency and
+tolerance versus exact equality. It checks domain relation naming, rendered
+operands and CHECK-before-operand/single-evaluation behavior. No domain
+relation is silently translated into a different one. The self-test is
+registered without platform guards. CI verification remains the release gate.

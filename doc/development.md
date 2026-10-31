@@ -47,11 +47,12 @@ any repository above configuration, or external test frameworks.
 - [x] Add unary/binary predicates with ADL, including negated relations, and
       retain/render both operands, the relation name and the resulting
       mathematical evidence. Provide thin optional macros for source spelling.
-- [ ] Keep exact equality, domain-specific \`same\`/identity, mathematical
+- [x] Keep exact equality, domain-specific \`same\`/identity, mathematical
       equality, containment, intersection, refinement, consistency and
       numerical tolerance **separate**; expose generic predicate checking
       in Testing and allow domain-local named adapters instead of depending
-      on numeric/function/interval/set.
+      on numeric/function/interval/set. Standalone domain-relation tests
+      now distinguish these contracts without adding domain dependencies.
 - [x] Preserve signed/unsigned integral comparison safety and support
       heterogeneous user-defined operands; test indeterminate-valued
       relations and single-evaluation side effects.
@@ -160,7 +161,7 @@ manually measures durations; numeric test files annotate frozen TSV cases.
 
 ### D05. Asynchronous progress and bounded concurrency checks
 
-- [ ] Provide convenient checks for future/condition-variable/atomic
+- [x] Provide convenient checks for future/condition-variable/atomic
       progress with deadline, observed state and an informative timeout
       failure; make the waiting predicate deterministic when possible.
       **Partially implemented:** future and condition-variable waits, and

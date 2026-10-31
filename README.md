@@ -63,6 +63,18 @@ recorded automatically; operand evaluation is deferred until after the
 numbered CHECK progress event and happens once. Explicit Context calls
 remain available whenever a handwritten description is preferable.
 
+## Domain relations remain separate
+
+Use `ARIADNE_EXPECT_EQUAL(_CTX)` for ordinary equality,
+`ARIADNE_EXPECT_SAME(_CTX)` for ADL-dispatched identity, and named
+`ARIADNE_EXPECT_BINARY_PREDICATE(_CTX)` relations for mathematical
+`equal`, `intersect`, `disjoint`, `contains` and `refines`.
+The domain supplies the functions; Testing provides only generic
+evaluation and evidence preservation. Tolerance via
+`ARIADNE_EXPECT_WITHIN(_CTX)` is not exact equality, and an uncertain
+mathematical relation remains Inconclusive. `test_relations.cpp` checks
+these distinctions with a dependency-free stand-in domain.
+
 ## Relational and predicate checks
 
 In addition to equality and tolerance, `ariadne-testing.hpp` exposes
