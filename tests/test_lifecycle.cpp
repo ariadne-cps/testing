@@ -84,22 +84,22 @@ struct VariantFail : ContextFixture {
 int main(){
     Trace trace; Fixture::trace=&trace;
     Suite suite("fixture lifecycle");
-    ARIADNE_ADD_TEST_TO(suite,Fixture,test_modify);
-    ARIADNE_ADD_TEST_TO(suite,Fixture,test_fresh);
-    ARIADNE_ADD_TEST_TO(suite,Fixture,test_throw);
-    ARIADNE_ADD_TEST_TO(suite,Fixture,test_abort);
-    ARIADNE_ADD_TEST_TO(suite,SetupFail,test_case);
-    ARIADNE_ADD_TEST_TO(suite,TeardownFail,test_success);
-    ARIADNE_ADD_TEST_TO(suite,TeardownFail,test_exception);
-    ARIADNE_ADD_TEST_TO(suite,TeardownFail,test_abort);
-    ARIADNE_ADD_TEST_NO_THROW_TO(suite,NoThrow,test_exception);
+    ARIADNE_TESTING_ADD_TEST_TO(suite,Fixture,test_modify);
+    ARIADNE_TESTING_ADD_TEST_TO(suite,Fixture,test_fresh);
+    ARIADNE_TESTING_ADD_TEST_TO(suite,Fixture,test_throw);
+    ARIADNE_TESTING_ADD_TEST_TO(suite,Fixture,test_abort);
+    ARIADNE_TESTING_ADD_TEST_TO(suite,SetupFail,test_case);
+    ARIADNE_TESTING_ADD_TEST_TO(suite,TeardownFail,test_success);
+    ARIADNE_TESTING_ADD_TEST_TO(suite,TeardownFail,test_exception);
+    ARIADNE_TESTING_ADD_TEST_TO(suite,TeardownFail,test_abort);
+    ARIADNE_TESTING_ADD_TEST_NO_THROW_TO(suite,NoThrow,test_exception);
     auto shared=std::make_shared<Shared>();
     auto group=fixture_variant<Variant>(suite,"shared resource",
         [shared](Context& c){return Variant(c,shared);});
-    ARIADNE_ADD_VARIANT_TEST(group,test_first);
-    ARIADNE_ADD_VARIANT_TEST(group,test_second);
+    ARIADNE_TESTING_ADD_VARIANT_TEST(group,test_first);
+    ARIADNE_TESTING_ADD_VARIANT_TEST(group,test_second);
     auto failing=fixture_variant<VariantFail>(suite,"variant failure");
-    ARIADNE_ADD_VARIANT_TEST(failing,test_exception);
+    ARIADNE_TESTING_ADD_VARIANT_TEST(failing,test_exception);
     Capture capture;
     auto const summary=suite.run(capture);
     Fixture::trace=nullptr;

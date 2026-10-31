@@ -58,58 +58,58 @@ int main() {
 
     suite.add("exact equality need not imply identity", [](Context& c) {
         Value a{1,10,0}, b{2,10,0};
-        ARIADNE_EXPECT_EQUAL_CTX(c,a,b);
+        ARIADNE_TESTING_EXPECT_EQUAL_CTX(c,a,b);
     });
     suite.add("identity does not imply exact equality", [](Context& c) {
         Value a{7,10,0}, b{7,11,0};
-        ARIADNE_EXPECT_SAME_CTX(c,a,b);
-        ARIADNE_EXPECT_EQUAL_CTX(c,a,b);
+        ARIADNE_TESTING_EXPECT_SAME_CTX(c,a,b);
+        ARIADNE_TESTING_EXPECT_EQUAL_CTX(c,a,b);
     });
     suite.add("exact equality does not imply identity", [](Context& c) {
         Value a{1,10,0}, b{2,10,0};
-        ARIADNE_EXPECT_EQUAL_CTX(c,a,b);
-        ARIADNE_EXPECT_SAME_CTX(c,a,b);
+        ARIADNE_TESTING_EXPECT_EQUAL_CTX(c,a,b);
+        ARIADNE_TESTING_EXPECT_SAME_CTX(c,a,b);
     });
     suite.add("mathematical equality can be uncertain", [](Context& c) {
         Value a{1,10,1}, b{2,11,1};
-        ARIADNE_EXPECT_BINARY_PREDICATE_CTX(c,equal,a,b);
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c,equal,a,b);
     });
     suite.add("mathematical inequality can be proven", [](Context& c) {
         Value a{1,10,0}, b{2,20,0};
-        ARIADNE_EXPECT_NOT_BINARY_PREDICATE_CTX(c,equal,a,b);
+        ARIADNE_TESTING_EXPECT_NOT_BINARY_PREDICATE_CTX(c,equal,a,b);
     });
     suite.add("intersection and disjointness", [](Context& c) {
         Value a{1,10,1}, near{2,12,1}, far{3,20,1};
-        ARIADNE_EXPECT_BINARY_PREDICATE_CTX(c,intersect,a,near);
-        ARIADNE_EXPECT_BINARY_PREDICATE_CTX(c,disjoint,a,far);
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c,intersect,a,near);
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c,disjoint,a,far);
     });
     suite.add("directional containment", [](Context& c) {
         Value outer{1,10,5}, inner{2,11,1};
-        ARIADNE_EXPECT_BINARY_PREDICATE_CTX(c,contains,outer,inner);
-        ARIADNE_EXPECT_NOT_BINARY_PREDICATE_CTX(c,contains,inner,outer);
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c,contains,outer,inner);
+        ARIADNE_TESTING_EXPECT_NOT_BINARY_PREDICATE_CTX(c,contains,inner,outer);
     });
     suite.add("proven refinement", [](Context& c) {
         Value inner{1,11,1}, outer{2,10,5};
-        ARIADNE_EXPECT_BINARY_PREDICATE_CTX(c,refines,inner,outer);
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c,refines,inner,outer);
     });
     suite.add("uncertain refinement", [](Context& c) {
         Value a{1,10,2}, b{2,12,2};
-        ARIADNE_EXPECT_BINARY_PREDICATE_CTX(c,refines,a,b);
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c,refines,a,b);
     });
     suite.add("consistency and its negation", [](Context& c) {
         Value good{1,10,0}, bad{2,10,-1};
-        ARIADNE_EXPECT_UNARY_PREDICATE_CTX(c,consistent,good);
-        ARIADNE_EXPECT_NOT_UNARY_PREDICATE_CTX(c,consistent,bad);
+        ARIADNE_TESTING_EXPECT_UNARY_PREDICATE_CTX(c,consistent,good);
+        ARIADNE_TESTING_EXPECT_NOT_UNARY_PREDICATE_CTX(c,consistent,bad);
     });
     suite.add("numerical tolerance is separate", [](Context& c) {
-        ARIADNE_EXPECT_WITHIN_CTX(c,11,10,1);
+        ARIADNE_TESTING_EXPECT_WITHIN_CTX(c,11,10,1);
     });
     suite.add("exact numerical equality rejects discrepancy", [](Context& c) {
-        ARIADNE_EXPECT_EQUAL_CTX(c,11,10);
+        ARIADNE_TESTING_EXPECT_EQUAL_CTX(c,11,10);
     });
     int left_calls=0, right_calls=0;
     suite.add("ADL relations evaluate once after CHECK", [&](Context& c) {
-        ARIADNE_EXPECT_BINARY_PREDICATE_CTX(c,intersect,
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c,intersect,
             ([&] {
                 if (capture.last_started.find("intersect(") == std::string::npos)
                     throw std::logic_error("CHECK event not published");
@@ -124,7 +124,7 @@ int main() {
     });
     suite.add("disjoint refinement must be rejected", [](Context& c) {
         Value a{1,10,1}, b{2,30,1};
-        ARIADNE_EXPECT_BINARY_PREDICATE_CTX(c,refines,a,b);
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c,refines,a,b);
     });
 
     auto const summary=suite.run(capture);

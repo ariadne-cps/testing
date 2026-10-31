@@ -45,18 +45,18 @@ struct MacroFixture : ContextFixture {
     using ContextFixture::ContextFixture;
 
     void test_status() {
-        ARIADNE_EXPECT_STATUS(solve(DomainStatus::Unknown),
+        ARIADNE_TESTING_EXPECT_STATUS(solve(DomainStatus::Unknown),
             [](DomainResult const& r) { return r.status; },
             (std::initializer_list<DomainStatus>{DomainStatus::Sat, DomainStatus::Unknown}),
             [](DomainResult const& r) { return r.reason == 42; });
     }
     void test_status_only() {
-        ARIADNE_EXPECT_STATUS_ONLY(solve(DomainStatus::Unsat),
+        ARIADNE_TESTING_EXPECT_STATUS_ONLY(solve(DomainStatus::Unsat),
             [](DomainResult const& r) { return r.status; },
             (std::initializer_list<DomainStatus>{DomainStatus::Unsat}));
     }
     void test_alternative() {
-        ARIADNE_EXPECT_ALTERNATIVE(incomplete(),
+        ARIADNE_TESTING_EXPECT_ALTERNATIVE(incomplete(),
             [](DomainResult const&) { return false; },
             [](std::exception const& e) {
                 auto const* partial = dynamic_cast<Incomplete const*>(&e);
@@ -64,25 +64,25 @@ struct MacroFixture : ContextFixture {
             });
     }
     void test_alternative_void() {
-        ARIADNE_EXPECT_ALTERNATIVE((void)0,
+        ARIADNE_TESTING_EXPECT_ALTERNATIVE((void)0,
             [](std::monostate const&) { return true; },
             [](std::exception const&) { return false; });
     }
     void test_atomic() {
         std::atomic<int> state{8};
-        ARIADNE_EXPECT_ATOMIC(state, [](int observed) { return observed == 8; }, 0ms);
+        ARIADNE_TESTING_EXPECT_ATOMIC(state, [](int observed) { return observed == 8; }, 0ms);
     }
     void test_ready() {
         std::promise<int> promise;
         auto future = promise.get_future();
         promise.set_value(3);
-        ARIADNE_EXPECT_READY(future, 0ms);
+        ARIADNE_TESTING_EXPECT_READY(future, 0ms);
     }
     void test_eventually() {
         std::condition_variable_any cv;
         std::mutex mutex;
         std::unique_lock<std::mutex> lock(mutex);
-        ARIADNE_EXPECT_EVENTUALLY(cv, lock, [] { return true; }, 0ms);
+        ARIADNE_TESTING_EXPECT_EVENTUALLY(cv, lock, [] { return true; }, 0ms);
     }
 };
 
@@ -92,7 +92,7 @@ int main() {
     int operations = 0, selectors = 0, verifiers = 0;
     int rejected_verifiers = 0;
     suite.add("context typed status", [&](Context& c) {
-        ARIADNE_EXPECT_STATUS_CTX(c,
+        ARIADNE_TESTING_EXPECT_STATUS_CTX(c,
             (++operations, solve(DomainStatus::Unknown)),
             [&](DomainResult const& r) { ++selectors; return r.status; },
             (std::initializer_list<DomainStatus>{DomainStatus::Sat, DomainStatus::Unknown}),
@@ -102,19 +102,19 @@ int main() {
             });
     });
     suite.add("context status only", [&](Context& c) {
-        ARIADNE_EXPECT_STATUS_ONLY_CTX(c,
+        ARIADNE_TESTING_EXPECT_STATUS_ONLY_CTX(c,
             (++operations, solve(DomainStatus::Unsat)),
             [&](DomainResult const& r) { ++selectors; return r.status; },
             (std::initializer_list<DomainStatus>{DomainStatus::Unsat}));
     });
     suite.add("context unpermitted status", [&](Context& c) {
-        ARIADNE_EXPECT_STATUS_CTX(c, (++operations, solve(DomainStatus::Sat)),
+        ARIADNE_TESTING_EXPECT_STATUS_CTX(c, (++operations, solve(DomainStatus::Sat)),
             [&](DomainResult const& r) { ++selectors; return r.status; },
             (std::initializer_list<DomainStatus>{DomainStatus::Unsat}),
             [&](DomainResult const&) { ++rejected_verifiers; return true; });
     });
     suite.add("context returned alternative", [&](Context& c) {
-        ARIADNE_EXPECT_ALTERNATIVE_CTX(c,
+        ARIADNE_TESTING_EXPECT_ALTERNATIVE_CTX(c,
             (++operations, solve(DomainStatus::Sat)),
             [&](DomainResult const& r) {
                 ++verifiers;
@@ -126,7 +126,7 @@ int main() {
             });
     });
     suite.add("context exception alternative", [&](Context& c) {
-        ARIADNE_EXPECT_ALTERNATIVE_CTX(c, incomplete(),
+        ARIADNE_TESTING_EXPECT_ALTERNATIVE_CTX(c, incomplete(),
             [&](DomainResult const&) {
                 ++rejected_verifiers;
                 return false;
@@ -139,7 +139,7 @@ int main() {
     });
     suite.add("context atomic progress", [&](Context& c) {
         std::atomic<int> value{4};
-        ARIADNE_EXPECT_ATOMIC_CTX(c, value,
+        ARIADNE_TESTING_EXPECT_ATOMIC_CTX(c, value,
             [&](int observed) { ++verifiers; return observed >= 4 && report.checks == 6; },
             0ms);
     });
@@ -147,36 +147,36 @@ int main() {
         std::promise<void> promise;
         auto future = promise.get_future();
         promise.set_value();
-        ARIADNE_EXPECT_READY_CTX(c, future, 0ms);
+        ARIADNE_TESTING_EXPECT_READY_CTX(c, future, 0ms);
     });
     suite.add("context condition eventually", [&](Context& c) {
         std::condition_variable_any cv;
         std::mutex mutex;
         std::unique_lock<std::mutex> lock(mutex);
-        ARIADNE_EXPECT_EVENTUALLY_CTX(c, cv, lock,
+        ARIADNE_TESTING_EXPECT_EVENTUALLY_CTX(c, cv, lock,
             [&] { ++verifiers; return report.checks == 8; }, 0ms);
     });
     suite.add("context atomic timeout", [](Context& c) {
         std::atomic<int> value{0};
-        ARIADNE_EXPECT_ATOMIC_CTX(c, value, [](int observed) { return observed == 1; }, 0ms);
+        ARIADNE_TESTING_EXPECT_ATOMIC_CTX(c, value, [](int observed) { return observed == 1; }, 0ms);
     });
     suite.add("context condition timeout", [](Context& c) {
         std::condition_variable_any cv;
         std::mutex mutex;
         std::unique_lock<std::mutex> lock(mutex);
-        ARIADNE_EXPECT_EVENTUALLY_CTX(c, cv, lock, [] { return false; }, 0ms);
+        ARIADNE_TESTING_EXPECT_EVENTUALLY_CTX(c, cv, lock, [] { return false; }, 0ms);
     });
     suite.add("context deferred future", [](Context& c) {
         auto future = std::async(std::launch::deferred, [] { return 42; });
-        ARIADNE_EXPECT_READY_CTX(c, future, 0ms);
+        ARIADNE_TESTING_EXPECT_READY_CTX(c, future, 0ms);
     });
-    ARIADNE_ADD_TEST_TO(suite, MacroFixture, test_status);
-    ARIADNE_ADD_TEST_TO(suite, MacroFixture, test_status_only);
-    ARIADNE_ADD_TEST_TO(suite, MacroFixture, test_alternative);
-    ARIADNE_ADD_TEST_TO(suite, MacroFixture, test_alternative_void);
-    ARIADNE_ADD_TEST_TO(suite, MacroFixture, test_atomic);
-    ARIADNE_ADD_TEST_TO(suite, MacroFixture, test_ready);
-    ARIADNE_ADD_TEST_TO(suite, MacroFixture, test_eventually);
+    ARIADNE_TESTING_ADD_TEST_TO(suite, MacroFixture, test_status);
+    ARIADNE_TESTING_ADD_TEST_TO(suite, MacroFixture, test_status_only);
+    ARIADNE_TESTING_ADD_TEST_TO(suite, MacroFixture, test_alternative);
+    ARIADNE_TESTING_ADD_TEST_TO(suite, MacroFixture, test_alternative_void);
+    ARIADNE_TESTING_ADD_TEST_TO(suite, MacroFixture, test_atomic);
+    ARIADNE_TESTING_ADD_TEST_TO(suite, MacroFixture, test_ready);
+    ARIADNE_TESTING_ADD_TEST_TO(suite, MacroFixture, test_eventually);
 
     Summary const summary = suite.run(report);
     bool ok = true;

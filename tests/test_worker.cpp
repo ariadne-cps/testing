@@ -29,20 +29,20 @@ int main() {
         std::jthread a([&] {
             batch.run(0, [&](WorkerBatch::Worker& worker) {
                 ready.wait();
-                ARIADNE_WORKER_CHECK(worker, false);
-                ARIADNE_WORKER_CHECK(worker, Evidence::Indeterminate);
+                ARIADNE_TESTING_WORKER_CHECK(worker, false);
+                ARIADNE_TESTING_WORKER_CHECK(worker, Evidence::Indeterminate);
             });
         });
         std::jthread b([&] {
             batch.run(1, [&](WorkerBatch::Worker& worker) {
-                ARIADNE_WORKER_CHECK(worker, true);
+                ARIADNE_TESTING_WORKER_CHECK(worker, true);
                 release.set_value();
                 throw std::runtime_error("worker failure");
             });
         });
         std::jthread d([&] {
             batch.run(2, [&](WorkerBatch::Worker& worker) {
-                ARIADNE_WORKER_CHECK(worker,
+                ARIADNE_TESTING_WORKER_CHECK(worker,
                     ([]() -> bool { throw std::runtime_error("predicate failure"); })());
             });
         });
@@ -59,7 +59,7 @@ int main() {
         try { batch.flush(c); } catch (std::logic_error const&) { early = true; }
         c.prove(early, "premature flush rejected");
         batch.run(0, [](WorkerBatch::Worker& worker) {
-            ARIADNE_WORKER_CHECK(worker, true);
+            ARIADNE_TESTING_WORKER_CHECK(worker, true);
         });
         batch.flush(c);
     });
@@ -69,7 +69,7 @@ int main() {
         try { batch.run(2, [](WorkerBatch::Worker&) {}); }
         catch (std::logic_error const&) { wrong = true; }
         batch.run(0, [&](WorkerBatch::Worker& worker) {
-            ARIADNE_WORKER_CHECK(worker, ++evaluated == 1);
+            ARIADNE_TESTING_WORKER_CHECK(worker, ++evaluated == 1);
         });
         bool duplicate = false;
         try { batch.run(0, [](WorkerBatch::Worker&) {}); }

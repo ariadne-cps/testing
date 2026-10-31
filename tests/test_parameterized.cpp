@@ -63,12 +63,12 @@ struct InterfaceFixture final : ContextFixture {
 
     void test_value() {
         ++*executions;
-        ARIADNE_EXPECT_EQUAL(implementation->value(), 42);
+        ARIADNE_TESTING_EXPECT_EQUAL(implementation->value(), 42);
     }
 
     void test_other() {
         ++*executions;
-        ARIADNE_EXPECT_GREATER(implementation->value(), 41);
+        ARIADNE_TESTING_EXPECT_GREATER(implementation->value(), 41);
     }
     void test_demonstration() { ++*executions; }
 };
@@ -76,7 +76,7 @@ struct InterfaceFixture final : ContextFixture {
 struct PrecisionFixture : ContextFixture {
     int bits;
     PrecisionFixture(Context& context, int value) : ContextFixture(context), bits(value) {}
-    void test_precision() { ARIADNE_EXPECT_GREATER(bits, 32); }
+    void test_precision() { ARIADNE_TESTING_EXPECT_GREATER(bits, 32); }
 };
 
 struct ApproximateTag { static constexpr int value = 1; };
@@ -99,15 +99,15 @@ int main() {
         ++first_factories;
         return InterfaceFixture(context, std::make_unique<FirstImplementation>(), executions);
     });
-    ARIADNE_ADD_VARIANT_TEST(full, test_value);
-    ARIADNE_ADD_VARIANT_TEST(full, test_other);
-    ARIADNE_ADD_VARIANT_TEST_NO_THROW(full, test_demonstration);
+    ARIADNE_TESTING_ADD_VARIANT_TEST(full, test_value);
+    ARIADNE_TESTING_ADD_VARIANT_TEST(full, test_other);
+    ARIADNE_TESTING_ADD_VARIANT_TEST_NO_THROW(full, test_demonstration);
 
     auto subset = fixture_variant<InterfaceFixture>(suite, "Affine", [&](Context& context) {
         ++second_factories;
         return InterfaceFixture(context, std::make_unique<SecondImplementation>(), executions);
     });
-    ARIADNE_ADD_VARIANT_TEST(subset, test_value);
+    ARIADNE_TESTING_ADD_VARIANT_TEST(subset, test_value);
     if (first_factories != 0 || second_factories != 0 || executions != 0) return 1;
 
     // A move-only factory is supported, because Suite stores a copyable
@@ -117,14 +117,14 @@ int main() {
         suite, "FloatMP/64", [value = std::move(state)](Context& context) {
             return PrecisionFixture(context, *value);
         });
-    ARIADNE_ADD_VARIANT_TEST(precision, test_precision);
+    ARIADNE_TESTING_ADD_VARIANT_TEST(precision, test_precision);
 
     auto nonmovable = fixture_variant<NotMovableFixture>(suite, "NonMovable");
-    ARIADNE_ADD_VARIANT_TEST(nonmovable, test_exists);
+    ARIADNE_TESTING_ADD_VARIANT_TEST(nonmovable, test_exists);
 
     // A typed generic test is instantiated separately per compile-time tag.
     auto paradigm_check = []<class Tag>(Context& context, std::type_identity<Tag>) {
-        ARIADNE_EXPECT_GREATER_CTX(context, Tag::value, 0);
+        ARIADNE_TESTING_EXPECT_GREATER_CTX(context, Tag::value, 0);
     };
     suite_variant(suite, "Approximate").add_typed<ApproximateTag>("api", paradigm_check);
     suite_variant(suite, "Validated").add_typed<ValidatedTag>("api", paradigm_check);
@@ -134,7 +134,7 @@ int main() {
     auto broken = fixture_variant<PrecisionFixture>(suite, "Broken", [](Context&) -> PrecisionFixture {
         throw std::runtime_error("factory failure");
     });
-    ARIADNE_ADD_VARIANT_TEST(broken, test_precision);
+    ARIADNE_TESTING_ADD_VARIANT_TEST(broken, test_precision);
     suite_variant(suite, "AfterError").add("still runs", [](Context& context) {
         context.prove(true, "runner continues");
     });
@@ -172,7 +172,7 @@ int main() {
                 std::string::npos) throw std::runtime_error("RUN was not flushed");
             return PrecisionFixture(context, 192);
         });
-    ARIADNE_ADD_VARIANT_TEST(live_variant, test_precision);
+    ARIADNE_TESTING_ADD_VARIANT_TEST(live_variant, test_precision);
     ConsoleReporter live_reporter(streamed);
     if (!live.run(live_reporter).successful()) return 9;
     if (streamed.str().find("[CHECK 1.1]") == std::string::npos) return 10;

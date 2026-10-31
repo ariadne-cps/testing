@@ -6,6 +6,6 @@ class CompileAPI(unittest.TestCase):
         umbrella = (ROOT / "include" / "ariadne-testing.hpp").read_text()
         self.assertIn('#include "testing/compile.hpp"', umbrella)
         header = (ROOT / "include" / "testing" / "compile.hpp").read_text()
-        for macro in ("ARIADNE_TEST_CONCEPT", "ARIADNE_TEST_TRAIT", "ARIADNE_TEST_SAME_TYPE"):
+        for macro in ("ARIADNE_TESTING_COMPILE_CONCEPT", "ARIADNE_TESTING_COMPILE_TRAIT", "ARIADNE_TESTING_COMPILE_SAME_TYPE"):
             self.assertIn("#define " + macro, header)
         self.assertIn("static_assert", header)
