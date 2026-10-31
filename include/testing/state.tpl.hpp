@@ -28,7 +28,7 @@
 #ifndef ARIADNE_TESTING_STATE_TPL_HPP
 #define ARIADNE_TESTING_STATE_TPL_HPP
 
-#include "include/testing/state.hpp"
+#include "testing/state.hpp"
 
 namespace Ariadne::Testing {
 

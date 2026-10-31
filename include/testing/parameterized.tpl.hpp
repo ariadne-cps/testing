@@ -28,7 +28,7 @@
 #ifndef ARIADNE_TESTING_PARAMETERIZED_TPL_HPP
 #define ARIADNE_TESTING_PARAMETERIZED_TPL_HPP
 
-#include "include/testing/parameterized.hpp"
+#include "testing/parameterized.hpp"
 
 namespace Ariadne::Testing {
 

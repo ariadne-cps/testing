@@ -28,7 +28,7 @@
 #ifndef ARIADNE_TESTING_FIXTURE_TPL_HPP
 #define ARIADNE_TESTING_FIXTURE_TPL_HPP
 
-#include "include/testing/fixture.hpp"
+#include "testing/fixture.hpp"
 
 namespace Ariadne::Testing {
 
