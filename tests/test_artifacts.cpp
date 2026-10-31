@@ -4,6 +4,8 @@
 #include <sstream>
 #include <iostream>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <vector>
 using namespace Ariadne::Testing;
 struct Capture : Reporter {
@@ -15,6 +17,7 @@ int main() {
     Suite s("artifacts");
     std::filesystem::path retained, removed, reference;
     std::filesystem::path equal_removed, invalid_removed, always_retained, conditional_removed;
+    std::filesystem::path not_directory_removed, binary_removed;
     s.add("success cleanup", [&](Context& c) {
         removed=c.work_directory();
         auto f=removed/"output.bin";
@@ -100,6 +103,33 @@ int main() {
         c.expect_file_equal(actual, missing, "missing reference fails");
         c.expect_file_signature(missing, "ABC", "missing signature fails");
     });
+    s.add("regular file cannot be a parent directory", [&](Context& c) {
+        not_directory_removed = c.work_directory();
+        auto const parent = not_directory_removed / "parent.bin";
+        { std::ofstream out(parent, std::ios::binary); out << "content"; }
+        c.expect_file_exists(parent / "child.bin",
+                             "a regular file cannot contain a child");
+    });
+    s.add("binary prefix and end-of-file comparison", [&](Context& c) {
+        binary_removed = c.work_directory();
+        auto const shorter = binary_removed / "three-bytes.bin";
+        auto const longer = binary_removed / "four-bytes.bin";
+        {
+            std::ofstream out(shorter, std::ios::binary);
+            out.write("A\0B", 3);
+        }
+        {
+            std::ofstream out(longer, std::ios::binary);
+            out.write("A\0BZ", 4);
+        }
+        c.expect_file_equal(shorter, longer, "actual file ends first");
+        c.expect_file_equal(longer, shorter, "reference file ends first");
+        c.expect_file_signature(shorter, std::string_view("A\0B", 3),
+                                "embedded NUL signature matches");
+        c.expect_file_signature(shorter, std::string_view("A\0BZ", 4),
+                                "signature longer than file fails");
+        c.expect_file_equal(shorter, shorter, "binary file equals itself");
+    });
     Capture r; auto sum=s.run(r);
     bool ok = true;
     auto verify = [&](bool condition, std::string const& description) {
@@ -108,7 +138,7 @@ int main() {
             ok = false;
         }
     };
-    verify(sum.passed == 5 && sum.failed == 3 && sum.inconclusive == 0 &&
+    verify(sum.passed == 5 && sum.failed == 5 && sum.inconclusive == 0 &&
            sum.skipped == 0 && sum.errors == 0,
            "unexpected suite summary: passed=" + std::to_string(sum.passed) +
            ", failed=" + std::to_string(sum.failed) +
@@ -120,8 +150,8 @@ int main() {
     verify(!std::filesystem::exists(removed), "successful case directory not removed");
     verify(std::filesystem::exists(retained), "failure artifacts not retained");
     verify(std::filesystem::exists(reference), "external golden reference disappeared");
-    verify(r.cases.size() == 8, "unexpected test case count");
-    if (r.cases.size() == 8) {
+    verify(r.cases.size() == 10, "unexpected test case count");
+    if (r.cases.size() == 10) {
         verify(r.cases[0].outcome == Outcome::Passed, "success-case outcome changed");
         verify(r.cases[1].outcome == Outcome::Failed, "golden-regression case must fail");
         verify(r.cases[2].outcome == Outcome::Failed, "missing file must be Failed, not Error");
@@ -144,7 +174,7 @@ int main() {
            "KeepOnFailure must not retain output from a successful case");
     verify(!always_retained.empty() && std::filesystem::exists(always_retained / "keep.bin"),
            "KeepAlways must retain output from a successful case");
-    if (r.cases.size() == 8) {
+    if (r.cases.size() == 10) {
         verify(r.cases[3].outcome == Outcome::Passed &&
                r.cases[3].assertions.size() == 1 &&
                r.cases[3].assertions[0].outcome == Outcome::Passed,
@@ -175,6 +205,37 @@ int main() {
             verify(r.cases[7].assertions[1].outcome == Outcome::Failed &&
                    r.cases[7].assertions[1].detail == "cannot open actual file",
                    "signature-file open failure diagnostic changed");
+        }
+    }
+    verify(!not_directory_removed.empty() &&
+           !std::filesystem::exists(not_directory_removed),
+           "file-as-parent case directory should be cleaned");
+    verify(!binary_removed.empty() && !std::filesystem::exists(binary_removed),
+           "binary prefix case directory should be cleaned");
+    if (r.cases.size() == 10) {
+        auto const& invalid_parent = r.cases[8];
+        verify(invalid_parent.outcome == Outcome::Failed &&
+               invalid_parent.assertions.size() == 1 &&
+               invalid_parent.assertions[0].outcome == Outcome::Failed &&
+               invalid_parent.assertions[0].detail == "file absent or not regular",
+               "ENOTDIR must be a missing-file failure, not an infrastructure error");
+        auto const& binary = r.cases[9];
+        verify(binary.outcome == Outcome::Failed && binary.assertions.size() == 5,
+               "unexpected binary prefix case classification");
+        if (binary.assertions.size() == 5) {
+            verify(binary.assertions[0].outcome == Outcome::Failed &&
+                   binary.assertions[0].detail == "first differing byte offset=3",
+                   "actual file ending first must report offset 3");
+            verify(binary.assertions[1].outcome == Outcome::Failed &&
+                   binary.assertions[1].detail == "first differing byte offset=3",
+                   "reference file ending first must report offset 3");
+            verify(binary.assertions[2].outcome == Outcome::Passed,
+                   "binary signature containing NUL should match");
+            verify(binary.assertions[3].outcome == Outcome::Failed &&
+                   binary.assertions[3].detail == "signature mismatch",
+                   "a signature longer than the file must fail");
+            verify(binary.assertions[4].outcome == Outcome::Passed,
+                   "binary file must equal itself");
         }
     }
     std::error_code error;
