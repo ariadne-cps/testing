@@ -93,6 +93,22 @@ struct DiagnosticEvent {
     std::uint_least32_t line = 0;
 };
 
+/** @brief Observed end state of a bounded wait, without diagnosing its cause. */
+enum class WaitStatus { Ready, Timeout, Deferred, InvalidTimeout, Unexpected };
+
+/** @brief Structured observation for a bounded wait assertion.
+ *  @details `elapsed` is measured waiting time, not a benchmark.
+ *  `available_budget` is the relative timeout or time remaining when
+ *  an absolute-deadline check began. It is negative for invalid durations.
+ *  A timeout does not establish deadlock, starvation or scheduler slowdown.
+ */
+struct WaitObservation {
+    WaitStatus status;
+    std::chrono::nanoseconds elapsed{};
+    std::chrono::nanoseconds available_budget{};
+    bool absolute_deadline = false;
+};
+
 /** @brief Captured assertion, including source location and nested diagnostic context. */
 struct AssertionRecord {
     Outcome outcome;
@@ -104,6 +120,8 @@ struct AssertionRecord {
     std::uint_least32_t line;
     std::size_t check_index = 0;
     std::vector<std::string> context;
+    // Empty for ordinary assertions and nonasserting elapsed diagnostics.
+    std::optional<WaitObservation> wait;
 };
 
 // The framework only records these references; adapters decide file formats.
@@ -622,7 +640,8 @@ class Suite;
     std::size_t begin_check(std::string_view description);
     void record(Outcome outcome, std::string_view description, std::string actual,
                 std::string expected, std::string detail, std::source_location location,
-                std::size_t index);
+                std::size_t index,
+                std::optional<WaitObservation> wait = std::nullopt);
     CaseResult& _result;
     Reporter* _reporter;
     std::size_t _check_count = 0;

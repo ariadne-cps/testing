@@ -372,10 +372,11 @@ std::size_t Context::begin_check(std::string_view description) {
 
 void Context::record(Outcome status, std::string_view description,
                      std::string actual, std::string expected, std::string detail,
-                     std::source_location location, std::size_t index) {
+                     std::source_location location, std::size_t index,
+                     std::optional<WaitObservation> wait) {
     _result.assertions.push_back({status, std::string(description), std::move(actual),
         std::move(expected), std::move(detail), location.file_name(), location.line(),
-        index, !_scopes.empty() ? _scopes : _unwinding_scopes});
+        index, !_scopes.empty() ? _scopes : _unwinding_scopes, std::move(wait)});
     if (priority(status) > priority(_result.outcome)) _result.outcome = status;
 }
 
