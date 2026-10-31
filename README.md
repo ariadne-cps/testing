@@ -358,6 +358,24 @@ a vacuous pass. The comparison neither filters cases nor alters random
 stream state. Independent golden-data generation belongs outside Testing;
 do not derive expected values from the implementation under test.
 
+## Explicit oracle replay and selection
+
+`plan_oracle_replay(manifest)` selects every frozen manifest row.
+Passing a nonempty span of `OracleRowId` to its second argument requests
+an explicit subset. The returned `OracleReplayPlan` preserves manifest
+order, rejects duplicate/unknown IDs and exposes `indices`, `includes(i)`,
+`complete` and `structurally_valid()`. It does not read source data,
+run callbacks or consume an RNG value. An empty request means *full replay*.
+
+`ARIADNE_TESTING_EXPECT_ORACLE_REPLAY_CTX(context, plan)` (or fixture form)
+classifies full coverage as Passed, partial coverage as Inconclusive (blocking
+by default), and invalid or fabricated plans as Error. The row comparison
+macro and the replay macro evaluate their expressions once after CHECK.
+When using a shared sequential RNG, the consumer must still generate every
+row in original order and conditionally check selected rows **after**
+drawing their samples; skipping RNG draws changes later cases. Testing
+does not filter datasets or apply hidden replay thresholds.
+
 ## Artifact files and golden references
 
 `Context::work_directory()` creates a temporary directory isolated to the running case. Use `Context::artifact(path, label, media_type, kind, lifetime)` to record artifacts and request retention; the default lifetime is `External`, which never changes an existing file. For managed outputs choose `Temporary`, `KeepOnFailure`, or `KeepAlways`; managed paths must be within the case directory.

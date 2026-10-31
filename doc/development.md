@@ -315,16 +315,21 @@ test non-C++ tooling.
 
 ### D12. Oracle data registration, reproducibility and dataset integrity
 
-- [ ] Add optional metadata for immutable reference files, row key,
+- [x] Add optional metadata for immutable reference files, row key,
       iteration/repetition, deterministic seed, precision and input
       attributes to assist reproducibility. Validate absent, duplicated,
       malformed, extra and out-of-order rows through domain-local
-      readers/checkers.
-- [ ] Keep independent golden-data generators outside Testing and keep
+      readers/checkers. Consumers retain ownership of parsers.
+- [x] Keep independent golden-data generators outside Testing and keep
       strict distinction between oracle verification and generating new
-      fixtures. Never calculate expected results from code under test.
-- [ ] Optional parameter/case selection must not silently reduce
+      fixtures. Neither oracle registration, validation nor replay plans
+      generate or overwrite expected data.
+- [x] Optional parameter/case selection must not silently reduce
       semantic coverage or disturb shared random-stream advancement.
+      Explicit oracle selection preserves manifest order; partial
+      coverage is Inconclusive (blocking by default), malformed plans
+      are Error, and selection itself never consumes RNG state. Consumers
+      remain responsible for preserving full shared-RNG advancement.
 
 **Evidence:** [numeric/tests/data/README-generators.md](https://github.com/ariadne-cps/numeric/blob/main/tests/data/README-generators.md)
 and [README-sampling.md](https://github.com/ariadne-cps/numeric/blob/main/tests/data/README-sampling.md);

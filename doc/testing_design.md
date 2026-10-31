@@ -1167,3 +1167,29 @@ bytes and metadata. The API deliberately leaves domain-specific TSV/CSV
 readers, independent generators, and random-stream advancement entirely
 with consumers. There are no platform-specific exclusions. CI remains
 the acceptance gate.
+
+## 2026-10-31 — D12 replay selection and semantic coverage
+
+`OracleReplayPlan` now validates its own structural properties, including
+strictly increasing indices, bounds, nonempty selection, valid manifest size
+and a consistent complete flag. Replay planning rejects invalid/empty frozen
+manifests, duplicate requests and unknown IDs; selected indices always remain
+in manifest order. `includes(index)` provides a read-only membership query,
+never implicitly selecting or generating a row. Full replay is the default
+for an empty request; an explicit partial selection remains Inconclusive
+under the default acceptance policy and a forged/invalid plan is Error.
+The consumer is responsible for generating or reading every sample in
+original order before conditional assertions: shared RNG advancement must
+not change during a replay. No seed reset, row filtering, oracle synthesis
+or automatic shrinking is introduced.
+
+Both `ARIADNE_TESTING_EXPECT_ORACLE_ROWS[_CTX]` and
+`ARIADNE_TESTING_EXPECT_ORACLE_REPLAY[_CTX]` now use deferred Context
+checks. CHECK notification precedes operand evaluation; operands are
+evaluated left-to-right exactly once and any exception is reported as
+Error by Suite. Original eager Context methods remain available.
+`test_oracle_replay.cpp` verifies exact subset identity, order,
+malformed plans, full/partial/error outcomes, event/operand ordering and
+a deterministic std::mt19937 stream whose advancement is unchanged by
+selection. No platform-conditional exclusion was introduced. CI is
+required before closing D12.
