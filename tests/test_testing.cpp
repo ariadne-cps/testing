@@ -195,7 +195,7 @@ int main() {
     std::ostringstream expression_output;
     int evaluation_count = 0;
     expressions.add("all macros", [&](Context& t) {
-        ARIADNE_PROVE_CTX(t, TestLogic::Truth::True);
+        ARIADNE_TESTING_PROVE_CTX(t, TestLogic::Truth::True);
         ARIADNE_TESTING_EXPECT_EQUAL_CTX(t, ++evaluation_count, 1);
         ARIADNE_TESTING_EXPECT_SAME_CTX(t, TestLogic::Value{2}, TestLogic::Value{2});
         ARIADNE_TESTING_EXPECT_WITHIN_CTX(t, 11, 10, 1);
@@ -837,7 +837,7 @@ int main() {
                 case TimedBehavior::ThrowNonstandard:
                     throw 42;
                 case TimedBehavior::AbortRequirement:
-                    ARIADNE_REQUIRE_CTX(c, false);
+                    ARIADNE_TESTING_REQUIRE_CTX(c, false);
                     return;
                 default:
                     throw std::logic_error("unknown timed test behavior");

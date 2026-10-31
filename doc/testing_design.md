@@ -1119,3 +1119,23 @@ CI verification of the new commit is required.
 
 The immediately preceding journal entry describes the earlier transitional
 state. The alias removal in this entry supersedes that temporary policy.
+
+## 2026-10-31 — Finish canonical macro migration in all self-tests
+
+The immediate removal of the old macro aliases exposed ten stale test
+invocations that the earlier self-test rename missed: two in
+`tests/test_testing.cpp`, six in `tests/test_requirements.cpp`, and two
+in `tests/test_payload.cpp`. On macOS Debug with AppleClang (and other
+affected configurations), these produced undeclared-identifier errors
+for `ARIADNE_PROVE_CTX` and `ARIADNE_REQUIRE_CTX`, preventing the
+test executables from building. These are test-source migration mistakes,
+not defects in requirement or evidence semantics.
+
+Replaced all ten references with `ARIADNE_TESTING_PROVE_CTX` and
+`ARIADNE_TESTING_REQUIRE_CTX`. No compatibility aliases were restored,
+and no tests, requirements, assertions or scenarios were skipped,
+weakened or otherwise modified. Audited all repository C++ test sources
+and public headers for obsolete macro invocations; the only deliberate
+legacy-name occurrences in C++ source are the `#ifdef` checks in
+`tests/compile/positive.cpp` that assert the aliases remain unavailable.
+Full platform CI on the correction commit is still the release gate.

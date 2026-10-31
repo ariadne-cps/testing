@@ -125,7 +125,7 @@ int main() {
         ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX(c, PayloadError,
             throw PayloadError(17, "payload"),
             [&](PayloadError const& error) {
-                ARIADNE_REQUIRE_CTX(c, error.code == 42);
+                ARIADNE_TESTING_REQUIRE_CTX(c, error.code == 42);
                 return error.code;
             }, 17);
         ++continued_after_fatal;
@@ -135,7 +135,7 @@ int main() {
             throw PayloadError(17, "payload"),
             [](PayloadError const& error) { return error.code; },
             ([&] {
-                ARIADNE_REQUIRE_CTX(c, (EvidenceValue{false, true}));
+                ARIADNE_TESTING_REQUIRE_CTX(c, (EvidenceValue{false, true}));
                 return 17;
             }()));
         ++continued_after_fatal;

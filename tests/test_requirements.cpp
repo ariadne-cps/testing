@@ -33,21 +33,21 @@ int main() {
     int evaluated = 0;
     int continued = 0;
     suite.add("passed", [&](Context& c) {
-        ARIADNE_REQUIRE_CTX(c, ++evaluated == 1);
+        ARIADNE_TESTING_REQUIRE_CTX(c, ++evaluated == 1);
         ARIADNE_TESTING_EXPECT_THROWS_MESSAGE_CTX(c, std::runtime_error,
             throw std::runtime_error("source: missing item"), "missing");
     });
     suite.add("failed fatal", [&](Context& c) {
         auto scope = c.scope("phase", 7);
-        ARIADNE_REQUIRE_CTX(c, false);
+        ARIADNE_TESTING_REQUIRE_CTX(c, false);
         ++continued;
     });
     suite.add("indeterminate fatal", [&](Context& c) {
-        ARIADNE_REQUIRE_CTX(c, (ThreeValued{false, true}));
+        ARIADNE_TESTING_REQUIRE_CTX(c, (ThreeValued{false, true}));
         ++continued;
     });
     suite.add("nested exception checker", [&](Context& c) {
-        c.expect_exception([&] { ARIADNE_REQUIRE_CTX(c, false); }, "fatal is not exception");
+        c.expect_exception([&] { ARIADNE_TESTING_REQUIRE_CTX(c, false); }, "fatal is not exception");
         ++continued;
     });
     suite.add("wrong message", [&](Context& c) {
@@ -63,11 +63,11 @@ int main() {
             (void)0, "expected");
     });
     suite.add("ordinary exception in prerequisite", [&](Context& c) {
-        ARIADNE_REQUIRE_CTX(c, ([]() -> bool { throw std::runtime_error("bad prerequisite"); })());
+        ARIADNE_TESTING_REQUIRE_CTX(c, ([]() -> bool { throw std::runtime_error("bad prerequisite"); })());
     });
     suite.add("after abort", [&](Context& c) {
         ++continued;
-        ARIADNE_PROVE_CTX(c, true);
+        ARIADNE_TESTING_PROVE_CTX(c, true);
     });
     ARIADNE_TESTING_ADD_TEST_TO(suite, Fixture, test_fixture);
     Captured capture;
