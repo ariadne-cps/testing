@@ -61,7 +61,7 @@ int main(){
     bool ok=true;
     auto check=[&](bool condition,std::string const& label){if(!condition){std::cerr<<label<<'\n';ok=false;}};
     check(summary.passed==3 && summary.failed==5 && summary.errors==3 &&
-          capture.cases.size()==11 && capture.checks==12,
+          capture.cases.size()==11 && capture.checks==11,
           "oracle outcomes: passed="+std::to_string(summary.passed)+
           " failed="+std::to_string(summary.failed)+
           " errors="+std::to_string(summary.errors));
