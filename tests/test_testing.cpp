@@ -819,5 +819,77 @@ int main() {
         manual_result.outcome != Outcome::Passed)
         return 101;
 
+
+    // A measured operation must emit Elapsed diagnostics even when it
+    // fails or aborts a case. It must preserve the original exception
+    // classification and must not execute the success continuation.
+    enum class TimedBehavior { Complete, ThrowStandard, ThrowNonstandard, AbortRequirement };
+    Suite measured_operations("measured operation outcomes");
+    int operation_calls = 0;
+    int successful_continuations = 0;
+    auto run_measured = [&](Context& c, TimedBehavior behavior) {
+        c.measure("measured operation", [&] {
+            ++operation_calls;
+            switch (behavior) {
+                case TimedBehavior::Complete:
+                    return;
+                case TimedBehavior::ThrowStandard:
+                    throw std::runtime_error("timed standard failure");
+                case TimedBehavior::ThrowNonstandard:
+                    throw 42;
+                case TimedBehavior::AbortRequirement:
+                    ARIADNE_REQUIRE_CTX(c, false);
+                    return;
+            }
+        });
+        ++successful_continuations;
+        c.prove(true, "measured operation completed");
+    };
+    measured_operations.add("completed", [&](Context& c) {
+        run_measured(c, TimedBehavior::Complete);
+    });
+    measured_operations.add("standard exception", [&](Context& c) {
+        run_measured(c, TimedBehavior::ThrowStandard);
+    });
+    measured_operations.add("nonstandard exception", [&](Context& c) {
+        run_measured(c, TimedBehavior::ThrowNonstandard);
+    });
+    measured_operations.add("failed prerequisite", [&](Context& c) {
+        run_measured(c, TimedBehavior::AbortRequirement);
+    });
+    CaptureReporter measured_capture;
+    auto const measured_summary = measured_operations.run(measured_capture);
+    if (measured_summary.passed != 1 || measured_summary.failed != 1 ||
+        measured_summary.errors != 2 || measured_summary.inconclusive != 0 ||
+        measured_summary.skipped != 0 || measured_capture.results.size() != 4 ||
+        operation_calls != 4 || successful_continuations != 1)
+        return 102;
+    for (auto const& case_result : measured_capture.results) {
+        if (case_result.diagnostics.size() != 1 ||
+            case_result.diagnostics[0].kind != DiagnosticKind::Elapsed ||
+            case_result.diagnostics[0].description != "measured operation" ||
+            case_result.diagnostics[0].duration.count() < 0)
+            return 103;
+    }
+    auto const& measured_ok = measured_capture.results[0];
+    auto const& measured_std = measured_capture.results[1];
+    auto const& measured_nonstd = measured_capture.results[2];
+    auto const& measured_abort = measured_capture.results[3];
+    if (measured_ok.outcome != Outcome::Passed ||
+        measured_ok.assertions.size() != 1 ||
+        measured_ok.assertions[0].description != "measured operation completed" ||
+        measured_std.outcome != Outcome::Error ||
+        measured_std.assertions.size() != 1 ||
+        measured_std.assertions[0].description != "Unhandled std::exception" ||
+        measured_std.assertions[0].detail != "timed standard failure" ||
+        measured_nonstd.outcome != Outcome::Error ||
+        measured_nonstd.assertions.size() != 1 ||
+        measured_nonstd.assertions[0].description != "Unhandled non-standard exception" ||
+        measured_abort.outcome != Outcome::Failed ||
+        measured_abort.assertions.size() != 1 ||
+        measured_abort.assertions[0].outcome != Outcome::Failed ||
+        measured_abort.assertions[0].description != "false")
+        return 104;
+
     return 0;
 }
