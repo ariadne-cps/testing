@@ -27,6 +27,7 @@
 
 #include <iostream>
 #include <future>
+#include <functional>
 #include <mutex>
 #include <condition_variable>
 #include <stdexcept>
@@ -498,5 +499,47 @@ int main() {
     if (run_suite(rejected, rejected_output) != 1 ||
         rejected_output.str().find("[FAIL] disproved") == std::string::npos)
         return 81;
+
+    // Suite registration rejects both independent invalid public inputs:
+    // an empty name and an empty callable. Neither may append a case.
+    Suite validation("registration contracts");
+    bool rejected_empty_name = false;
+    bool rejected_empty_body = false;
+    try {
+        validation.add("", [](Context&) {});
+    } catch (std::invalid_argument const&) {
+        rejected_empty_name = true;
+    }
+    try {
+        validation.add("no action", std::function<void(Context&)>{});
+    } catch (std::invalid_argument const&) {
+        rejected_empty_body = true;
+    }
+    if (!rejected_empty_name || !rejected_empty_body) return 84;
+
+    // An unhandled non-std C++ exception is a case Error, not a program
+    // termination. A following valid test must still run normally.
+    validation.add("nonstandard exception", [](Context&) { throw 42; });
+    validation.add("after nonstandard exception", [](Context& t) {
+        t.prove(true, "runner continued");
+    });
+    CaptureReporter contract_reporter;
+    auto const contract_summary = validation.run(contract_reporter);
+    if (contract_summary.passed != 1 || contract_summary.failed != 0 ||
+        contract_summary.inconclusive != 0 || contract_summary.skipped != 0 ||
+        contract_summary.errors != 1 || contract_reporter.results.size() != 2)
+        return 85;
+    if (contract_reporter.results[0].name != "nonstandard exception" ||
+        contract_reporter.results[0].outcome != Outcome::Error ||
+        contract_reporter.results[0].assertions.size() != 1 ||
+        contract_reporter.results[0].assertions[0].description !=
+            "Unhandled non-standard exception" ||
+        contract_reporter.results[0].assertions[0].outcome != Outcome::Error ||
+        contract_reporter.results[0].assertions[0].check_index != 0 ||
+        contract_reporter.results[1].name != "after nonstandard exception" ||
+        contract_reporter.results[1].outcome != Outcome::Passed ||
+        contract_reporter.results[1].assertions.size() != 1 ||
+        contract_reporter.results[1].assertions[0].description != "runner continued")
+        return 86;
     return 0;
 }

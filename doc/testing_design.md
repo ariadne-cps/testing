@@ -677,3 +677,24 @@ second assertion. The expected suite count and RUN/CHECK indices are
 updated to reflect the additional case. The framework implementation is
 untouched. A fresh coverage report for this commit is required before
 claiming complete function coverage for `testing.cpp`.
+
+## 2026-10-31 — testing.cpp coverage: registration contracts and nonstandard exceptions
+
+The user-supplied 2026-10-31 LLVM 21 report for the post-scope-move
+revision reports `src/testing.cpp` at 31/31 functions, 273/301 lines
+and 161/206 branches, confirming the previous move-constructor
+coverage improvement. The report's direct branch records show
+`Suite::add` at line 351 has no execution for the empty-name or
+empty-callable branch (both True counts 0), and `Suite::run` lines
+374–377 have no execution for an unhandled non-`std::exception`
+throw. These represent valid public API/error-policy paths.
+
+Added `test_testing.cpp` cases verifying that both forms of invalid
+registration throw `std::invalid_argument` without registering cases;
+that a test throwing an integer is classified as `Error`, with an
+explicit unhandled-exception assertion at index zero; and that a
+following case still executes and passes. Both independent registration
+guard outcomes and the exception handler should be exercised by this
+change. No framework implementation or coverage object selection
+changed. Verify the exact delta against the next official coverage
+report before marking these gaps closed.
