@@ -883,3 +883,32 @@ CHECK-before-operation notification, exactly-once evaluation and continued
 case execution. No platform/compiler-specific exclusions and no new
 production dependencies were introduced. The final release gate is GitHub
 Actions GCC/Clang/MSVC, sanitizers and coverage on the published commit.
+
+## 2026-10-31 — D05 part 1: atomic progress, bounded waits and CTest watchdog
+
+The generic `Context::expect_atomic(state, predicate, timeout, description)`
+observes an externally updated `std::atomic<T>` using acquire loads and
+waits only up to a `steady_clock` deadline, with a bounded 1 ms polling
+backoff. A worker may publish progress using release stores without ever
+touching the owning Context or Reporter. The predicate returns bool,
+must be nonblocking and is evaluated on the owning case thread. The
+assertion records the last observed value, elapsed time and the timeout
+limit, distinguishing Passed/Failed from an invalid negative timeout
+(Error). A zero timeout still permits an already-satisfied predicate.
+This API does not use `atomic::wait`, because C++20 provides no timeout
+for that operation, and does not cancel or join worker threads.
+
+The new `test_progress.cpp` exercises already-met, externally published,
+zero/positive timeout, negative timeout and throwing-predicate cases.
+It synchronizes the worker through promises rather than requiring a
+specific scheduling delay; its timeout is a generous upper bound, not
+an assertion about scheduler timing. Context and Reporter stay owned by
+the runner thread; concurrent worker-issued checks and deterministic
+result aggregation are still open D05 tasks.
+
+CTest now applies a 90-second *process-level* timeout to every framework
+self-test target. This is the watchdog for real deadlocks that cannot
+be safely cancelled inside a C++ test process. Downstream repositories
+remain responsible for their CTest timeout policies. No compiler- or
+OS-specific skip was added. CI validation is required before marking
+this increment as fully verified.

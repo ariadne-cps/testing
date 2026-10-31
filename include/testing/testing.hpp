@@ -33,6 +33,8 @@
 #define ARIADNE_TESTING_TESTING_HPP
 
 #include <chrono>
+#include <atomic>
+#include <thread>
 #include <filesystem>
 #include <fstream>
 #include <system_error>
@@ -546,6 +548,21 @@ template<class Lock, class Predicate, class Rep, class Period>
                            Predicate&& predicate, std::chrono::duration<Rep, Period> timeout,
                            std::string_view description,
                            std::source_location location = std::source_location::current());
+
+    // std::atomic::wait has no timeout in C++20. Poll a load with a
+    // steady-clock deadline and a bounded backoff; do not block indefinitely.
+    // Only the owning case thread may use this Context and its Reporter.
+    /** @brief Check that externally updated atomic state satisfies a predicate.
+     *  @details The predicate must be a nonblocking boolean condition on the
+     *  observed value. Atomic loads use acquire ordering, suitable for a
+     *  producer that publishes progress with release. No worker is cancelled
+     *  or joined by this API. It reports the last observed value and timeout.
+     */
+    template<class T, class Predicate, class Rep, class Period>
+    void expect_atomic(std::atomic<T> const& state, Predicate&& predicate,
+                       std::chrono::duration<Rep, Period> timeout,
+                       std::string_view description,
+                       std::source_location location = std::source_location::current());
 
     // Deferred checker: emit progress before evaluating its potentially costly predicate.
     /** @brief Record the evidence of a deferred proposition.

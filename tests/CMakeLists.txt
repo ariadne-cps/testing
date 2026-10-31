@@ -68,5 +68,21 @@ if(WIN32)
     set_tests_properties(test_alternatives PROPERTIES
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:ariadne-testing>")
 endif()
+add_executable(test_progress test_progress.cpp)
+target_link_libraries(test_progress PRIVATE ariadne-testing testing)
+add_test(NAME test_progress COMMAND $<TARGET_FILE:test_progress>)
+if(WIN32)
+    set_tests_properties(test_progress PROPERTIES
+        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:ariadne-testing>")
+endif()
+
+# A process-level watchdog is essential for deadlocks that cannot be
+# cancelled by a bounded in-process wait. Consumers own their own limits.
+set_tests_properties(
+    test_testing test_parameterized test_requirements test_payload
+    test_ranges test_artifacts test_state test_boundary_matrix
+    test_evidence_enum test_status test_alternatives test_progress
+    PROPERTIES TIMEOUT 90
+)
 add_custom_target(tests)
-add_dependencies(tests test_testing test_parameterized test_requirements test_payload test_ranges test_artifacts test_state test_boundary_matrix test_evidence_enum test_status test_alternatives)
+add_dependencies(tests test_testing test_parameterized test_requirements test_payload test_ranges test_artifacts test_state test_boundary_matrix test_evidence_enum test_status test_alternatives test_progress)

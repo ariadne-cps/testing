@@ -124,6 +124,19 @@ Variants are part of case names, not a third numeric progress counter.
 supports compile-time paradigm variants. Factory errors are reported as
 test Error, while normal fixture methods remain standard C++.
 
+## Bounded atomic progress
+
+`Context::expect_atomic(state, predicate, timeout, description)` waits
+for a predicate on a `std::atomic<T>` loaded with acquire ordering. The
+operation publishes CHECK before observing the state, reports the last
+observed value and elapsed/limit durations, and classifies timeout as
+Failed or negative timeout as Error. Use release stores in the producer;
+only the case runner may access `Context` and `Reporter`. Workers must
+not issue checks directly because worker-result synchronization remains
+a separate D05 task. Atomic waits use a bounded poll instead of the
+non-timed C++20 `atomic::wait`. This facility does not stop hung workers;
+the repository's CTest self-tests have a separate 90-second watchdog.
+
 ## Structured diagnostic scopes
 
 Use `auto file = ctx().scope("oracle", "floatmp_rounding.tsv");` and

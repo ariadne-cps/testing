@@ -738,6 +738,44 @@ template<class Lock, class Predicate, class Rep, class Period>
                location, index);
     }
 
+
+template<class T, class Predicate, class Rep, class Period>
+void Context::expect_atomic(std::atomic<T> const& state, Predicate&& predicate,
+                            std::chrono::duration<Rep, Period> timeout,
+                            std::string_view description,
+                            std::source_location location) {
+    auto const index = begin_check(description);
+    if (timeout < timeout.zero()) {
+        record(Outcome::Error, description, {}, "predicate satisfied",
+               "negative timeout", location, index);
+        return;
+    }
+    auto const start = std::chrono::steady_clock::now();
+    auto const deadline = start +
+        std::chrono::duration_cast<std::chrono::steady_clock::duration>(timeout);
+    auto observed = state.load(std::memory_order_acquire);
+    bool matched = static_cast<bool>(std::invoke(predicate, observed));
+    while (!matched) {
+        auto const now = std::chrono::steady_clock::now();
+        if (now >= deadline) break;
+        auto const remaining = deadline - now;
+        auto const max_pause = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+            std::chrono::milliseconds(1));
+        std::this_thread::sleep_for(std::min(remaining, max_pause));
+        observed = state.load(std::memory_order_acquire);
+        matched = static_cast<bool>(std::invoke(predicate, observed));
+    }
+    auto const waited = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - start).count();
+    auto const limit = std::chrono::duration_cast<std::chrono::milliseconds>(
+        timeout).count();
+    record(matched ? Outcome::Passed : Outcome::Failed, description,
+           Detail::render(observed), "predicate satisfied",
+           std::string(matched ? "waited=" : "timeout; waited=") +
+               std::to_string(waited) + "ms; limit=" + std::to_string(limit) + "ms",
+           location, index);
+}
+
 template<class Callable>
     void Context::check(Callable&& predicate, std::string_view description,
                std::source_location location){

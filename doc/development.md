@@ -163,15 +163,18 @@ manually measures durations; numeric test files annotate frozen TSV cases.
 - [ ] Provide convenient checks for future/condition-variable/atomic
       progress with deadline, observed state and an informative timeout
       failure; make the waiting predicate deterministic when possible.
-      **Partially implemented:** future and condition-variable waits; atomic
-      progress, cross-thread synchronization and deadlines remain open.
+      **Partially implemented:** future and condition-variable waits, and
+      atomic progress with an observable value and steady-clock deadline.
+      Safe cross-thread check aggregation and shared absolute-deadline
+      coordination remain open.
 - [ ] Define ownership, synchronization and aggregation for checks issued
       from worker threads; never allow concurrent writes to unprotected
       \`Context\`/Reporter state. Define reporting order and worker exception
       capture.
-- [ ] Retain *process-level* CTest timeout/watchdog for genuinely blocked
+- [x] Retain *process-level* CTest timeout/watchdog for genuinely blocked
       or deadlocked code; do not promise safe forced cancellation of a
-      hung C++ thread from inside the same process.
+      hung C++ thread from inside the same process. Framework self-tests
+      now use a 90-second CTest watchdog; consumers must set their own.
 - [ ] Preserve the distinction between timing-dependent test failure,
       scheduler slowdown and benchmark duration.
 
