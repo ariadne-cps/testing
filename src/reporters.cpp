@@ -71,7 +71,8 @@ char const* artifact_lifetime(ArtifactLifetime lifetime) {
 void json_string(std::ostream& out, std::string_view value) {
     constexpr char digits[] = "0123456789abcdef";
     out.put('"');
-    for (unsigned char const character : value) {
+    for (char const raw : value) {
+        auto const character = static_cast<unsigned char>(raw);
         switch (character) {
             case '"': out << "\\\""; break;
             case '\\': out << "\\\\"; break;
@@ -194,7 +195,8 @@ void json_case(std::ostream& out, CaseResult const& c) {
 }
 
 void xml_string(std::ostream& out, std::string_view value) {
-    for (unsigned char const character : value) {
+    for (char const raw : value) {
+        auto const character = static_cast<unsigned char>(raw);
         switch (character) {
             case '&': out << "&amp;"; break;
             case '<': out << "&lt;"; break;
