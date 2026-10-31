@@ -76,7 +76,7 @@ int main() {
     Suite next("empty suite");
     auto second=next.run(fanout);
     check(second.passed==0 &&
-          json.str().find("\"suite\":\"empty suite\",\"summary\"")!=std::string::npos &&
+          json.str().find("\"suite\":\"empty suite\",\"selection\"")!=std::string::npos &&
           json.str().find("\"cases\":[]")!=std::string::npos &&
           junit.str().find("<testsuite name=\"empty suite\" tests=\"0\"")!=std::string::npos,
           "reporter reuse leaked cases");
