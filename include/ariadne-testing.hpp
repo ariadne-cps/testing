@@ -28,6 +28,7 @@
 #include "testing/testing.hpp"
 #include "testing/fixture.hpp"
 #include "testing/checks.hpp"
+#include "testing/compile.hpp"
 #include "testing/parameterized.hpp"
 #include "testing/state.hpp"
 #include "testing/worker.hpp"
