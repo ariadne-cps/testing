@@ -1339,3 +1339,24 @@ synthetic failure does not alter the actual Suite summary or any
 CaseResult. Reused reporters clear selection state at suite finish.
 `test_reporters.cpp` checks complete, partial and empty selections.
 This behavior must be validated by CI before acceptance.
+
+## 2026-10-31 — Windows sccache server startup timeout in CI
+
+Windows MSVC Debug compilation failed while preparing
+`tests/test_payload.cpp.obj` with
+`sccache: Timed out waiting for server startup`. This is an
+infrastructure failure in the optional compiler cache, not a C++/RTL/test
+regression; the compiler had not yet produced a diagnostic. The prior
+`sccache` installation was pinned to version 0.18.0.
+
+Added a Windows-only `SCCACHE_CONF` configuration setting
+`server_startup_timeout_ms = 60000` (up from sccache's documented 10s
+default), and a serial cache-server preflight before CMake and parallel
+Ninja invocations. The preflight retries up to three times. If all
+attempts fail, it sets an empty compiler launcher and compiles directly
+with the same MSVC compiler, warnings-as-errors and test targets,
+logging an explicit cache-unavailable warning. sccache is a performance
+optimization, not a correctness gate, so this fallback prevents its
+availability from falsifying the result of C++ compilation. Neither
+tests nor semantics nor supported platforms were excluded. Subsequent
+CI must verify the workflow on both Windows architectures.

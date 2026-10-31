@@ -481,3 +481,13 @@ selection, a synthetic `__incomplete_selection__` failure with
 `type="incomplete_coverage"`. This synthetic row is a reporting gate,
 not an executed C++ case and does not change `Suite::run_selected()`
 outcomes. A completed full run never receives this synthetic row.
+
+## Windows CI compiler-cache startup
+
+Windows jobs try to start the optional sccache server before Ninja
+starts concurrent compilers, with a 60-second server startup deadline
+and three preflight attempts. If the cache cannot initialize, the job
+logs a warning and compiles directly with MSVC. This fallback does
+**not** skip compilation, alter compiler flags or suppress failing
+tests. It prevents an unavailable cache daemon from making a valid
+C++ build look like a source-code failure.
