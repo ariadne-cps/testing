@@ -22,8 +22,8 @@ bool possibly(ThreeValued v) { return v.possible; }
 struct Fixture : ContextFixture {
     using ContextFixture::ContextFixture;
     void test_fixture() {
-        ARIADNE_REQUIRE(true);
-        ARIADNE_EXPECT_THROWS_MESSAGE(std::runtime_error,
+        ARIADNE_TESTING_REQUIRE(true);
+        ARIADNE_TESTING_EXPECT_THROWS_MESSAGE(std::runtime_error,
             throw std::runtime_error("expected text"), "text");
     }
 };
@@ -34,7 +34,7 @@ int main() {
     int continued = 0;
     suite.add("passed", [&](Context& c) {
         ARIADNE_REQUIRE_CTX(c, ++evaluated == 1);
-        ARIADNE_EXPECT_THROWS_MESSAGE_CTX(c, std::runtime_error,
+        ARIADNE_TESTING_EXPECT_THROWS_MESSAGE_CTX(c, std::runtime_error,
             throw std::runtime_error("source: missing item"), "missing");
     });
     suite.add("failed fatal", [&](Context& c) {
@@ -51,15 +51,15 @@ int main() {
         ++continued;
     });
     suite.add("wrong message", [&](Context& c) {
-        ARIADNE_EXPECT_THROWS_MESSAGE_CTX(c, std::runtime_error,
+        ARIADNE_TESTING_EXPECT_THROWS_MESSAGE_CTX(c, std::runtime_error,
             throw std::runtime_error("actual"), "expected");
     });
     suite.add("wrong type", [&](Context& c) {
-        ARIADNE_EXPECT_THROWS_MESSAGE_CTX(c, std::runtime_error,
+        ARIADNE_TESTING_EXPECT_THROWS_MESSAGE_CTX(c, std::runtime_error,
             throw std::logic_error("actual"), "actual");
     });
     suite.add("missing exception", [&](Context& c) {
-        ARIADNE_EXPECT_THROWS_MESSAGE_CTX(c, std::runtime_error,
+        ARIADNE_TESTING_EXPECT_THROWS_MESSAGE_CTX(c, std::runtime_error,
             (void)0, "expected");
     });
     suite.add("ordinary exception in prerequisite", [&](Context& c) {
@@ -69,7 +69,7 @@ int main() {
         ++continued;
         ARIADNE_PROVE_CTX(c, true);
     });
-    ARIADNE_ADD_TEST_TO(suite, Fixture, test_fixture);
+    ARIADNE_TESTING_ADD_TEST_TO(suite, Fixture, test_fixture);
     Captured capture;
     Summary sum = suite.run(capture);
     if(sum.passed != 3 || sum.failed != 5 || sum.inconclusive != 1 || sum.errors != 1)
@@ -105,13 +105,13 @@ int main() {
     // a non-standard exception. Message checks must do the same.
     Suite exception_failures("exception type boundaries");
     exception_failures.add("typed exception absent", [](Context& c) {
-        ARIADNE_EXPECT_THROWS_CTX(c, std::runtime_error, (void)0);
+        ARIADNE_TESTING_EXPECT_THROWS_CTX(c, std::runtime_error, (void)0);
     });
     exception_failures.add("typed exception nonstandard", [](Context& c) {
-        ARIADNE_EXPECT_THROWS_CTX(c, std::runtime_error, throw 42);
+        ARIADNE_TESTING_EXPECT_THROWS_CTX(c, std::runtime_error, throw 42);
     });
     exception_failures.add("message exception nonstandard", [](Context& c) {
-        ARIADNE_EXPECT_THROWS_MESSAGE_CTX(c, std::runtime_error,
+        ARIADNE_TESTING_EXPECT_THROWS_MESSAGE_CTX(c, std::runtime_error,
                                           throw 42, "message");
     });
     exception_failures.add("follow-up still executes", [](Context& c) {

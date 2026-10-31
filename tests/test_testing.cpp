@@ -159,10 +159,10 @@ int main() {
         }
     };
     Suite fixture_suite("fixtures");
-    ARIADNE_ADD_TEST_TO(fixture_suite, FixtureExample, test_first);
-    ARIADNE_ADD_TEST_TO(fixture_suite, FixtureExample, test_second);
-    ARIADNE_ADD_TEST_NO_THROW_TO(fixture_suite, FixtureExample, test_print_only);
-    ARIADNE_ADD_TEST_NO_THROW_TO(fixture_suite, FixtureExample, test_throws);
+    ARIADNE_TESTING_ADD_TEST_TO(fixture_suite, FixtureExample, test_first);
+    ARIADNE_TESTING_ADD_TEST_TO(fixture_suite, FixtureExample, test_second);
+    ARIADNE_TESTING_ADD_TEST_NO_THROW_TO(fixture_suite, FixtureExample, test_print_only);
+    ARIADNE_TESTING_ADD_TEST_NO_THROW_TO(fixture_suite, FixtureExample, test_throws);
     std::ostringstream fixture_out;
     ConsoleReporter fixture_reporter(fixture_out);
     auto const fixture_summary = fixture_suite.run(fixture_reporter);
@@ -196,12 +196,12 @@ int main() {
     int evaluation_count = 0;
     expressions.add("all macros", [&](Context& t) {
         ARIADNE_PROVE_CTX(t, TestLogic::Truth::True);
-        ARIADNE_EXPECT_EQUAL_CTX(t, ++evaluation_count, 1);
-        ARIADNE_EXPECT_SAME_CTX(t, TestLogic::Value{2}, TestLogic::Value{2});
-        ARIADNE_EXPECT_WITHIN_CTX(t, 11, 10, 1);
-        ARIADNE_EXPECT_THROWS_CTX(t, std::runtime_error, throw std::runtime_error("expected"));
-        ARIADNE_EXPECT_EXCEPTION_CTX(t, throw 42);
-        ARIADNE_EXPECT_NO_THROW_CTX(t, (void)0);
+        ARIADNE_TESTING_EXPECT_EQUAL_CTX(t, ++evaluation_count, 1);
+        ARIADNE_TESTING_EXPECT_SAME_CTX(t, TestLogic::Value{2}, TestLogic::Value{2});
+        ARIADNE_TESTING_EXPECT_WITHIN_CTX(t, 11, 10, 1);
+        ARIADNE_TESTING_EXPECT_THROWS_CTX(t, std::runtime_error, throw std::runtime_error("expected"));
+        ARIADNE_TESTING_EXPECT_EXCEPTION_CTX(t, throw 42);
+        ARIADNE_TESTING_EXPECT_NO_THROW_CTX(t, (void)0);
     });
     ConsoleReporter expression_reporter(expression_output);
     auto const expression_summary = expressions.run(expression_reporter);
@@ -215,7 +215,7 @@ int main() {
     Suite ordering("deferred evaluation");
     std::ostringstream ordering_output;
     ordering.add("start precedes operands", [&](Context& t) {
-        ARIADNE_EXPECT_EQUAL_CTX(t, ([&]() {
+        ARIADNE_TESTING_EXPECT_EQUAL_CTX(t, ([&]() {
             if (ordering_output.str().find("[CHECK 1.1]") == std::string::npos)
                 throw std::runtime_error("CHECK event missing before operand evaluation");
             return 2;
@@ -241,31 +241,31 @@ int main() {
     Suite relations("relations");
     CaptureReporter relation_capture;
     relations.add("built-in relations", [](Context& t) {
-        ARIADNE_EXPECT_NOT_EQUAL_CTX(t, -1, static_cast<std::size_t>(-1));
-        ARIADNE_EXPECT_LESS_CTX(t, -1, 0u);
-        ARIADNE_EXPECT_LESS_EQUAL_CTX(t, -1, 0u);
-        ARIADNE_EXPECT_GREATER_CTX(t, 0u, -1);
-        ARIADNE_EXPECT_GREATER_EQUAL_CTX(t, 0u, -1);
-        ARIADNE_EXPECT_LESS_CTX(t, 7u, 9);
-        ARIADNE_EXPECT_GREATER_EQUAL_CTX(t, 9u, 9);
+        ARIADNE_TESTING_EXPECT_NOT_EQUAL_CTX(t, -1, static_cast<std::size_t>(-1));
+        ARIADNE_TESTING_EXPECT_LESS_CTX(t, -1, 0u);
+        ARIADNE_TESTING_EXPECT_LESS_EQUAL_CTX(t, -1, 0u);
+        ARIADNE_TESTING_EXPECT_GREATER_CTX(t, 0u, -1);
+        ARIADNE_TESTING_EXPECT_GREATER_EQUAL_CTX(t, 0u, -1);
+        ARIADNE_TESTING_EXPECT_LESS_CTX(t, 7u, 9);
+        ARIADNE_TESTING_EXPECT_GREATER_EQUAL_CTX(t, 9u, 9);
     });
     relations.add("generic ADL", [](Context& t) {
-        ARIADNE_EXPECT_BINARY_PREDICATE_CTX(t, ordered, TestLogic::Value{1}, TestLogic::Value{2});
-        ARIADNE_EXPECT_NOT_BINARY_PREDICATE_CTX(t, ordered, TestLogic::Value{2}, TestLogic::Value{1});
-        ARIADNE_EXPECT_UNARY_PREDICATE_CTX(t, positive, TestLogic::Value{3});
-        ARIADNE_EXPECT_NOT_UNARY_PREDICATE_CTX(t, positive, TestLogic::Value{-3});
-        ARIADNE_EXPECT_LESS_CTX(t, TestLogic::Value{1}, TestLogic::Value{2});
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(t, ordered, TestLogic::Value{1}, TestLogic::Value{2});
+        ARIADNE_TESTING_EXPECT_NOT_BINARY_PREDICATE_CTX(t, ordered, TestLogic::Value{2}, TestLogic::Value{1});
+        ARIADNE_TESTING_EXPECT_UNARY_PREDICATE_CTX(t, positive, TestLogic::Value{3});
+        ARIADNE_TESTING_EXPECT_NOT_UNARY_PREDICATE_CTX(t, positive, TestLogic::Value{-3});
+        ARIADNE_TESTING_EXPECT_LESS_CTX(t, TestLogic::Value{1}, TestLogic::Value{2});
     });
     relations.add("indeterminate remains indeterminate", [](Context& t) {
-        ARIADNE_EXPECT_BINARY_PREDICATE_CTX(t, ordered, TestLogic::Value{0}, TestLogic::Value{1});
-        ARIADNE_EXPECT_NOT_BINARY_PREDICATE_CTX(t, ordered, TestLogic::Value{0}, TestLogic::Value{1});
-        ARIADNE_EXPECT_UNARY_PREDICATE_CTX(t, positive, TestLogic::Value{0});
-        ARIADNE_EXPECT_NOT_UNARY_PREDICATE_CTX(t, positive, TestLogic::Value{0});
-        ARIADNE_EXPECT_LESS_CTX(t, TestLogic::Value{0}, TestLogic::Value{1});
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(t, ordered, TestLogic::Value{0}, TestLogic::Value{1});
+        ARIADNE_TESTING_EXPECT_NOT_BINARY_PREDICATE_CTX(t, ordered, TestLogic::Value{0}, TestLogic::Value{1});
+        ARIADNE_TESTING_EXPECT_UNARY_PREDICATE_CTX(t, positive, TestLogic::Value{0});
+        ARIADNE_TESTING_EXPECT_NOT_UNARY_PREDICATE_CTX(t, positive, TestLogic::Value{0});
+        ARIADNE_TESTING_EXPECT_LESS_CTX(t, TestLogic::Value{0}, TestLogic::Value{1});
     });
     relations.add("failed relation keeps operands", [](Context& t) {
-        ARIADNE_EXPECT_LESS_CTX(t, 5, 3);
-        ARIADNE_EXPECT_NOT_BINARY_PREDICATE_CTX(t, ordered, TestLogic::Value{1}, TestLogic::Value{2});
+        ARIADNE_TESTING_EXPECT_LESS_CTX(t, 5, 3);
+        ARIADNE_TESTING_EXPECT_NOT_BINARY_PREDICATE_CTX(t, ordered, TestLogic::Value{1}, TestLogic::Value{2});
     });
     auto const relation_summary = relations.run(relation_capture);
     if (relation_summary.passed != 2 || relation_summary.inconclusive != 1 ||
@@ -286,7 +286,7 @@ int main() {
     int order = 0;
     int right_order_offset = 0;
     evaluation.add("left, right, predicate", [&](Context& t) {
-        ARIADNE_EXPECT_LESS_CTX(t, ([&] {
+        ARIADNE_TESTING_EXPECT_LESS_CTX(t, ([&] {
             if (order++ != 0 || live_comparisons.str().find("[CHECK 1.1]") == std::string::npos)
                 throw std::logic_error("left operand evaluated before CHECK");
             order += right_order_offset;
@@ -354,23 +354,23 @@ int main() {
     Suite expectations("evidence expectations");
     CaptureReporter expected_capture;
     expectations.add("exact expectations", [](Context& t) {
-        ARIADNE_EXPECT_DEFINITELY_CTX(t, TestLogic::Truth::True);
-        ARIADNE_EXPECT_POSSIBLY_CTX(t, TestLogic::Truth::True);
-        ARIADNE_EXPECT_POSSIBLY_CTX(t, TestLogic::Truth::Indeterminate);
-        ARIADNE_EXPECT_NOT_POSSIBLY_CTX(t, TestLogic::Truth::False);
-        ARIADNE_EXPECT_INDETERMINATE_CTX(t, TestLogic::Truth::Indeterminate);
+        ARIADNE_TESTING_EXPECT_DEFINITELY_CTX(t, TestLogic::Truth::True);
+        ARIADNE_TESTING_EXPECT_POSSIBLY_CTX(t, TestLogic::Truth::True);
+        ARIADNE_TESTING_EXPECT_POSSIBLY_CTX(t, TestLogic::Truth::Indeterminate);
+        ARIADNE_TESTING_EXPECT_NOT_POSSIBLY_CTX(t, TestLogic::Truth::False);
+        ARIADNE_TESTING_EXPECT_INDETERMINATE_CTX(t, TestLogic::Truth::Indeterminate);
     });
     expectations.add("failed and inconclusive proof", [](Context& t) {
-        ARIADNE_EXPECT_DEFINITELY_CTX(t, TestLogic::Truth::False);
-        ARIADNE_EXPECT_DEFINITELY_CTX(t, TestLogic::Truth::Indeterminate);
+        ARIADNE_TESTING_EXPECT_DEFINITELY_CTX(t, TestLogic::Truth::False);
+        ARIADNE_TESTING_EXPECT_DEFINITELY_CTX(t, TestLogic::Truth::Indeterminate);
     });
     expectations.add("inconclusive refutation", [](Context& t) {
-        ARIADNE_EXPECT_NOT_POSSIBLY_CTX(t, TestLogic::Truth::Indeterminate);
+        ARIADNE_TESTING_EXPECT_NOT_POSSIBLY_CTX(t, TestLogic::Truth::Indeterminate);
     });
     expectations.add("false possibility and wrong expectation", [](Context& t) {
-        ARIADNE_EXPECT_POSSIBLY_CTX(t, TestLogic::Truth::False);
-        ARIADNE_EXPECT_NOT_POSSIBLY_CTX(t, TestLogic::Truth::True);
-        ARIADNE_EXPECT_INDETERMINATE_CTX(t, TestLogic::Truth::True);
+        ARIADNE_TESTING_EXPECT_POSSIBLY_CTX(t, TestLogic::Truth::False);
+        ARIADNE_TESTING_EXPECT_NOT_POSSIBLY_CTX(t, TestLogic::Truth::True);
+        ARIADNE_TESTING_EXPECT_INDETERMINATE_CTX(t, TestLogic::Truth::True);
     });
     auto const expected_sum = expectations.run(expected_capture);
     if (expected_sum.passed != 1 || expected_sum.failed != 2 ||
@@ -519,16 +519,16 @@ int main() {
         using ContextFixture::ContextFixture;
         void test_compact() {
             int evaluations = 0;
-            ARIADNE_EXPECT_EQUAL(++evaluations, 1);
-            ARIADNE_PROVE(evaluations == 1);
-            ARIADNE_EXPECT_NO_THROW((void)evaluations);
+            ARIADNE_TESTING_EXPECT_EQUAL(++evaluations, 1);
+            ARIADNE_TESTING_PROVE(evaluations == 1);
+            ARIADNE_TESTING_EXPECT_NO_THROW((void)evaluations);
         }
-        void test_no_throw() { ARIADNE_EXPECT_GREATER(2, 1); }
+        void test_no_throw() { ARIADNE_TESTING_EXPECT_GREATER(2, 1); }
     };
     {
-        ARIADNE_TEST_SUITE("compact");
-        ARIADNE_ADD_TEST(CompactFixture, test_compact);
-        ARIADNE_ADD_TEST_NO_THROW(CompactFixture, test_no_throw);
+        ARIADNE_TESTING_SUITE("compact");
+        ARIADNE_TESTING_ADD_TEST(CompactFixture, test_compact);
+        ARIADNE_TESTING_ADD_TEST_NO_THROW(CompactFixture, test_no_throw);
         std::ostringstream compact_output;
         if (::Ariadne::Testing::run_suite(ariadne_test_suite, compact_output) != 0) return 77;
         if (compact_output.str().find("[PASS] compact") == std::string::npos) return 78;

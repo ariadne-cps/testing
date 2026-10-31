@@ -31,19 +31,19 @@ struct DeadlineFixture : ContextFixture {
         auto future = promise.get_future();
         promise.set_value(7);
         auto deadline = std::chrono::steady_clock::now() - 1ms;
-        ARIADNE_EXPECT_READY_UNTIL(future, deadline);
+        ARIADNE_TESTING_EXPECT_READY_UNTIL(future, deadline);
     }
     void test_condition() {
         std::condition_variable_any condition;
         std::mutex mutex;
         std::unique_lock<std::mutex> lock(mutex);
         auto deadline = std::chrono::steady_clock::now() - 1ms;
-        ARIADNE_EXPECT_EVENTUALLY_UNTIL(condition, lock, [] { return true; }, deadline);
+        ARIADNE_TESTING_EXPECT_EVENTUALLY_UNTIL(condition, lock, [] { return true; }, deadline);
     }
     void test_atomic() {
         std::atomic<int> state{9};
         auto deadline = std::chrono::steady_clock::now() - 1ms;
-        ARIADNE_EXPECT_ATOMIC_UNTIL(state, [](int value) { return value == 9; }, deadline);
+        ARIADNE_TESTING_EXPECT_ATOMIC_UNTIL(state, [](int value) { return value == 9; }, deadline);
     }
 };
 
@@ -134,19 +134,19 @@ int main() {
         std::promise<void> promise;
         auto future = promise.get_future();
         promise.set_value();
-        ARIADNE_EXPECT_READY_UNTIL_CTX(c, future, deadline);
+        ARIADNE_TESTING_EXPECT_READY_UNTIL_CTX(c, future, deadline);
         std::condition_variable_any cv;
         std::mutex mutex;
         std::unique_lock<std::mutex> lock(mutex);
-        ARIADNE_EXPECT_EVENTUALLY_UNTIL_CTX(c, cv, lock,
+        ARIADNE_TESTING_EXPECT_EVENTUALLY_UNTIL_CTX(c, cv, lock,
             [&] { ++condition_calls[2]; return true; }, deadline);
         std::atomic<int> state{5};
-        ARIADNE_EXPECT_ATOMIC_UNTIL_CTX(c, state,
+        ARIADNE_TESTING_EXPECT_ATOMIC_UNTIL_CTX(c, state,
             [&](int value) { ++atomic_calls; return value == 5; }, deadline);
     });
-    ARIADNE_ADD_TEST_TO(suite, DeadlineFixture, test_future);
-    ARIADNE_ADD_TEST_TO(suite, DeadlineFixture, test_condition);
-    ARIADNE_ADD_TEST_TO(suite, DeadlineFixture, test_atomic);
+    ARIADNE_TESTING_ADD_TEST_TO(suite, DeadlineFixture, test_future);
+    ARIADNE_TESTING_ADD_TEST_TO(suite, DeadlineFixture, test_condition);
+    ARIADNE_TESTING_ADD_TEST_TO(suite, DeadlineFixture, test_atomic);
 
     auto const summary = suite.run(capture);
     bool ok = true;

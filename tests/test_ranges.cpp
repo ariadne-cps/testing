@@ -22,34 +22,34 @@ Truth same_value(Uncertain a, Uncertain b) {
 struct Fixture : ContextFixture {
     using ContextFixture::ContextFixture;
     void test_short() {
-        ARIADNE_EXPECT_RANGES((std::vector<int>{1,2}), (std::vector<int>{1,2}));
+        ARIADNE_TESTING_EXPECT_RANGES((std::vector<int>{1,2}), (std::vector<int>{1,2}));
     }
 };
 int main() {
     Suite suite("ranges");
     int evaluations=0;
     suite.add("equal", [&](Context& c) {
-        ARIADNE_EXPECT_RANGES_CTX(c, (++evaluations, std::vector<int>{1,2,3}),
+        ARIADNE_TESTING_EXPECT_RANGES_CTX(c, (++evaluations, std::vector<int>{1,2,3}),
                                 (std::vector<unsigned>{1u,2u,3u}));
     });
     suite.add("mismatch", [](Context& c) {
-        ARIADNE_EXPECT_RANGES_CTX(c, (std::vector<int>{1,7,3}),
+        ARIADNE_TESTING_EXPECT_RANGES_CTX(c, (std::vector<int>{1,7,3}),
                                 (std::vector<int>{1,2,3}));
     });
     suite.add("different lengths", [](Context& c) {
-        ARIADNE_EXPECT_RANGES_CTX(c, (std::vector<int>{1,2,3}),
+        ARIADNE_TESTING_EXPECT_RANGES_CTX(c, (std::vector<int>{1,2,3}),
                                 (std::vector<int>{1,2}));
     });
     suite.add("missing elements", [](Context& c) {
-        ARIADNE_EXPECT_RANGES_CTX(c, (std::vector<int>{1}),
+        ARIADNE_TESTING_EXPECT_RANGES_CTX(c, (std::vector<int>{1}),
                                 (std::vector<int>{1,2,3}));
     });
     suite.add("custom predicate indeterminate", [](Context& c) {
-        ARIADNE_EXPECT_RANGES_BY_CTX(c, (std::vector<Uncertain>{{1},{3}}),
+        ARIADNE_TESTING_EXPECT_RANGES_BY_CTX(c, (std::vector<Uncertain>{{1},{3}}),
             (std::vector<Uncertain>{{1},{2}}), same_value);
     });
     suite.add("custom path", [](Context& c) {
-        ARIADNE_EXPECT_RANGES_AT_CTX(c, (std::vector<int>{1,3}),
+        ARIADNE_TESTING_EXPECT_RANGES_AT_CTX(c, (std::vector<int>{1,3}),
             (std::vector<int>{1,2}),
             [](int a, int b) { return a==b; },
             [](std::size_t i) { return std::string("node/")+std::to_string(i); });
@@ -60,11 +60,11 @@ int main() {
             Comparator(Comparator const&) = delete;
             bool operator()(int a, int b) const { return a == b; }
         } comparator;
-        ARIADNE_EXPECT_RANGES_BY_CTX(c, (std::vector<int>{1,2}),
+        ARIADNE_TESTING_EXPECT_RANGES_BY_CTX(c, (std::vector<int>{1,2}),
             (std::vector<int>{1,2}), comparator);
     });
     suite.add("named path function", [](Context& c) {
-        ARIADNE_EXPECT_RANGES_AT_CTX(c, (std::vector<Uncertain>{{1},{2}}),
+        ARIADNE_TESTING_EXPECT_RANGES_AT_CTX(c, (std::vector<Uncertain>{{1},{2}}),
             (std::vector<Uncertain>{{1},{2}}), same_value,
             [](std::size_t i) { return std::to_string(i); });
     });
@@ -73,9 +73,9 @@ int main() {
         std::istringstream rhs("1 2 3");
         auto a=std::ranges::subrange(std::istream_iterator<int>(lhs),std::istream_iterator<int>());
         auto b=std::ranges::subrange(std::istream_iterator<int>(rhs),std::istream_iterator<int>());
-        ARIADNE_EXPECT_RANGES_CTX(c,a,b);
+        ARIADNE_TESTING_EXPECT_RANGES_CTX(c,a,b);
     });
-    ARIADNE_ADD_TEST_TO(suite,Fixture,test_short);
+    ARIADNE_TESTING_ADD_TEST_TO(suite,Fixture,test_short);
     Capture report;
     auto const summary=suite.run(report);
     if(summary.passed!=5 || summary.failed!=4 || summary.inconclusive!=1 ||
@@ -91,7 +91,7 @@ int main() {
     // Both locations must be retained for a useful diagnostic.
     Suite range_boundaries("range diagnostic boundaries");
     range_boundaries.add("unknown before definite mismatch", [](Context& c) {
-        ARIADNE_EXPECT_RANGES_BY_CTX(c, (std::vector<int>{0,7,5}),
+        ARIADNE_TESTING_EXPECT_RANGES_BY_CTX(c, (std::vector<int>{0,7,5}),
             (std::vector<int>{0,2,5}),
             [](int actual, int expected) -> Evidence {
                 if (actual == 0) return Evidence::Indeterminate;
@@ -99,12 +99,12 @@ int main() {
             });
     });
     range_boundaries.add("long values bounded in diagnostics", [](Context& c) {
-        ARIADNE_EXPECT_RANGES_CTX(c,
+        ARIADNE_TESTING_EXPECT_RANGES_CTX(c,
             (std::vector<std::string>{std::string(120, 'a')}),
             (std::vector<std::string>{std::string(120, 'b')}));
     });
     range_boundaries.add("two empty ranges compare equal", [](Context& c) {
-        ARIADNE_EXPECT_RANGES_CTX(c, (std::vector<int>{}),
+        ARIADNE_TESTING_EXPECT_RANGES_CTX(c, (std::vector<int>{}),
                                   (std::vector<int>{}));
     });
     Capture boundary_capture;
