@@ -816,7 +816,13 @@ which does not require the symbolic-link privilege, and a symbolic directory
 link on POSIX. Both must resolve to the external fixture, reject a managed
 artifact through the link, and accept an ordinary nested output. An exit guard
 removes the link before the case directory is cleaned, even on exceptions.
-The filesystem-error fixture continues testing an ELOOP link on POSIX and
-uses an invalid filename containing `*` on Windows. Both paths must produce
-an `Error` assertion with a nonempty diagnostic instead of being classified
-as an absent regular file. The Windows-specific cases require CI verification.
+The filesystem-error fixture continues testing an ELOOP link on POSIX.
+An initial Windows fixture using an invalid filename containing `*` did not
+produce an OS error under MSVC: `is_regular_file` classified it as absent,
+causing both Windows Debug configurations to fail in `test_boundary_matrix`
+on commit `bb7f23e`. This was an incorrect test expectation, not evidence
+that the library must change its error classification. The Windows fixture
+now creates a directory junction back to its parent and traverses more than
+the Win32 reparse-point limit; the cleanup guard removes the junction before
+work-directory cleanup. Both platforms assert a genuine filesystem `Error`
+and a diagnostic. Windows CI validation is required for this correction.

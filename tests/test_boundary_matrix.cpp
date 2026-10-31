@@ -11,6 +11,9 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#if defined(_WIN32)
+#include <cstdlib>
+#endif
 
 #if defined(_WIN32)
 #include <process.h>
@@ -349,11 +352,27 @@ int main() {
     // The filesystem must distinguish invalid paths from ordinary missing files.
     Suite fs_suite("filesystem error boundaries");
 #if defined(_WIN32)
-    // '*' is an invalid Win32 path component: status must report an OS error.
-    // Unlike a symlink loop, this fixture needs no extra Windows privilege.
-    fs_suite.add("invalid Win32 filename", [](Context& c) {
-        c.expect_file_exists(c.work_directory() / "invalid*name",
-                             "invalid Win32 path");
+    // Exercise a genuine lookup error with a cycle of directory junctions.
+    // Windows junctions need no symlink privilege on the supported CI runners.
+    fs_suite.add("junction cycle", [](Context& c) {
+        auto const root = c.work_directory();
+        auto const link = root / "loop";
+        auto const command = L"mklink /J \"" + link.wstring() +
+                             L"\" \"" + root.wstring() + L"\" >NUL";
+        if (_wsystem(command.c_str()) != 0)
+            throw std::runtime_error("cannot create cyclic junction fixture");
+        struct RemoveJunction {
+            std::filesystem::path path;
+            ~RemoveJunction() {
+                std::error_code ignored;
+                (void)std::filesystem::remove(path, ignored);
+            }
+        } cleanup{link};
+        auto cyclic = root;
+        // More than the Win32 reparse traversal limit (63). Failure must
+        // come from the OS, not from a nonexistent file shortcut.
+        for (int i = 0; i < 64; ++i) cyclic /= "loop";
+        c.expect_file_exists(cyclic, "cyclic directory junction");
     });
 #else
     // A circular symbolic link is a real filesystem error (ELOOP), not
