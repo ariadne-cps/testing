@@ -116,5 +116,50 @@ int main() {
         boundary_capture.cases[2].outcome != Outcome::Passed)
         return 8;
 
+
+    // Fatal prerequisites inside payload validation must abort the entire
+    // case without being downgraded to a recoverable projector Error.
+    Suite fatal_payload("fatal prerequisites in payload verification");
+    int continued_after_fatal = 0;
+    fatal_payload.add("projector prerequisite fails", [&](Context& c) {
+        ARIADNE_EXPECT_THROWS_PAYLOAD_CTX(c, PayloadError,
+            throw PayloadError(17, "payload"),
+            [&](PayloadError const& error) {
+                ARIADNE_REQUIRE_CTX(c, error.code == 42);
+                return error.code;
+            }, 17);
+        ++continued_after_fatal;
+    });
+    fatal_payload.add("expected-value prerequisite is indeterminate", [&](Context& c) {
+        ARIADNE_EXPECT_THROWS_PAYLOAD_CTX(c, PayloadError,
+            throw PayloadError(17, "payload"),
+            [](PayloadError const& error) { return error.code; },
+            ([&] {
+                ARIADNE_REQUIRE_CTX(c, (EvidenceValue{false, true}));
+                return 17;
+            }()));
+        ++continued_after_fatal;
+    });
+    fatal_payload.add("next case still executes", [&](Context& c) {
+        ++continued_after_fatal;
+        c.prove(true, "fatal requirements only terminate their own case");
+    });
+    Capture fatal_capture;
+    auto const fatal_summary = fatal_payload.run(fatal_capture);
+    if (fatal_summary.passed != 1 || fatal_summary.failed != 1 ||
+        fatal_summary.inconclusive != 1 || fatal_summary.errors != 0 ||
+        fatal_summary.skipped != 0 || fatal_capture.cases.size() != 3 ||
+        continued_after_fatal != 1)
+        return 9;
+    if (fatal_capture.cases[0].outcome != Outcome::Failed ||
+        fatal_capture.cases[0].assertions.size() != 1 ||
+        fatal_capture.cases[0].assertions[0].outcome != Outcome::Failed ||
+        fatal_capture.cases[0].assertions[0].description != "error.code == 42" ||
+        fatal_capture.cases[1].outcome != Outcome::Inconclusive ||
+        fatal_capture.cases[1].assertions.size() != 1 ||
+        fatal_capture.cases[1].assertions[0].outcome != Outcome::Inconclusive ||
+        fatal_capture.cases[2].outcome != Outcome::Passed ||
+        fatal_capture.cases[2].assertions.size() != 1)
+        return 10;
     return 0;
 }
