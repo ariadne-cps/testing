@@ -81,7 +81,7 @@ endif()
 set_tests_properties(
     test_testing test_parameterized test_requirements test_payload
     test_ranges test_artifacts test_state test_boundary_matrix
-    test_evidence_enum test_status test_alternatives test_progress test_check_macros
+    test_evidence_enum test_status test_alternatives test_progress
     PROPERTIES TIMEOUT 90
 )
 add_executable(test_check_macros test_check_macros.cpp)
@@ -91,5 +91,6 @@ if(WIN32)
     set_tests_properties(test_check_macros PROPERTIES
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:ariadne-testing>")
 endif()
+set_tests_properties(test_check_macros PROPERTIES TIMEOUT 90)
 add_custom_target(tests)
 add_dependencies(tests test_testing test_parameterized test_requirements test_payload test_ranges test_artifacts test_state test_boundary_matrix test_evidence_enum test_status test_alternatives test_progress test_check_macros)
