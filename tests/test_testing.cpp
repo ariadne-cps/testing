@@ -893,5 +893,42 @@ int main() {
         measured_abort.assertions[0].description != "false")
         return 104;
 
+
+    // Imported assertion results may lack a source location. The public
+    // console reporter must retain the useful failure diagnostics without
+    // manufacturing a file:line reference.
+    CaseResult imported_case;
+    imported_case.name = "imported assertion";
+    imported_case.outcome = Outcome::Failed;
+    AssertionRecord imported_assertion{};
+    imported_assertion.outcome = Outcome::Failed;
+    imported_assertion.description = "imported validation failed";
+    imported_assertion.actual = "7";
+    imported_assertion.expected = "8";
+    imported_assertion.detail = "reference mismatch";
+    imported_assertion.check_index = 1;
+    imported_case.assertions.push_back(imported_assertion);
+    std::ostringstream imported_output;
+    ConsoleReporter imported_reporter(imported_output);
+    imported_reporter.case_finished(imported_case);
+    auto const imported_log = imported_output.str();
+    if (imported_log.find("[FAIL] imported assertion") == std::string::npos ||
+        imported_log.find("FAIL: imported validation failed") == std::string::npos ||
+        imported_log.find("actual: 7") == std::string::npos ||
+        imported_log.find("expected: 8") == std::string::npos ||
+        imported_log.find("detail: reference mismatch") == std::string::npos ||
+        imported_log.find("\n    at ") != std::string::npos)
+        return 105;
+
+    // The same record with known provenance must instead retain the
+    // exact source location, ensuring both sides of the contract.
+    imported_case.assertions[0].file = "imported-test.cpp";
+    imported_case.assertions[0].line = 37;
+    std::ostringstream located_output;
+    ConsoleReporter located_reporter(located_output);
+    located_reporter.case_finished(imported_case);
+    if (located_output.str().find("at imported-test.cpp:37") == std::string::npos)
+        return 106;
+
     return 0;
 }
