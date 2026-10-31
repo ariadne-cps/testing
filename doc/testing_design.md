@@ -985,3 +985,23 @@ states, a deferred future, synchronized cross-thread publishing under one
 reused deadline, a positive timeout, throwing predicates and both macro
 variants. A green result across the new GitHub Actions matrix is required
 before treating this increment as verified.
+
+## 2026-10-31 — Correct D05 deadline predicate-count expectation
+
+CI on `bdf380b` failed `test_deadlines` across the tested platforms with
+"shared deadline summary, predicate calls or CHECK count". The test had
+incorrectly required exactly three calls across three predicate-based
+`condition_variable_any::wait_until` checks. The C++ condition-variable
+predicate contract does not promise one evaluation per invocation; an
+already-expired, unsatisfied wait may evaluate its predicate again at timeout.
+An isolated C++20 reproduction on GCC and Clang confirmed two evaluations
+for this exact case.
+
+The corrected self-test tracks each of the three condition-variable
+scenarios separately and verifies that every expected predicate is exercised
+at least once, while independently retaining exact CHECK/event counts,
+assertion outcomes, timing diagnostics and the atomic predicate count.
+The test no longer asserts an unspecified property of the standard library
+or makes an OS-specific exclusion. No runtime logic or expected progress
+outcome has changed. The CI matrix on this follow-up commit is required
+to establish full verification.

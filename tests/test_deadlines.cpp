@@ -1,6 +1,7 @@
 #include "ariadne-testing.hpp"
 
 #include <atomic>
+#include <array>
 #include <chrono>
 #include <condition_variable>
 #include <future>
@@ -49,7 +50,11 @@ struct DeadlineFixture : ContextFixture {
 int main() {
     Suite suite("shared steady-clock deadline");
     Capture capture;
-    int condition_calls = 0, atomic_calls = 0;
+    // wait_until(lock, deadline, predicate) may invoke its predicate more
+    // than once, including a final recheck after timeout. Count each
+    // scenario separately rather than asserting a total invocation count.
+    std::array<int, 3> condition_calls{0, 0, 0};
+    int atomic_calls = 0;
     suite.add("expired deadline accepts already-satisfied state", [&](Context& c) {
         auto deadline = std::chrono::steady_clock::now() - 1ms;
         std::promise<int> promise;
@@ -59,7 +64,7 @@ int main() {
         std::condition_variable_any cv;
         std::mutex mutex;
         std::unique_lock<std::mutex> lock(mutex);
-        c.expect_eventually_until(cv, lock, [&] { ++condition_calls; return true; },
+        c.expect_eventually_until(cv, lock, [&] { ++condition_calls[0]; return true; },
                                   deadline, "already-met condition");
         std::atomic<int> state{4};
         c.expect_atomic_until(state, [&](int value) {
@@ -74,7 +79,7 @@ int main() {
         std::condition_variable_any cv;
         std::mutex mutex;
         std::unique_lock<std::mutex> lock(mutex);
-        c.expect_eventually_until(cv, lock, [&] { ++condition_calls; return false; },
+        c.expect_eventually_until(cv, lock, [&] { ++condition_calls[1]; return false; },
                                   deadline, "unmet condition");
         std::atomic<int> state{2};
         c.expect_atomic_until(state, [&](int value) {
@@ -134,7 +139,7 @@ int main() {
         std::mutex mutex;
         std::unique_lock<std::mutex> lock(mutex);
         ARIADNE_EXPECT_EVENTUALLY_UNTIL_CTX(c, cv, lock,
-            [&] { ++condition_calls; return true; }, deadline);
+            [&] { ++condition_calls[2]; return true; }, deadline);
         std::atomic<int> state{5};
         ARIADNE_EXPECT_ATOMIC_UNTIL_CTX(c, state,
             [&](int value) { ++atomic_calls; return value == 5; }, deadline);
@@ -150,9 +155,27 @@ int main() {
     };
     verify(summary.passed == 6 && summary.failed == 3 && summary.errors == 1 &&
            summary.inconclusive == 0 && summary.skipped == 0 &&
-           capture.results.size() == 10 && capture.checks == 18 &&
-           condition_calls == 3 && atomic_calls == 3,
-           "shared deadline summary, predicate calls or CHECK count");
+           capture.results.size() == 10 && capture.checks == 18,
+           "shared deadline summary or CHECK count: passed=" +
+               std::to_string(summary.passed) + ", failed=" +
+               std::to_string(summary.failed) + ", errors=" +
+               std::to_string(summary.errors) + ", checks=" +
+               std::to_string(capture.checks));
+    // Predicate-based condition waits may recheck after a timeout, including
+    // on a deadline already in the past. They promise no exact call count.
+    // Every expected path must nevertheless exercise its predicate.
+    verify(condition_calls[0] >= 1 &&
+           condition_calls[1] >= 1 &&
+           condition_calls[2] >= 1,
+           "condition predicates not exercised: " +
+               std::to_string(condition_calls[0]) + "/" +
+               std::to_string(condition_calls[1]) + "/" +
+               std::to_string(condition_calls[2]));
+    // Each atomic observation uses an already-satisfied or expired deadline
+    // and therefore must invoke its predicate once per call.
+    verify(atomic_calls == 3,
+           "atomic predicates unexpectedly evaluated " +
+               std::to_string(atomic_calls) + " times");
     if (capture.results.size() == 10) {
         std::vector<Outcome> const expected{
             Outcome::Passed, Outcome::Failed, Outcome::Failed,
