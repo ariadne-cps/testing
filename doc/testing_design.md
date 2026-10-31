@@ -858,3 +858,28 @@ exercises SAT, UNSAT, UNKNOWN/reason, missing witnesses, unsupported statuses,
 uncertain postconditions, error propagation, evaluation counts and CHECK order.
 No domain library dependencies or platform-specific test omissions were added.
 D08's separate result/exception alternatives remain to be implemented.
+
+## 2026-10-31 — D08 part 2: result/exception alternatives
+
+`Context::expect_alternative(operation, verify_result, verify_exception, description)`
+completes D08 with an explicit, deferred choice between a returned result
+and a `std::exception` thrown by the operation. The operation executes once,
+after the numbered CHECK event, and only the matching validator runs.
+Each validator returns boolean or three-valued evidence, preserving
+Passed/Failed/Inconclusive classification. An exception verifier can
+`dynamic_cast` the `std::exception` reference and check domain-specific
+types, partial results, deadlines and other payloads without dependencies
+from Testing to consumers. Non-standard operation exceptions are always
+Failed rather than implicitly accepted. Exceptions originating from either
+validator are recorded as Error (not mistaken for an allowed operation
+exception), while a fatal `require` preserves the AbortCase propagation
+contract. A void operation presents `std::monostate` to its result validator;
+reference-returning operations are outside this API.
+
+`test_alternatives.cpp` exercises accepted complete/partial/deadline paths,
+incorrect result/exception types and payloads, nonstandard operation errors,
+exception-producing validators, uncertain postconditions, void operations,
+CHECK-before-operation notification, exactly-once evaluation and continued
+case execution. No platform/compiler-specific exclusions and no new
+production dependencies were introduced. The final release gate is GitHub
+Actions GCC/Clang/MSVC, sanitizers and coverage on the published commit.

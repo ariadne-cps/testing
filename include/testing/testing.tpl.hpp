@@ -575,6 +575,83 @@ void Context::expect_status(Operation&& operation, Selector&& selector,
                   permitted, [](auto const&) { return true; }, description, location);
 }
 
+
+template<class Operation, class VerifyResult, class VerifyException>
+void Context::expect_alternative(Operation&& operation, VerifyResult&& verify_result,
+                                 VerifyException&& verify_exception,
+                                 std::string_view description,
+                                 std::source_location location) {
+    using OperationResult = std::invoke_result_t<Operation&&>;
+    static_assert(!std::is_reference_v<OperationResult>,
+                  "Alternative checks require a value or void operation result");
+    using StoredResult = std::conditional_t<std::is_void_v<OperationResult>,
+                                            std::monostate, std::remove_cv_t<OperationResult>>;
+    auto const index = begin_check(description);
+    std::optional<StoredResult> result;
+    std::exception_ptr failure;
+    try {
+        if constexpr (std::is_void_v<OperationResult>) {
+            std::invoke(std::forward<Operation>(operation));
+            result.emplace();
+        } else {
+            result.emplace(std::invoke(std::forward<Operation>(operation)));
+        }
+    } catch (Detail::AbortCase const&) {
+        throw;
+    } catch (...) {
+        failure = std::current_exception();
+    }
+
+    if (failure) {
+        try {
+            std::rethrow_exception(failure);
+        } catch (std::exception const& error) {
+            try {
+                auto const verdict = Detail::evidence(
+                    std::invoke(std::forward<VerifyException>(verify_exception), error));
+                record(outcome(verdict), description, error.what(), "permitted exception",
+                       verdict == Evidence::False ? "exception alternative rejected" :
+                       verdict == Evidence::Indeterminate ? "exception postcondition indeterminate" : "",
+                       location, index);
+            } catch (Detail::AbortCase const&) {
+                throw;
+            } catch (std::exception const& verification_error) {
+                record(Outcome::Error, description, {}, "permitted exception",
+                       std::string("exception verifier threw: ") + verification_error.what(),
+                       location, index);
+            } catch (...) {
+                record(Outcome::Error, description, {}, "permitted exception",
+                       "exception verifier threw a non-standard exception", location, index);
+            }
+        } catch (...) {
+            record(Outcome::Failed, description, {}, "permitted exception",
+                   "non-standard operation exception", location, index);
+        }
+        return;
+    }
+
+    try {
+        auto const verdict = Detail::evidence(
+            std::invoke(std::forward<VerifyResult>(verify_result), std::as_const(*result)));
+        std::string actual;
+        if constexpr (std::is_void_v<OperationResult>) actual = "void";
+        else actual = Detail::render(*result);
+        record(outcome(verdict), description, std::move(actual), "permitted result",
+               verdict == Evidence::False ? "result alternative rejected" :
+               verdict == Evidence::Indeterminate ? "result postcondition indeterminate" : "",
+               location, index);
+    } catch (Detail::AbortCase const&) {
+        throw;
+    } catch (std::exception const& verification_error) {
+        record(Outcome::Error, description, {}, "permitted result",
+               std::string("result verifier threw: ") + verification_error.what(),
+               location, index);
+    } catch (...) {
+        record(Outcome::Error, description, {}, "permitted result",
+               "result verifier threw a non-standard exception", location, index);
+    }
+}
+
 template<class Callable>
     void Context::expect_exception(Callable&& action, std::string_view description,
                           std::source_location location){

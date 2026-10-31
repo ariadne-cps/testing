@@ -40,6 +40,8 @@
 #include <cstdint>
 #include <functional>
 #include <future>
+#include <exception>
+#include <variant>
 #include <initializer_list>
 #include <condition_variable>
 #include <mutex>
@@ -492,6 +494,24 @@ template<class Exception, class Action, class ProjectorFn, class ExpectedFn>
                        std::initializer_list<Status> permitted,
                        std::string_view description,
                        std::source_location location = std::source_location::current());
+
+    // An alternative is accepted only if its validator returns true/proven.
+    // Only the operation's exceptions are candidates for the exception path.
+    /** @brief Check a returned result or an allowed std::exception alternative.
+     *  @details The operation runs once after CHECK. The result validator
+     *  receives const Result& (std::monostate for void operations); the
+     *  exception validator receives const std::exception& and may inspect
+     *  derived types and their partial-result payloads using dynamic_cast.
+     *  Each verifier returns boolean or three-valued evidence. Rejection is
+     *  Failed, uncertainty Inconclusive, and verifier exceptions Error.
+     *  Non-standard operation exceptions are rejected. Reference-returning
+     *  operations are intentionally unsupported.
+     */
+    template<class Operation, class VerifyResult, class VerifyException>
+    void expect_alternative(Operation&& operation, VerifyResult&& verify_result,
+                            VerifyException&& verify_exception,
+                            std::string_view description,
+                            std::source_location location = std::source_location::current());
 
     /** @brief Verify that an operation throws any exception.
  *  @note Arguments supplied as callables are evaluated at check time.

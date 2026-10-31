@@ -98,6 +98,20 @@ postcondition. An expected UNKNOWN with the required reason is Passed;
 uncertain postcondition evidence is Inconclusive. A shorter overload checks
 only status. An unpermitted status fails without running the verifier.
 
+## Alternative result/exception outcomes
+
+`Context::expect_alternative(operation, verify_result, verify_exception, description)`
+tests one of two completion paths: a normally returned result or an exception.
+Each caller-provided validator decides whether its observed alternative is
+allowed and checks any applicable witness, partial result or budget policy.
+For exceptions, the callback receives `std::exception const&` so consumers
+can test derived types and payloads with `dynamic_cast`. A void operation
+passes `std::monostate const&` to its result validator. Validation returns
+boolean or three-valued evidence; false is Failed, indeterminate is
+Inconclusive, and validator exceptions produce Error. Nonstandard operation
+exceptions are rejected. CHECK is announced before the operation and only
+the selected validator executes.
+
 ## Parameterized suites and fixture factories
 
 The umbrella header also provides implementation/precision variants.

@@ -220,10 +220,13 @@ checks image data and pixels.
       (SAT, UNSAT, UNKNOWN with reason, feasible/infeasible, etc.) and
       conditional witness/model postconditions, without mapping domain
       UNKNOWN automatically to \`Outcome::Inconclusive\`.
-- [ ] Provide a structured C++ facility for operations with several
+- [x] Provide a structured C++ facility for operations with several
       permitted exception/result alternatives, each possibly requiring
       postconditions. A warning is not a substitute for checking partial
-      results or an explicit budget-exhaustion policy.
+      results or an explicit budget-exhaustion policy. Implemented through
+      `Context::expect_alternative` with separately verified result and
+      exception paths; consumers express permitted derived exceptions and
+      partial-result/budget constraints in their explicit validators.
 
 **Evidence:** [smt/test_smt_neural_benchmarks.cpp](https://github.com/ariadne-cps/smt/blob/main/tests/test_smt_neural_benchmarks.cpp)
 tests resource-exhaustion reasons;
