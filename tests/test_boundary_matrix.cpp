@@ -11,9 +11,6 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-#if defined(_WIN32)
-#include <cstdlib>
-#endif
 
 #if defined(_WIN32)
 #include <process.h>
@@ -349,34 +346,27 @@ int main() {
         }
     }
 
-    // The filesystem must distinguish invalid paths from ordinary missing files.
+    // An overlong path component is a real filesystem error on both POSIX
+    // and Windows; missing files and invalid names can be classified as
+    // not_found by MSVC, so neither proves the infrastructure-error path.
     Suite fs_suite("filesystem error boundaries");
-#if defined(_WIN32)
-    // Exercise a genuine lookup error with a cycle of directory junctions.
-    // Windows junctions need no symlink privilege on the supported CI runners.
-    fs_suite.add("junction cycle", [](Context& c) {
-        auto const root = c.work_directory();
-        auto const link = root / "loop";
-        auto const command = L"mklink /J \"" + link.wstring() +
-                             L"\" \"" + root.wstring() + L"\" >NUL";
-        if (_wsystem(command.c_str()) != 0)
-            throw std::runtime_error("cannot create cyclic junction fixture");
-        struct RemoveJunction {
-            std::filesystem::path path;
-            ~RemoveJunction() {
-                std::error_code ignored;
-                (void)std::filesystem::remove(path, ignored);
-            }
-        } cleanup{link};
-        auto cyclic = root;
-        // More than the Win32 reparse traversal limit (63). Failure must
-        // come from the OS, not from a nonexistent file shortcut.
-        for (int i = 0; i < 64; ++i) cyclic /= "loop";
-        c.expect_file_exists(cyclic, "cyclic directory junction");
+    fs_suite.add("overlong filename", [](Context& c) {
+        auto const too_long = c.work_directory() / std::string(1024, 'x');
+        std::error_code status_error;
+        bool const regular = std::filesystem::is_regular_file(too_long, status_error);
+        if (regular || !status_error ||
+            status_error == std::errc::no_such_file_or_directory ||
+            status_error == std::errc::not_a_directory) {
+            throw std::runtime_error(
+                "overlong filename did not cause a non-absence filesystem error: " +
+                status_error.message());
+        }
+        c.expect_file_exists(too_long, "overlong filename must be an error");
     });
-#else
-    // A circular symbolic link is a real filesystem error (ELOOP), not
-    // an ordinary missing file. Keep it within a Context-owned directory.
+#if !defined(_WIN32)
+    // Additional POSIX-specific ELOOP regression. Windows junction cycles
+    // do not reliably produce ELOOP, so the shared test above verifies the
+    // same Error contract on Windows without a privileged symlink fixture.
     fs_suite.add("symlink loop", [](Context& c) {
         auto const loop = c.work_directory() / "self-loop";
         std::filesystem::create_symlink(loop.filename(), loop);
@@ -385,13 +375,22 @@ int main() {
 #endif
     Capture fs_report;
     auto const fs_summary = fs_suite.run(fs_report);
-    ok &= verify(fs_summary.errors == 1 && fs_summary.failed == 0 &&
-                 fs_report.cases.size() == 1, "filesystem error must be Error");
-    if (fs_report.cases.size() == 1)
-        ok &= verify(fs_report.cases[0].assertions.size() == 1 &&
-                     fs_report.cases[0].assertions[0].outcome == Outcome::Error &&
-                     !fs_report.cases[0].assertions[0].detail.empty(),
-                     "filesystem: missing underlying error detail");
+#if defined(_WIN32)
+    constexpr std::size_t expected_cases = 1;
+#else
+    constexpr std::size_t expected_cases = 2;
+#endif
+    ok &= verify(fs_summary.errors == expected_cases && fs_summary.failed == 0 &&
+                 fs_report.cases.size() == expected_cases,
+                 "filesystem errors must be classified as Error");
+    for (auto const& result : fs_report.cases) {
+        ok &= verify(result.outcome == Outcome::Error &&
+                     result.assertions.size() == 1 &&
+                     result.assertions[0].outcome == Outcome::Error &&
+                     !result.assertions[0].detail.empty(),
+                     "filesystem: missing Error assertion or underlying detail in " +
+                     result.name);
+    }
 
     return ok ? 0 : 1;
 }

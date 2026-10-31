@@ -826,3 +826,23 @@ now creates a directory junction back to its parent and traverses more than
 the Win32 reparse-point limit; the cleanup guard removes the junction before
 work-directory cleanup. Both platforms assert a genuine filesystem `Error`
 and a diagnostic. Windows CI validation is required for this correction.
+
+## 2026-10-31 — Filesystem status errors on Windows and POSIX
+
+Windows CI for `252334e` still failed `test_boundary_matrix`: the
+cyclic directory junction did not yield an `Outcome::Error` assertion.
+The preceding invalid-`*` filename fixture failed for the same reason.
+MSVC's `std::filesystem` maps several native Windows errors to
+`file_type::not_found`; constructing either fixture without checking the
+observable filesystem error was an unsupported expectation.
+
+The regression now exercises a valid public-API boundary shared by all
+platforms: a filename component of 1024 characters, exceeding filesystem
+component limits. The fixture first establishes that `is_regular_file`
+reports a non-absence `error_code` (rather than assuming the platform's
+mapping), then requires `Context::expect_file_exists` to record one
+`Error` assertion with a nonempty diagnostic. The existing POSIX `ELOOP`
+fixture is retained as a separate, POSIX-specific link behavior; Windows
+is never left without an actual assertion for the shared Error contract.
+The two previous Windows-only guesses are removed, not turned into skipped
+or vacuous tests. MSVC CI confirmation is still required.
