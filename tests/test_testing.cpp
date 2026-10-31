@@ -633,5 +633,82 @@ int main() {
         invalid_waits_capture.results[1].outcome != Outcome::Passed)
         return 88;
 
+    // One predicate type, twelve logically distinct evidence-expectation
+    // combinations. The table verifies the public three-valued contract,
+    // including outcomes that are allowed rather than definitely proven.
+    struct EvidenceScenario {
+        std::string name;
+        TestLogic::Truth actual;
+        EvidenceExpectation expected;
+        Outcome outcome;
+        std::string observed_name;
+        std::string expected_name;
+    };
+    std::vector<EvidenceScenario> const evidence_scenarios{
+        {"definitely true when true", TestLogic::Truth::True,
+            EvidenceExpectation::DefinitelyTrue, Outcome::Passed, "true", "definitely true"},
+        {"definitely true when false", TestLogic::Truth::False,
+            EvidenceExpectation::DefinitelyTrue, Outcome::Failed, "false", "definitely true"},
+        {"definitely true when unknown", TestLogic::Truth::Indeterminate,
+            EvidenceExpectation::DefinitelyTrue, Outcome::Inconclusive, "indeterminate", "definitely true"},
+        {"possibly true when true", TestLogic::Truth::True,
+            EvidenceExpectation::PossiblyTrue, Outcome::Passed, "true", "possibly true"},
+        {"possibly true when false", TestLogic::Truth::False,
+            EvidenceExpectation::PossiblyTrue, Outcome::Failed, "false", "possibly true"},
+        {"possibly true when unknown", TestLogic::Truth::Indeterminate,
+            EvidenceExpectation::PossiblyTrue, Outcome::Passed, "indeterminate", "possibly true"},
+        {"not possibly when true", TestLogic::Truth::True,
+            EvidenceExpectation::NotPossibly, Outcome::Failed, "true", "not possibly true"},
+        {"not possibly when false", TestLogic::Truth::False,
+            EvidenceExpectation::NotPossibly, Outcome::Passed, "false", "not possibly true"},
+        {"not possibly when unknown", TestLogic::Truth::Indeterminate,
+            EvidenceExpectation::NotPossibly, Outcome::Inconclusive, "indeterminate", "not possibly true"},
+        {"expect unknown when true", TestLogic::Truth::True,
+            EvidenceExpectation::Indeterminate, Outcome::Failed, "true", "indeterminate"},
+        {"expect unknown when false", TestLogic::Truth::False,
+            EvidenceExpectation::Indeterminate, Outcome::Failed, "false", "indeterminate"},
+        {"expect unknown when unknown", TestLogic::Truth::Indeterminate,
+            EvidenceExpectation::Indeterminate, Outcome::Passed, "indeterminate", "indeterminate"}
+    };
+    auto evaluate_evidence = [](Context& c, EvidenceScenario const& scenario) {
+        c.expect_evidence([&] { return scenario.actual; }, scenario.expected,
+                          "three-valued evidence expectation");
+    };
+    Suite evidence_matrix("all supported evidence expectations");
+    std::size_t evidence_passes = 0, evidence_failures = 0, evidence_unknowns = 0;
+    for (auto const& scenario : evidence_scenarios) {
+        auto const* entry = &scenario;
+        evidence_matrix.add(entry->name, [&, entry](Context& c) {
+            evaluate_evidence(c, *entry);
+        });
+        if (entry->outcome == Outcome::Passed) ++evidence_passes;
+        else if (entry->outcome == Outcome::Failed) ++evidence_failures;
+        else if (entry->outcome == Outcome::Inconclusive) ++evidence_unknowns;
+    }
+    CaptureReporter evidence_report;
+    auto const evidence_summary = evidence_matrix.run(evidence_report);
+    if (evidence_summary.passed != evidence_passes ||
+        evidence_summary.failed != evidence_failures ||
+        evidence_summary.inconclusive != evidence_unknowns ||
+        evidence_summary.errors != 0 || evidence_summary.skipped != 0 ||
+        evidence_report.results.size() != evidence_scenarios.size()) {
+        std::cerr << "evidence expectation matrix: wrong outcome counts\n";
+        return 93;
+    }
+    for (std::size_t i = 0; i != evidence_scenarios.size(); ++i) {
+        auto const& scenario = evidence_scenarios[i];
+        auto const& result = evidence_report.results[i];
+        if (result.name != scenario.name || result.outcome != scenario.outcome ||
+            result.assertions.size() != 1 ||
+            result.assertions[0].outcome != scenario.outcome ||
+            result.assertions[0].actual != scenario.observed_name ||
+            result.assertions[0].expected != scenario.expected_name ||
+            result.assertions[0].description != "three-valued evidence expectation") {
+            std::cerr << "evidence expectation matrix: incorrect result for "
+                      << scenario.name << '\n';
+            return 94;
+        }
+    }
+
     return 0;
 }

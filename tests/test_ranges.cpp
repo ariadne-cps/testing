@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <iterator>
+#include <iostream>
 
 using namespace Ariadne::Testing;
 
@@ -130,6 +131,129 @@ int main() {
         empty_assertion.detail.find("actual_count=0, expected_count=0") == std::string::npos ||
         empty_assertion.detail.find("first_mismatch_index") != std::string::npos)
         return 10;
+
+    // Exercise a single range-checker instantiation with different valid
+    // inputs. This is an oracle for first mismatch, uncertainty, truncation,
+    // and unequal length, rather than a collection of unrelated templates.
+    struct RangeScenario {
+        std::string name;
+        std::vector<std::string> actual;
+        std::vector<std::string> expected;
+        Outcome outcome;
+        int first_index;
+        int first_unknown_if_failed;
+    };
+    std::string const long_a(120, 'a');
+    std::string const long_b(120, 'b');
+    std::vector<RangeScenario> const scenarios{
+        {"empty", {}, {}, Outcome::Passed, -1, -1},
+        {"equal", {"1", "2"}, {"1", "2"}, Outcome::Passed, -1, -1},
+        {"one mismatch", {"1", "7", "3"}, {"1", "2", "3"}, Outcome::Failed, 1, -1},
+        {"multiple mismatches", {"7", "9", "11"}, {"2", "3", "4"}, Outcome::Failed, 0, -1},
+        {"uncertain pair", {"1", "?", "3"}, {"1", "2", "3"}, Outcome::Inconclusive, 1, -1},
+        {"multiple uncertain pairs", {"?", "?"}, {"1", "2"}, Outcome::Inconclusive, 0, -1},
+        {"uncertainty before failure", {"?", "7"}, {"1", "2"}, Outcome::Failed, 1, 0},
+        {"failure before uncertainty", {"7", "?"}, {"1", "2"}, Outcome::Failed, 0, 1},
+        {"extra actual element", {"1", "2", "3"}, {"1", "2"}, Outcome::Failed, 2, -1},
+        {"extra expected element", {"1", "2"}, {"1", "2", "3"}, Outcome::Failed, 2, -1},
+        {"mismatch and extra actual", {"7", "9", "3"}, {"1", "2"}, Outcome::Failed, 0, -1},
+        {"mismatch and extra expected", {"7"}, {"1", "2", "3"}, Outcome::Failed, 0, -1},
+        {"long mismatched strings", {long_a}, {long_b}, Outcome::Failed, 0, -1},
+        {"empty actual", {}, {"1"}, Outcome::Failed, 0, -1},
+        {"empty expected", {"1"}, {}, Outcome::Failed, 0, -1},
+        {"long equal strings", {long_a}, {long_a}, Outcome::Passed, -1, -1}
+    };
+    auto compare_scenario = [](Context& c, RangeScenario const& scenario) {
+        c.check_ranges(
+            [&]() -> std::vector<std::string> const& { return scenario.actual; },
+            [&]() -> std::vector<std::string> const& { return scenario.expected; },
+            [] {
+                return [](std::string const& actual, std::string const& expected) -> Evidence {
+                    if (actual == "?" || expected == "?") return Evidence::Indeterminate;
+                    return actual == expected ? Evidence::True : Evidence::False;
+                };
+            },
+            [] {
+                return [](std::size_t index) {
+                    return std::string("element/") + std::to_string(index);
+                };
+            },
+            "structured range equality");
+    };
+    Suite matrix("range outcome and diagnostics matrix");
+    std::size_t passed = 0, failed = 0, inconclusive = 0;
+    for (auto const& scenario : scenarios) {
+        auto const* entry = &scenario;
+        matrix.add(entry->name, [&, entry](Context& c) {
+            compare_scenario(c, *entry);
+        });
+        if (entry->outcome == Outcome::Passed) ++passed;
+        else if (entry->outcome == Outcome::Failed) ++failed;
+        else if (entry->outcome == Outcome::Inconclusive) ++inconclusive;
+    }
+    Capture matrix_report;
+    auto const matrix_summary = matrix.run(matrix_report);
+    if (matrix_summary.passed != passed || matrix_summary.failed != failed ||
+        matrix_summary.inconclusive != inconclusive || matrix_summary.errors != 0 ||
+        matrix_report.cases.size() != scenarios.size()) {
+        std::cerr << "range matrix: incorrect summary or case count\n";
+        return 11;
+    }
+    for (std::size_t i = 0; i < scenarios.size(); ++i) {
+        auto const& scenario = scenarios[i];
+        auto const& result = matrix_report.cases[i];
+        if (result.name != scenario.name || result.outcome != scenario.outcome ||
+            result.assertions.size() != 1 ||
+            result.assertions[0].outcome != scenario.outcome) {
+            std::cerr << "range matrix: incorrect outcome for " << scenario.name << '\n';
+            return 12;
+        }
+        auto const& assertion = result.assertions[0];
+        auto const counts = "actual_count=" + std::to_string(scenario.actual.size()) +
+                            ", expected_count=" + std::to_string(scenario.expected.size());
+        if (assertion.detail.find(counts) == std::string::npos) {
+            std::cerr << "range matrix: incorrect element counts for " << scenario.name << '\n';
+            return 13;
+        }
+        auto const first = assertion.detail.find("first_mismatch_index=");
+        if (scenario.first_index == -1) {
+            if (first != std::string::npos) {
+                std::cerr << "range matrix: unexpected mismatch for " << scenario.name << '\n';
+                return 14;
+            }
+        } else {
+            auto const marker = "first_mismatch_index=" +
+                                std::to_string(scenario.first_index);
+            auto const path = "path=element/" + std::to_string(scenario.first_index);
+            if (first == std::string::npos ||
+                assertion.detail.find(marker) == std::string::npos ||
+                assertion.detail.find(path) == std::string::npos) {
+                std::cerr << "range matrix: incorrect mismatch location for "
+                          << scenario.name << '\n';
+                return 15;
+            }
+        }
+        auto const unknown = assertion.detail.find("first_indeterminate_index=");
+        if (scenario.first_unknown_if_failed == -1) {
+            if (unknown != std::string::npos) {
+                std::cerr << "range matrix: unexpected secondary uncertainty for "
+                          << scenario.name << '\n';
+                return 16;
+            }
+        } else if (assertion.detail.find("first_indeterminate_index=" +
+                    std::to_string(scenario.first_unknown_if_failed)) == std::string::npos) {
+            std::cerr << "range matrix: lost uncertainty context for " << scenario.name << '\n';
+            return 17;
+        }
+    }
+    auto const& truncated = matrix_report.cases[12].assertions[0];
+    if (truncated.actual.find(std::string(93, 'a') + "...") == std::string::npos ||
+        truncated.expected.find(std::string(93, 'b') + "...") == std::string::npos ||
+        truncated.actual.find(std::string(94, 'a')) != std::string::npos ||
+        truncated.expected.find(std::string(94, 'b')) != std::string::npos) {
+        std::cerr << "range matrix: long mismatched elements were not truncated\n";
+        return 18;
+    }
 
     return 0;
 }
