@@ -51,6 +51,30 @@ builds them serially in the current configuration. The independent
 unittest cases only when an interpreter exists, without requiring Python.
 CTest labels distinguish compile, cmake and python checks.
 
+## Structured JSON/JUnit and live console reporting
+
+`JsonReporter` serializes each completed suite to one JSON document
+containing every case and outcome, ordered assertions, diagnostic scopes,
+elapsed times, wait observations and artifact references. `JUnitReporter`
+emits XML with `failed` and `inconclusive` preserved as different
+`<failure type=...>` values, `error` as `<error>` and skipped cases
+as `<skipped>`; full diagnostic details remain in `<system-out>`.
+Both operate on the same `CaseResult` and require no third-party library.
+
+```cpp
+ConsoleReporter console(std::cout);
+JsonReporter json(json_file);
+JUnitReporter junit(xml_file);
+ReporterFanout reporting{std::ref(console), std::ref(json), std::ref(junit)};
+auto summary = suite.run(reporting);
+```
+
+The console remains first in the fan-out and keeps flushing `RUN` and
+`CHECK` during the test body. JSON/JUnit serialize at suite completion.
+The output streams and delegated reporters must outlive the fan-out.
+Report generation does not change test results or enforce benchmark
+timing thresholds.
+
 ## Example
 
 ```cpp

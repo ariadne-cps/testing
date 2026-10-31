@@ -1193,3 +1193,28 @@ malformed plans, full/partial/error outcomes, event/operand ordering and
 a deterministic std::mt19937 stream whose advancement is unchanged by
 selection. No platform-conditional exclusion was introduced. CI is
 required before closing D12.
+
+## 2026-10-31 — D13 structured reporters without losing live progress
+
+Added dependency-free `JsonReporter`, `JUnitReporter` and `ReporterFanout`
+on the existing Reporter callbacks. JSON emits one complete object per
+suite with all five operational outcomes, assertion outcomes and nested
+scope contexts, exact nanosecond durations, wait status/budget, diagnostic
+events and full artifact references/metadata. String escaping protects
+quotes, backslashes and control characters.
+
+JUnit uses distinct failure types for Failed and Inconclusive, an Error
+element for execution errors and a Skipped element for skipped cases.
+It includes testcase duration, artifact paths as properties, and all
+assertions and diagnostics in system-out, with XML escaping. It does not
+silently map Inconclusive to a Pass. JUnit's time is wall duration in
+seconds; nonasserting elapsed notes remain mere observations.
+
+ReporterFanout forwards every event in registration order. Placing
+ConsoleReporter first preserves streaming, flushed RUN/CHECK progress
+even while structured reporters buffer per-case records until suite
+completion. No changes were made to Suite::run, outcome policy or
+suite identities. `test_reporters.cpp` checks all five outcomes,
+streaming progress during test execution, escaping, scopes, diagnostics,
+artifacts, summary counts and reporter reuse. CI verification remains
+the acceptance gate.

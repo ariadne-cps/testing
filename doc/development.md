@@ -339,9 +339,11 @@ and [README-sampling.md](https://github.com/ariadne-cps/numeric/blob/main/tests/
 
 ### D13. Structured reporters, selection and CI integration
 
-- [ ] Add JSON/JUnit output with structured classifications, nested
+- [x] Add JSON/JUnit output with structured classifications, nested
       contexts, timings and artifact paths, while keeping ConsoleReporter
       and streaming RUN/CHECK flushes authoritative for hang diagnosis.
+      Dependency-free JsonReporter, JUnitReporter and ReporterFanout
+      preserve classifications and live reporter events.
 - [ ] Add case filters/tags, per-implementation selection and optional
       per-case CTest listing. Avoid requiring Logging or third-party
       testing frameworks.
