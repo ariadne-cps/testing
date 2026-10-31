@@ -265,7 +265,7 @@ ordering and avoid `-Wsign-compare`, while user-defined types use their own
 relational operators and evidence. Two new functions, `check_unary` and
 `check_binary`, invoke arbitrary C++ predicates (including ADL calls),
 render the arguments and preserve evidence: True/False/Indeterminate. For
-negation, `detail::negate(Evidence)` swaps True/False and leaves
+negation, `Detail::negate(Evidence)` swaps True/False and leaves
 Indeterminate unchanged, instead of using boolean negation of a validated
 predicate. All checkers announce and flush the check event before evaluating
 operands, which are evaluated exactly once, left to right.
@@ -542,7 +542,7 @@ with C3556/C3169. This was a macro portability bug, not an sccache failure,
 and the existing semantic test remains in place.
 
 The comparator and optional path factory macros now call
-`detail::capture_callable` after the CHECK notification. It keeps lvalue
+`Detail::capture_callable` after the CHECK notification. It keeps lvalue
 callables (including named free functions and non-copyable functors) through
 `std::reference_wrapper` and owns rvalue callable temporaries by move,
 without repeating expression evaluation. The underlying range comparison,

@@ -404,7 +404,7 @@ Summary Suite::run(Reporter& reporter) const {
         auto const started = std::chrono::steady_clock::now();
         try {
             test.run(context);
-        } catch (detail::AbortCase const&) {
+        } catch (Detail::AbortCase const&) {
             // A failed requirement is already represented by its assertion.
         } catch (std::exception const& exception) {
             context.record(Outcome::Error, "Unhandled std::exception", {}, {}, exception.what(),

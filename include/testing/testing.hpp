@@ -162,7 +162,7 @@ class ConsoleReporter final : public Reporter {
     ConsoleDetail _detail;
 };
 
-namespace detail {
+namespace Detail {
 
 template<class T>
 Evidence evidence(T const& value) {
@@ -241,7 +241,7 @@ auto magnitude(T const& value) {
 // Internal case-abort marker, not a user-observable test exception.
 struct AbortCase {};
 
-} // namespace detail
+} // namespace Detail
 
 class Context {
   public:
@@ -298,7 +298,7 @@ class Context {
     template<class T>
     Scope scope(std::string name, T const& value,
                 std::source_location location = std::source_location::current()) {
-        return scope(std::move(name) + "=" + detail::render(value), location);
+        return scope(std::move(name) + "=" + Detail::render(value), location);
     }
 
     void note(std::string description,
@@ -309,7 +309,7 @@ class Context {
     template<class T>
     void inspect(std::string name, T const& value,
                  std::source_location location = std::source_location::current()) {
-        emit(DiagnosticKind::Value, std::move(name), detail::render(value), {}, location);
+        emit(DiagnosticKind::Value, std::move(name), Detail::render(value), {}, location);
     }
 
     void elapsed(std::string description, std::chrono::nanoseconds duration,
@@ -336,7 +336,7 @@ class Context {
     void prove(T const& predicate, std::string_view description,
                std::source_location location = std::source_location::current()) {
         auto const index = begin_check(description);
-        record(outcome(detail::evidence(predicate)), description, {}, {}, {}, location, index);
+        record(outcome(Detail::evidence(predicate)), description, {}, {}, {}, location, index);
     }
 
     // Test a specified mathematical evidence classification. A deliberately
@@ -346,7 +346,7 @@ class Context {
                          std::string_view description,
                          std::source_location location = std::source_location::current()) {
         auto const index = begin_check(description);
-        auto const actual = detail::evidence(std::invoke(std::forward<PredicateFn>(predicate_fn)));
+        auto const actual = Detail::evidence(std::invoke(std::forward<PredicateFn>(predicate_fn)));
         Outcome status = Outcome::Failed;
         switch (expected) {
             case EvidenceExpectation::DefinitelyTrue:
@@ -395,9 +395,9 @@ class Context {
         auto const index = begin_check(description);
         decltype(auto) actual = std::invoke(std::forward<ActualFn>(actual_fn));
         decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
-        auto const verdict = detail::equal_evidence(actual, expected);
+        auto const verdict = Detail::equal_evidence(actual, expected);
         record(outcome(verdict), description,
-               detail::render(actual), detail::render(expected), {}, location, index);
+               Detail::render(actual), Detail::render(expected), {}, location, index);
     }
 
     // Compare two input ranges without copying their elements. Both ranges
@@ -429,7 +429,7 @@ class Context {
         std::string unknown_actual;
         std::string unknown_expected;
         auto snippet = [](auto const& value) {
-            std::string text = detail::render(value);
+            std::string text = Detail::render(value);
             constexpr std::size_t max_length = 96;
             if (text.size() > max_length) {
                 text.resize(max_length - 3);
@@ -442,7 +442,7 @@ class Context {
             auto const verdict = [&] {
                 if constexpr (std::is_same_v<std::remove_cvref_t<decltype(comparison)>, Evidence>)
                     return comparison;
-                else return detail::evidence(comparison);
+                else return Detail::evidence(comparison);
             }();
             if (verdict == Evidence::False && !first_failure) {
                 first_failure = actual_count;
@@ -483,7 +483,7 @@ class Context {
         std::string expected_detail = "count=" + std::to_string(expected_count);
         if (mismatch) {
             info += ", first_mismatch_index=" + std::to_string(*mismatch);
-            info += ", path=" + detail::render(std::invoke(path, *mismatch));
+            info += ", path=" + Detail::render(std::invoke(path, *mismatch));
             actual_detail += ", value=" + (first_failure ? failure_actual : unknown_actual);
             expected_detail += ", value=" + (first_failure ? failure_expected : unknown_expected);
         }
@@ -512,7 +512,7 @@ class Context {
         check_ranges(std::forward<ActualFn>(actual_fn),
                      std::forward<ExpectedFn>(expected_fn),
                      [] { return [](auto const& a, auto const& b) {
-                         return detail::equal_evidence(a, b);
+                         return Detail::equal_evidence(a, b);
                      }; },
                      description, location);
     }
@@ -550,25 +550,25 @@ class Context {
         }();
         auto const verdict = [&]() -> Evidence {
             if constexpr (Relation == Comparison::NotEqual) {
-                if constexpr (built_in_integers) return detail::evidence(!std::cmp_equal(comparable_actual, comparable_expected));
-                else return detail::evidence(comparable_actual != comparable_expected);
+                if constexpr (built_in_integers) return Detail::evidence(!std::cmp_equal(comparable_actual, comparable_expected));
+                else return Detail::evidence(comparable_actual != comparable_expected);
             } else if constexpr (Relation == Comparison::Less) {
-                if constexpr (built_in_integers) return detail::evidence(std::cmp_less(comparable_actual, comparable_expected));
-                else return detail::evidence(comparable_actual < comparable_expected);
+                if constexpr (built_in_integers) return Detail::evidence(std::cmp_less(comparable_actual, comparable_expected));
+                else return Detail::evidence(comparable_actual < comparable_expected);
             } else if constexpr (Relation == Comparison::LessEqual) {
-                if constexpr (built_in_integers) return detail::evidence(std::cmp_less_equal(comparable_actual, comparable_expected));
-                else return detail::evidence(comparable_actual <= comparable_expected);
+                if constexpr (built_in_integers) return Detail::evidence(std::cmp_less_equal(comparable_actual, comparable_expected));
+                else return Detail::evidence(comparable_actual <= comparable_expected);
             } else if constexpr (Relation == Comparison::Greater) {
-                if constexpr (built_in_integers) return detail::evidence(std::cmp_greater(comparable_actual, comparable_expected));
-                else return detail::evidence(comparable_actual > comparable_expected);
+                if constexpr (built_in_integers) return Detail::evidence(std::cmp_greater(comparable_actual, comparable_expected));
+                else return Detail::evidence(comparable_actual > comparable_expected);
             } else {
                 static_assert(Relation == Comparison::GreaterEqual);
-                if constexpr (built_in_integers) return detail::evidence(std::cmp_greater_equal(comparable_actual, comparable_expected));
-                else return detail::evidence(comparable_actual >= comparable_expected);
+                if constexpr (built_in_integers) return Detail::evidence(std::cmp_greater_equal(comparable_actual, comparable_expected));
+                else return Detail::evidence(comparable_actual >= comparable_expected);
             }
         }();
         record(outcome(verdict), description,
-               detail::render(actual), detail::render(expected), {}, location, index);
+               Detail::render(actual), Detail::render(expected), {}, location, index);
     }
 
     template<class Predicate, class OperandFn>
@@ -577,9 +577,9 @@ class Context {
                      std::source_location location = std::source_location::current()) {
         auto const index = begin_check(description);
         decltype(auto) operand = std::invoke(std::forward<OperandFn>(operand_fn));
-        auto verdict = detail::evidence(std::invoke(std::forward<Predicate>(predicate), operand));
-        if (negate) verdict = detail::negate(verdict);
-        record(outcome(verdict), description, detail::render(operand), {}, {}, location, index);
+        auto verdict = Detail::evidence(std::invoke(std::forward<Predicate>(predicate), operand));
+        if (negate) verdict = Detail::negate(verdict);
+        record(outcome(verdict), description, Detail::render(operand), {}, {}, location, index);
     }
 
     template<class Predicate, class LeftFn, class RightFn>
@@ -589,10 +589,10 @@ class Context {
         auto const index = begin_check(description);
         decltype(auto) left = std::invoke(std::forward<LeftFn>(left_fn));
         decltype(auto) right = std::invoke(std::forward<RightFn>(right_fn));
-        auto verdict = detail::evidence(std::invoke(std::forward<Predicate>(predicate), left, right));
-        if (negate) verdict = detail::negate(verdict);
+        auto verdict = Detail::evidence(std::invoke(std::forward<Predicate>(predicate), left, right));
+        if (negate) verdict = Detail::negate(verdict);
         record(outcome(verdict), description,
-               detail::render(left), detail::render(right), {}, location, index);
+               Detail::render(left), Detail::render(right), {}, location, index);
     }
 
     template<class A, class B>
@@ -611,8 +611,8 @@ class Context {
         decltype(auto) actual = std::invoke(std::forward<ActualFn>(actual_fn));
         decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
         auto const relation = same(actual, expected); // ADL: numerical domain
-        record(outcome(detail::evidence(relation)), description,
-               detail::render(actual), detail::render(expected), {}, location, index);
+        record(outcome(Detail::evidence(relation)), description,
+               Detail::render(actual), Detail::render(expected), {}, location, index);
     }
 
     template<class A, class B>
@@ -631,11 +631,11 @@ class Context {
         decltype(auto) actual = std::invoke(std::forward<ActualFn>(actual_fn));
         decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
         decltype(auto) tolerance = std::invoke(std::forward<ToleranceFn>(tolerance_fn));
-        auto const error = detail::magnitude(actual - expected);
+        auto const error = Detail::magnitude(actual - expected);
         auto const relation = (error <= tolerance);
-        record(outcome(detail::evidence(relation)), description,
-               detail::render(actual), detail::render(expected),
-               "error=" + detail::render(error) + ", tolerance=" + detail::render(tolerance), location, index);
+        record(outcome(Detail::evidence(relation)), description,
+               Detail::render(actual), Detail::render(expected),
+               "error=" + Detail::render(error) + ", tolerance=" + Detail::render(tolerance), location, index);
     }
 
     template<class A, class B, class Tolerance>
@@ -653,10 +653,10 @@ class Context {
     void require(Callable&& predicate, std::string_view description,
                  std::source_location location = std::source_location::current()) {
         auto const index = begin_check(description);
-        auto const evidence = detail::evidence(std::invoke(std::forward<Callable>(predicate)));
+        auto const evidence = Detail::evidence(std::invoke(std::forward<Callable>(predicate)));
         auto const status = outcome(evidence);
         record(status, description, {}, {}, {}, location, index);
-        if (status != Outcome::Passed) throw detail::AbortCase{};
+        if (status != Outcome::Passed) throw Detail::AbortCase{};
     }
 
     template<class Exception, class Callable>
@@ -664,7 +664,7 @@ class Context {
                        std::source_location location = std::source_location::current()) {
         auto const index = begin_check(description);
         try { std::invoke(std::forward<Callable>(action)); }
-        catch (detail::AbortCase const&) { throw; }
+        catch (Detail::AbortCase const&) { throw; }
         catch (Exception const&) { record(Outcome::Passed, description, {}, {}, {}, location, index); return; }
         catch (std::exception const& e) {
             record(Outcome::Failed, description, {}, {}, std::string("unexpected exception: ") + e.what(), location, index); return;
@@ -681,7 +681,7 @@ class Context {
                       "Exception message checks require a std::exception-derived type");
         auto const index = begin_check(description);
         try { std::invoke(std::forward<Callable>(action)); }
-        catch (detail::AbortCase const&) { throw; }
+        catch (Detail::AbortCase const&) { throw; }
         catch (Exception const& e) {
             std::string const actual(e.what());
             bool const matches = actual.find(substring) != std::string::npos;
@@ -715,17 +715,17 @@ class Context {
                       "Payload checking requires a std::exception-derived type");
         auto const index = begin_check(description);
         try { std::invoke(std::forward<Action>(action)); }
-        catch (detail::AbortCase const&) { throw; }
+        catch (Detail::AbortCase const&) { throw; }
         catch (Exception const& exception) {
             try {
                 decltype(auto) projector =
                     std::invoke(std::forward<ProjectorFn>(projector_fn));
                 decltype(auto) actual = std::invoke(projector, exception);
                 decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
-                auto const verdict = detail::equal_evidence(actual, expected);
-                record(outcome(verdict), description, detail::render(actual),
-                       detail::render(expected), {}, location, index);
-            } catch (detail::AbortCase const&) {
+                auto const verdict = Detail::equal_evidence(actual, expected);
+                record(outcome(verdict), description, Detail::render(actual),
+                       Detail::render(expected), {}, location, index);
+            } catch (Detail::AbortCase const&) {
                 throw;
             } catch (std::exception const& error) {
                 record(Outcome::Error, description, {}, {},
@@ -757,7 +757,7 @@ class Context {
                           std::source_location location = std::source_location::current()) {
         auto const index = begin_check(description);
         try { std::invoke(std::forward<Callable>(action)); }
-        catch (detail::AbortCase const&) { throw; }
+        catch (Detail::AbortCase const&) { throw; }
         catch (...) { record(Outcome::Passed, description, {}, {}, {}, location, index); return; }
         record(Outcome::Failed, description, {}, {}, "no exception thrown", location, index);
     }
@@ -766,7 +766,7 @@ class Context {
                          std::source_location location = std::source_location::current()) {
         auto const index = begin_check(description);
         try { std::invoke(std::forward<Callable>(action)); }
-        catch (detail::AbortCase const&) { throw; }
+        catch (Detail::AbortCase const&) { throw; }
         catch (std::exception const& e) {
             record(Outcome::Failed, description, {}, {}, e.what(), location, index); return;
         }
@@ -809,9 +809,9 @@ class Context {
                 break;
         }
         record(result, description, observed, "ready",
-               "waited=" + detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
+               "waited=" + Detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
                                 elapsed_time).count()) + "ms; limit=" +
-               detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
+               Detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
                                 timeout).count()) + "ms",
                location, index);
     }
@@ -834,9 +834,9 @@ class Context {
         auto const elapsed_time = std::chrono::steady_clock::now() - start;
         record(completed ? Outcome::Passed : Outcome::Failed, description,
                completed ? "condition satisfied" : "timeout", "condition satisfied",
-               "waited=" + detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
+               "waited=" + Detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
                                 elapsed_time).count()) + "ms; limit=" +
-               detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
+               Detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
                                 timeout).count()) + "ms",
                location, index);
     }
@@ -847,7 +847,7 @@ class Context {
                std::source_location location = std::source_location::current()) {
         auto const index = begin_check(description);
         auto const value = std::invoke(std::forward<Callable>(predicate));
-        record(outcome(detail::evidence(value)), description, {}, {}, {}, location, index);
+        record(outcome(Detail::evidence(value)), description, {}, {}, {}, location, index);
     }
 
     void skip(std::string_view reason,
