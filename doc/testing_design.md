@@ -782,3 +782,27 @@ No assertion expectations were weakened and no framework source or
 coverage selection changed. A fresh official LLVM report must
 confirm the branch and region delta before declaring `checks.hpp`
 fully covered.
+
+## 2026-10-31 — checks.hpp coverage closed (LLVM 21)
+
+The user-supplied `Archivio 8(3).zip` coverage report generated on
+2026-10-31 confirms `include/testing/checks.hpp` at **58/58 functions,
+58/58 lines, 75/75 regions, and 14/14 branches (100% each)**. The
+preceding report showed 72/75 regions and 9/14 branches, so the targeted
+regression tests in commit `0afabca` closed the remaining three regions
+and five branches. The corresponding Ubuntu, macOS, Sanitizers and
+Coverage GitHub Actions completed successfully; Windows validation
+was still running when this checkpoint was recorded.
+
+Repository-wide metrics in the same report are **173/173 functions
+(100%), 917/1002 lines (91.52%), 536/623 regions (86.04%), and
+286/374 branches (76.47%)**. `fixture.hpp`, `parameterized.hpp`,
+`state.hpp`, and `checks.hpp` have complete coverage under their
+applicable metrics. `testing.hpp` remains at 56/56 functions,
+445/513 lines and 84/140 branches; `testing.cpp` remains at
+31/31 functions, 284/301 lines and 174/206 branches.
+
+`checks.hpp` is closed under the coverage playbook. Future coverage
+work should focus on behaviorally meaningful remaining gaps in
+`testing.hpp` and `testing.cpp`; do not introduce artificial scenarios
+or weaken expectations merely to inflate the metrics.
