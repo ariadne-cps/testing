@@ -191,7 +191,7 @@ int main() {
            summary.skipped == 0 && report.cases.size() == 18 &&
            report.checks == 18,
            "public macro summary/check count changed");
-    verify(operations == 4 && selectors == 3 && verifiers == 4 &&
+    verify(operations == 4 && selectors == 3 && verifiers == 5 &&
            rejected_verifiers == 0,
            "deferred operations or postconditions were evaluated incorrectly");
     if (report.cases.size() == 18) {
