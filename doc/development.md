@@ -306,7 +306,7 @@ works with singleton Logger state.
       suite identity and parameterization.
 
 **Evidence:** [foundation/test_paradigm.cpp](https://github.com/ariadne-cps/foundation/blob/main/tests/test_paradigm.cpp)
-uses \`ARIADNE_TEST_CONCEPT\`;
+uses \`ARIADNE_TESTING_COMPILE_CONCEPT\`;
 [numeric/check_numeric.cpp](https://github.com/ariadne-cps/numeric/blob/main/tests/check_numeric.cpp)
 is compiled separately as an object target;
 [configuration/test_doc_markdown.py](https://github.com/ariadne-cps/configuration/blob/main/tests/test_doc_markdown.py)
@@ -396,3 +396,16 @@ migration or edit to those repos.
   in its \`main\` tree.
 * This is a source-level survey, not a compilation or execution audit.
   Priority indicates likely migration leverage, not benchmarked effort.
+
+## Public macro naming policy (2026-10-31)
+
+Every new public testing macro is named `ARIADNE_TESTING_*`. This applies
+to expression checks, `_CTX` counterparts, fixture and suite registration,
+worker staging, and compile-time assertions. Deprecated nonconflicting
+pre-namespace spellings may remain as temporary compatibility aliases;
+do not introduce legacy `ARIADNE_TEST_*` aliases, since those are owned by
+the older Ariadne Macro testing API and can have different semantics.
+For compile-time assertions use `ARIADNE_TESTING_COMPILE_CONCEPT`,
+`ARIADNE_TESTING_COMPILE_TRAIT` and
+`ARIADNE_TESTING_COMPILE_SAME_TYPE`. New regressions and examples use
+canonical names exclusively. CI across supported compilers is required.

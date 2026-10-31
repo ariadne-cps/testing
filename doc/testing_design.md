@@ -270,12 +270,12 @@ Indeterminate unchanged, instead of using boolean negation of a validated
 predicate. All checkers announce and flush the check event before evaluating
 operands, which are evaluated exactly once, left to right.
 
-Added optional thin expression macros `ARIADNE_EXPECT_NOT_EQUAL`,
-`ARIADNE_EXPECT_LESS`, `ARIADNE_EXPECT_LESS_EQUAL`,
-`ARIADNE_EXPECT_GREATER`, `ARIADNE_EXPECT_GREATER_EQUAL`,
-`ARIADNE_EXPECT_UNARY_PREDICATE`, `ARIADNE_EXPECT_NOT_UNARY_PREDICATE`,
-`ARIADNE_EXPECT_BINARY_PREDICATE` and
-`ARIADNE_EXPECT_NOT_BINARY_PREDICATE` in `testing/checks.hpp`.
+Added optional thin expression macros `ARIADNE_TESTING_EXPECT_NOT_EQUAL`,
+`ARIADNE_TESTING_EXPECT_LESS`, `ARIADNE_TESTING_EXPECT_LESS_EQUAL`,
+`ARIADNE_TESTING_EXPECT_GREATER`, `ARIADNE_TESTING_EXPECT_GREATER_EQUAL`,
+`ARIADNE_TESTING_EXPECT_UNARY_PREDICATE`, `ARIADNE_TESTING_EXPECT_NOT_UNARY_PREDICATE`,
+`ARIADNE_TESTING_EXPECT_BINARY_PREDICATE` and
+`ARIADNE_TESTING_EXPECT_NOT_BINARY_PREDICATE` in `testing/checks.hpp`.
 The macros stringify the source expression but leave test classification,
 operand evaluation and diagnostics in the C++ framework. No domain-specific
 relation or production dependency was added. Self-tests exercise all five
@@ -298,10 +298,10 @@ check, **not** a proof of the proposition. Domain statuses such as SAT,
 UNSAT and UNKNOWN are ordinary domain values, not automatically mapped to
 Testing's `Inconclusive` outcome.
 
-Optional `ARIADNE_EXPECT_DEFINITELY`, `ARIADNE_EXPECT_POSSIBLY`,
-`ARIADNE_EXPECT_NOT_POSSIBLY` and `ARIADNE_EXPECT_INDETERMINATE`
+Optional `ARIADNE_TESTING_EXPECT_DEFINITELY`, `ARIADNE_TESTING_EXPECT_POSSIBLY`,
+`ARIADNE_TESTING_EXPECT_NOT_POSSIBLY` and `ARIADNE_TESTING_EXPECT_INDETERMINATE`
 macros use deferred lambdas and expression stringification. Existing
-`Context::prove` and `ARIADNE_PROVE` retain strict proof semantics.
+`Context::prove` and `ARIADNE_TESTING_PROVE` retain strict proof semantics.
 Self-tests verify passing expectations, unsuccessful possibility,
 inconclusive proof/refutation, failed mismatched expectation and the
 recorded evidence labels. Policy configuration, legacy equivalence
@@ -312,7 +312,7 @@ The new implementation was published for the GitHub Actions CI matrix.
 
 The fourth logical expectation is now expressed using the dual of
 `possibly(proposition)`: `EvidenceExpectation::NotPossibly` and
-`ARIADNE_EXPECT_NOT_POSSIBLY(context, proposition)`. For a proposition
+`ARIADNE_TESTING_EXPECT_NOT_POSSIBLY(context, proposition)`. For a proposition
 whose evidence is False, this expectation passes; when the evidence is
 Indeterminate it remains Inconclusive, and when it is True it fails.
 This is a terminology-only change to the public API; the previous
@@ -329,17 +329,17 @@ Source: `ariadne-cps/macro/include/macro/testing.hpp` on main; `function/tests/t
 
 | Legacy | Candidate replacement | Non-equivalence or required verification |
 |---|---|---|
-| `ASSERT(x)` | `ARIADNE_PROVE(ctx(),x)` | Old Indeterminate merely warns and does not increment failures; new Inconclusive blocks default CI. |
-| `EQUAL(a,b)`, `EQUALS(a,b)` | `ARIADNE_EXPECT_EQUAL` | Old uses `decision(a==b)` and can re-evaluate operands for diagnostic printing; new captures once and preserves evidence. |
-| `NOT_EQUAL(a,b)` | `ARIADNE_EXPECT_NOT_EQUAL` | Old negates the bool decision of `a==b`; new uses `a!=b` and preserves its evidence. |
-| `SAME(a,b)`, `SAME_AS(a,b)` | `ARIADNE_EXPECT_SAME` | Old uses `decision(same(a,b))`; new uses the evidence classification of ADL same. |
+| `ASSERT(x)` | `ARIADNE_TESTING_PROVE(ctx(),x)` | Old Indeterminate merely warns and does not increment failures; new Inconclusive blocks default CI. |
+| `EQUAL(a,b)`, `EQUALS(a,b)` | `ARIADNE_TESTING_EXPECT_EQUAL` | Old uses `decision(a==b)` and can re-evaluate operands for diagnostic printing; new captures once and preserves evidence. |
+| `NOT_EQUAL(a,b)` | `ARIADNE_TESTING_EXPECT_NOT_EQUAL` | Old negates the bool decision of `a==b`; new uses `a!=b` and preserves its evidence. |
+| `SAME(a,b)`, `SAME_AS(a,b)` | `ARIADNE_TESTING_EXPECT_SAME` | Old uses `decision(same(a,b))`; new uses the evidence classification of ADL same. |
 | `LESS(a,b)`, `COMPARE(a,op,b)` | Relational/check_equal macros according to operator | Old decision semantics and possible operand re-evaluation differ. |
-| `WITHIN(a,b,t)` | `ARIADNE_EXPECT_WITHIN` | Magnitude and tolerance relation remain, but old uses decision and may re-evaluate failing operands. |
+| `WITHIN(a,b,t)` | `ARIADNE_TESTING_EXPECT_WITHIN` | Magnitude and tolerance relation remain, but old uses decision and may re-evaluate failing operands. |
 | `CHECK(a,b)`, `CHECK_WARN(a,b)` | Equality or warning adapter | CHECK uses testing_check + decision; CHECK_WARN only warns and does not fail. |
 | `UNARY_PREDICATE`, `BINARY_PREDICATE` | Generic predicate macros | Old decision/operand re-evaluation may differ; new evaluates once and preserves evidence. |
 | `CONCEPT`, `STATIC_ASSERT`, `SAME_TYPE` | C++ compile-time checks or ordinary checks | Legacy macro assertions happen at runtime even for compile-time expressions. |
-| `FAIL(statement)` | `ARIADNE_EXPECT_EXCEPTION` | Both expect an exception of any type. |
-| `THROWS(statement,E)` | `ARIADNE_EXPECT_THROWS` | Both require type E; new also handles unexpected non-standard exception types as a failed expectation. |
+| `FAIL(statement)` | `ARIADNE_TESTING_EXPECT_EXCEPTION` | Both expect an exception of any type. |
+| `THROWS(statement,E)` | `ARIADNE_TESTING_EXPECT_THROWS` | Both require type E; new also handles unexpected non-standard exception types as a failed expectation. |
 | local `REFINES(a,b)` | Generic binary predicate + domain-local diagnostic adapter | Old additionally prints model differences, error and norm on failure, requiring a domain adapter to retain coverage. |
 | `EXECUTE`, `TRY`, `CONSTRUCT`, `ASSIGN`, `PRINT`, `WARN` | Explicit C++ with check/notes | These have differing scope, side-effect and exception semantics; do not automatically replace. |
 
@@ -363,7 +363,7 @@ external state in the factory.
 
 `SuiteVariant::add_typed<Tag>` instantiates a generic callback separately
 for each compile-time tag (such as Approximate, Validated, Effective).
-`ARIADNE_ADD_VARIANT_TEST(group, method)` and its `NO_THROW` form
+`ARIADNE_TESTING_ADD_VARIANT_TEST(group, method)` and its `NO_THROW` form
 stringify the method token and delegate to C++ member invocation.
 The optional prefix `test_` is stripped from display names, preserving
 current fixture conventions. Variant names appear in full case paths;
@@ -418,9 +418,9 @@ these remain in development.md.
 
 ## 2026-10-30 — Fixture shorthand and conventional suite entry point
 
-The canonical expression-checking macros take an explicit context and have a `_CTX` suffix (e.g. `ARIADNE_EXPECT_EQUAL_CTX(context, actual, expected)`). The unsuffixed macros are fixture-only shorthand using `this->ctx()`, and preserve expression stringification and single evaluation by forwarding to `_CTX`. They are not valid in free functions or ordinary Context& lambdas; no global or thread-local context is introduced.
+The canonical expression-checking macros take an explicit context and have a `_CTX` suffix (e.g. `ARIADNE_TESTING_EXPECT_EQUAL_CTX(context, actual, expected)`). The unsuffixed macros are fixture-only shorthand using `this->ctx()`, and preserve expression stringification and single evaluation by forwarding to `_CTX`. They are not valid in free functions or ordinary Context& lambdas; no global or thread-local context is introduced.
 
-For the conventional single-suite main, `ARIADNE_TEST_SUITE(name)` declares a local variable `ariadne_test_suite`; `ARIADNE_ADD_TEST(Fixture, method)` and `ARIADNE_ADD_TEST_NO_THROW(Fixture, method)` use it, and `ARIADNE_RUN_TESTS()` evaluates the standard console exit gate. The explicit `ARIADNE_ADD_TEST_TO(suite, Fixture, method)` and `ARIADNE_ADD_TEST_NO_THROW_TO` variants continue to support independent suites in one executable. `run_suite(suite, output)` is the underlying helper; callers may still instantiate reporters directly. These naming changes require downstream migrations from old explicit-context and explicit-suite macro signatures. No assertion or suite outcome semantics change.
+For the conventional single-suite main, `ARIADNE_TESTING_SUITE(name)` declares a local variable `ariadne_test_suite`; `ARIADNE_TESTING_ADD_TEST(Fixture, method)` and `ARIADNE_TESTING_ADD_TEST_NO_THROW(Fixture, method)` use it, and `ARIADNE_TESTING_RUN_TESTS()` evaluates the standard console exit gate. The explicit `ARIADNE_TESTING_ADD_TEST_TO(suite, Fixture, method)` and `ARIADNE_TESTING_ADD_TEST_NO_THROW_TO` variants continue to support independent suites in one executable. `run_suite(suite, output)` is the underlying helper; callers may still instantiate reporters directly. These naming changes require downstream migrations from old explicit-context and explicit-suite macro signatures. No assertion or suite outcome semantics change.
 
 ## 2026-10-30 — Public umbrella header
 
@@ -470,7 +470,7 @@ Testing stays build-tree-only, uninstalled and absent from production targets.
 
 ## 2026-10-30 — D09: fatal prerequisites and typed exception messages
 
-Added `Context::require` and the `ARIADNE_REQUIRE` / `ARIADNE_REQUIRE_CTX`
+Added `Context::require` and the `ARIADNE_TESTING_REQUIRE` / `ARIADNE_REQUIRE_CTX`
 macros. Checks are announced before their predicates are evaluated once.
 Failed or indeterminate requirements record their original evidence-derived
 outcomes, then stop only the current case using an internal `AbortCase`
@@ -517,7 +517,7 @@ concerns normal C++ replacements for legacy construction/evaluation macros.
 
 Added `Context::check_ranges` with default evidence-preserving equality,
 user-supplied binary comparator and optional index-to-path projector. Its
-`ARIADNE_EXPECT_RANGES`, `_BY`, `_AT` macros and explicit `_CTX` forms
+`ARIADNE_TESTING_EXPECT_RANGES`, `_BY`, `_AT` macros and explicit `_CTX` forms
 defer range/comparator evaluation until after the indexed CHECK event.
 Input ranges, including single-pass iterator ranges, are visited once and
 compared without copying elements. Diagnostics record complete actual and
@@ -536,7 +536,7 @@ to downstream repositories rather than included in the framework.
 ## 2026-10-30 — D07: MSVC callable capture portability fix
 
 Windows/MSVC compilation of the D07 self-test failed when a free function
-(`same_value`) was passed to `ARIADNE_EXPECT_RANGES_BY_CTX`: the macro's
+(`same_value`) was passed to `ARIADNE_TESTING_EXPECT_RANGES_BY_CTX`: the macro's
 `decltype(auto)` factory returned a function designator, which MSVC rejected
 with C3556/C3169. This was a macro portability bug, not an sccache failure,
 and the existing semantic test remains in place.
@@ -764,8 +764,8 @@ The user-provided LLVM 21 report `Archivio 7(6).zip` shows
 `include/testing/checks.hpp` with 58/58 functions, 58/58 lines,
 72/75 regions and 9/14 branches. All five uncovered branches are
 attributed to expressions expanded inside the one-evaluation macro
-wrappers: one at line 42 (`ARIADNE_EXPECT_EQUAL_CTX`) and four at
-lines 105-106 (`ARIADNE_EXPECT_LESS_CTX`). Their source is conditional
+wrappers: one at line 42 (`ARIADNE_TESTING_EXPECT_EQUAL_CTX`) and four at
+lines 105-106 (`ARIADNE_TESTING_EXPECT_LESS_CTX`). Their source is conditional
 error handling in `test_testing.cpp`'s CHECK-before-evaluation and
 operand-order tests, not independent conditions of the macros themselves.
 
@@ -945,7 +945,7 @@ The original worker source location, evidence outcome and error diagnostic
 are preserved. Uncaught worker exceptions become Error; zero-check workers
 also become Error rather than vacuous success. Missing, duplicate and
 prematurely flushed slots are rejected. The documented
-`ARIADNE_WORKER_CHECK` macro is the thin deferred-expression convenience
+`ARIADNE_TESTING_WORKER_CHECK` macro is the thin deferred-expression convenience
 wrapper; `Worker::check` is also available directly.
 
 `test_worker.cpp` exercises synchronized cross-thread interleaving,
@@ -1068,8 +1068,8 @@ verification of the current main commit remains required.
 
 ## 2026-10-31 — D11: compile-only and non-C++ orchestration
 
-Compile-time names `ARIADNE_TEST_CONCEPT`, `ARIADNE_TEST_TRAIT`
-and `ARIADNE_TEST_SAME_TYPE` are thin static_assert wrappers in
+Compile-time names `ARIADNE_TESTING_COMPILE_CONCEPT`, `ARIADNE_TESTING_COMPILE_TRAIT`
+and `ARIADNE_TESTING_COMPILE_SAME_TYPE` are thin static_assert wrappers in
 `testing/compile.hpp`, exported from the umbrella header. They do
 not create runtime Suite cases or conceal native compiler diagnostics.
 
@@ -1088,3 +1088,18 @@ Repository-level coverage includes the concept and type-negative cases,
 the driver's missing-input contract, and an optional Python API test;
 CI remains the cross-platform release gate. The existing per-case
 discovery work remains intentionally deferred.
+
+## 2026-10-31 — Unified public macro namespace
+
+All new-framework macros now use the canonical `ARIADNE_TESTING_*` prefix
+across assertion wrappers, worker checks, suite/fixture registration,
+parameterized variants and D11 compile-time checks. C++ Context methods
+and runtime behavior are unchanged. The former nonconflicting names remain
+as guarded transitional aliases; these are no longer preferred in examples.
+D11's prior `ARIADNE_TEST_CONCEPT` and `ARIADNE_TEST_SAME_TYPE` are NOT
+exported as aliases because Ariadne's legacy Macro testing framework
+already defines those names with runtime rather than static_assert semantics.
+The canonical compile-time macros have explicit `COMPILE_` in their names.
+Downstream users should migrate source sites rather than relying indefinitely
+on compatibility aliases. All test sources were migrated to canonical
+spellings; CI is required to verify this release.

@@ -35,8 +35,8 @@ installed: consumers compile/link it from source for their test targets.
 
 ## Compile-time and standalone CTest checks
 
-The public `ARIADNE_TEST_CONCEPT(expr)`, `ARIADNE_TEST_TRAIT(expr)`
-and `ARIADNE_TEST_SAME_TYPE(A, B)` macros expand directly to
+The public `ARIADNE_TESTING_COMPILE_CONCEPT(expr)`, `ARIADNE_TESTING_COMPILE_TRAIT(expr)`
+and `ARIADNE_TESTING_COMPILE_SAME_TYPE(A, B)` macros expand directly to
 `static_assert`; compiler diagnostics remain authoritative.
 Parenthesize expressions containing commas or use named type aliases.
 
@@ -67,15 +67,31 @@ int main() {
 }
 ```
 
+## Canonical macro namespace
+
+Every public macro of the new framework begins with `ARIADNE_TESTING_`,
+including assertions, fixture registration, worker checks and compile-time
+requirements. Existing nonconflicting `ARIADNE_EXPECT_*`, `ARIADNE_PROVE`,
+`ARIADNE_REQUIRE` and registration names are temporarily accepted as
+deprecated compatibility aliases; migrate consumers to the canonical spelling.
+
+Compile-time checks are named `ARIADNE_TESTING_COMPILE_CONCEPT`,
+`ARIADNE_TESTING_COMPILE_TRAIT` and
+`ARIADNE_TESTING_COMPILE_SAME_TYPE`. The previous D11 spellings
+`ARIADNE_TEST_CONCEPT` and `ARIADNE_TEST_SAME_TYPE` are **not** aliased:
+they already exist in the legacy `macro/testing.hpp` and have different,
+runtime semantics. Do not include both testing frameworks in one
+translation unit unless the legacy macros have been deliberately isolated.
+
 ## Self-describing assertions
 
 Include `ariadne-testing.hpp` to access all public Testing APIs, including
 fixture, checks and parameterized helpers. Within `ContextFixture` methods,
-use `ARIADNE_PROVE(predicate)`, `ARIADNE_EXPECT_EQUAL(a, b)`,
-`ARIADNE_EXPECT_SAME(a, b)`, `ARIADNE_EXPECT_WITHIN(a, b, tolerance)`,
-`ARIADNE_EXPECT_THROWS(Exception, operation())`,
-`ARIADNE_EXPECT_EXCEPTION(operation())` and
-`ARIADNE_EXPECT_NO_THROW(operation())`. In free functions or Context&
+use `ARIADNE_TESTING_PROVE(predicate)`, `ARIADNE_TESTING_EXPECT_EQUAL(a, b)`,
+`ARIADNE_TESTING_EXPECT_SAME(a, b)`, `ARIADNE_TESTING_EXPECT_WITHIN(a, b, tolerance)`,
+`ARIADNE_TESTING_EXPECT_THROWS(Exception, operation())`,
+`ARIADNE_TESTING_EXPECT_EXCEPTION(operation())` and
+`ARIADNE_TESTING_EXPECT_NO_THROW(operation())`. In free functions or Context&
 lambdas use their `_CTX(context, ...)` equivalents. Expression names are
 recorded automatically; operand evaluation is deferred until after the
 numbered CHECK progress event and happens once. Explicit Context calls
@@ -83,23 +99,23 @@ remain available whenever a handwritten description is preferable.
 
 ## Domain relations remain separate
 
-Use `ARIADNE_EXPECT_EQUAL(_CTX)` for ordinary equality,
-`ARIADNE_EXPECT_SAME(_CTX)` for ADL-dispatched identity, and named
-`ARIADNE_EXPECT_BINARY_PREDICATE(_CTX)` relations for mathematical
+Use `ARIADNE_TESTING_EXPECT_EQUAL(_CTX)` for ordinary equality,
+`ARIADNE_TESTING_EXPECT_SAME(_CTX)` for ADL-dispatched identity, and named
+`ARIADNE_TESTING_EXPECT_BINARY_PREDICATE(_CTX)` relations for mathematical
 `equal`, `intersect`, `disjoint`, `contains` and `refines`.
 The domain supplies the functions; Testing provides only generic
 evaluation and evidence preservation. Tolerance via
-`ARIADNE_EXPECT_WITHIN(_CTX)` is not exact equality, and an uncertain
+`ARIADNE_TESTING_EXPECT_WITHIN(_CTX)` is not exact equality, and an uncertain
 mathematical relation remains Inconclusive. `test_relations.cpp` checks
 these distinctions with a dependency-free stand-in domain.
 
 ## Relational and predicate checks
 
 In addition to equality and tolerance, `ariadne-testing.hpp` exposes
-`ARIADNE_EXPECT_NOT_EQUAL`, `ARIADNE_EXPECT_LESS`,
-`ARIADNE_EXPECT_LESS_EQUAL`, `ARIADNE_EXPECT_GREATER`,
-`ARIADNE_EXPECT_GREATER_EQUAL`, and generic
-`ARIADNE_EXPECT_UNARY_PREDICATE`/`ARIADNE_EXPECT_BINARY_PREDICATE`
+`ARIADNE_TESTING_EXPECT_NOT_EQUAL`, `ARIADNE_TESTING_EXPECT_LESS`,
+`ARIADNE_TESTING_EXPECT_LESS_EQUAL`, `ARIADNE_TESTING_EXPECT_GREATER`,
+`ARIADNE_TESTING_EXPECT_GREATER_EQUAL`, and generic
+`ARIADNE_TESTING_EXPECT_UNARY_PREDICATE`/`ARIADNE_TESTING_EXPECT_BINARY_PREDICATE`
 with corresponding `NOT_` forms. Each expression is evaluated once after
 the numbered CHECK notification. Generic predicate negation preserves an
 indeterminate verdict rather than coercing it to a boolean. Domain-specific
@@ -107,10 +123,10 @@ relations, such as `refines`, can be supplied by their owner via ADL.
 
 ## Explicit evidence expectations
 
-Inside a fixture, use `ARIADNE_EXPECT_DEFINITELY(proposition)`,
-`ARIADNE_EXPECT_POSSIBLY(proposition)`,
-`ARIADNE_EXPECT_NOT_POSSIBLY(proposition)`, or
-`ARIADNE_EXPECT_INDETERMINATE(proposition)`; outside a fixture use `_CTX`.
+Inside a fixture, use `ARIADNE_TESTING_EXPECT_DEFINITELY(proposition)`,
+`ARIADNE_TESTING_EXPECT_POSSIBLY(proposition)`,
+`ARIADNE_TESTING_EXPECT_NOT_POSSIBLY(proposition)`, or
+`ARIADNE_TESTING_EXPECT_INDETERMINATE(proposition)`; outside a fixture use `_CTX`.
 An indeterminate proposition *expected* to be indeterminate passes; an
 indeterminate result under a requested definite proof remains inconclusive.
 The possibly check only establishes non-refutation and must not be confused
@@ -149,28 +165,28 @@ Use the `_CTX` forms in free functions or `Suite::add` lambdas and the
 short forms inside a `ContextFixture`:
 
 ```cpp
-ARIADNE_EXPECT_STATUS_CTX(c, solve(), [](auto const& r) { return r.status; },
+ARIADNE_TESTING_EXPECT_STATUS_CTX(c, solve(), [](auto const& r) { return r.status; },
     (std::initializer_list<Status>{Status::SAT, Status::UNKNOWN}),
     [](auto const& r) { return valid_witness_or_reason(r); });
 
-ARIADNE_EXPECT_STATUS_ONLY_CTX(c, solve(), [](auto const& r) { return r.status; },
+ARIADNE_TESTING_EXPECT_STATUS_ONLY_CTX(c, solve(), [](auto const& r) { return r.status; },
     (std::initializer_list<Status>{Status::UNSAT}));
 
-ARIADNE_EXPECT_ALTERNATIVE_CTX(c, compute(),
+ARIADNE_TESTING_EXPECT_ALTERNATIVE_CTX(c, compute(),
     [](auto const& result) { return verify_result(result); },
     [](std::exception const& error) { return permitted_exception(error); });
 
-ARIADNE_EXPECT_ATOMIC_CTX(c, progress,
+ARIADNE_TESTING_EXPECT_ATOMIC_CTX(c, progress,
     [](int observed) { return observed >= 10; }, std::chrono::seconds(5));
-ARIADNE_EXPECT_READY_CTX(c, future, std::chrono::seconds(5));
-ARIADNE_EXPECT_EVENTUALLY_CTX(c, cv, lock,
+ARIADNE_TESTING_EXPECT_READY_CTX(c, future, std::chrono::seconds(5));
+ARIADNE_TESTING_EXPECT_EVENTUALLY_CTX(c, cv, lock,
     [&] { return finished; }, std::chrono::seconds(5));
 ```
 
 The corresponding fixture macros omit `_CTX` and the context argument:
-`ARIADNE_EXPECT_STATUS`, `ARIADNE_EXPECT_STATUS_ONLY`,
-`ARIADNE_EXPECT_ALTERNATIVE`, `ARIADNE_EXPECT_ATOMIC`,
-`ARIADNE_EXPECT_READY`, and `ARIADNE_EXPECT_EVENTUALLY`.
+`ARIADNE_TESTING_EXPECT_STATUS`, `ARIADNE_TESTING_EXPECT_STATUS_ONLY`,
+`ARIADNE_TESTING_EXPECT_ALTERNATIVE`, `ARIADNE_TESTING_EXPECT_ATOMIC`,
+`ARIADNE_TESTING_EXPECT_READY`, and `ARIADNE_TESTING_EXPECT_EVENTUALLY`.
 Wrap initializer-list expressions containing commas in parentheses, as
 shown above; callbacks are invoked only when their selected check requires
 them, and the operation expression is evaluated once after CHECK.
@@ -181,7 +197,7 @@ equally supported and preferred when explicit descriptions are needed.
 
 ## Fixture lifecycle and shared resources
 
-Every `ARIADNE_ADD_TEST_TO` and `ARIADNE_ADD_VARIANT_TEST` case constructs
+Every `ARIADNE_TESTING_ADD_TEST_TO` and `ARIADNE_TESTING_ADD_VARIANT_TEST` case constructs
 a new fixture with its own `Context&`. Optional `void set_up()` and
 `void tear_down()` hooks run around the test body. Teardown runs after
 normal completion, an exception or a failed fatal requirement; setup
@@ -204,7 +220,7 @@ The umbrella header also provides implementation/precision variants.
 For each case, `fixture_variant<Fixture>(suite, "implementation", factory)`
 constructs a fresh fixture using the supplied `Context&`, with an
 implementation owned or cloned by the factory. Register a subset of test
-methods per implementation with `ARIADNE_ADD_VARIANT_TEST(group, test_method)`.
+methods per implementation with `ARIADNE_TESTING_ADD_VARIANT_TEST(group, test_method)`.
 Variants are part of case names, not a third numeric progress counter.
 `suite_variant(suite, "Validated").add_typed<ValidatedTag>("api", callback)`
 supports compile-time paradigm variants. Factory errors are reported as
@@ -240,9 +256,9 @@ it rather than restarting the full duration for every check:
 
 ```cpp
 auto const deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-ARIADNE_EXPECT_READY_UNTIL_CTX(c, future, deadline);
-ARIADNE_EXPECT_EVENTUALLY_UNTIL_CTX(c, cv, lock, [&] { return finished; }, deadline);
-ARIADNE_EXPECT_ATOMIC_UNTIL_CTX(c, progress,
+ARIADNE_TESTING_EXPECT_READY_UNTIL_CTX(c, future, deadline);
+ARIADNE_TESTING_EXPECT_EVENTUALLY_UNTIL_CTX(c, cv, lock, [&] { return finished; }, deadline);
+ARIADNE_TESTING_EXPECT_ATOMIC_UNTIL_CTX(c, progress,
     [](int value) { return value >= 10; }, deadline);
 ```
 
@@ -260,7 +276,7 @@ and CTest's separate process watchdog remain unchanged.
 
 `WorkerBatch batch(n)` allocates fixed numbered worker slots. Run
 `batch.run(i, [](WorkerBatch::Worker& worker) { ... })` on a caller-owned
-worker thread and use `ARIADNE_WORKER_CHECK(worker, expression)` to buffer
+worker thread and use `ARIADNE_TESTING_WORKER_CHECK(worker, expression)` to buffer
 one evidence-preserving check without touching `Context` or `Reporter`.
 After joining **all** threads, invoke `batch.flush(context)` on the owning
 case thread. Assertions are emitted in slot order, then check order.
@@ -288,7 +304,7 @@ additional details if the case fails.
 
 ## Fatal prerequisites and exception messages
 
-`ARIADNE_REQUIRE(condition)` records a prerequisite and stops the current
+`ARIADNE_TESTING_REQUIRE(condition)` records a prerequisite and stops the current
 fixture test case if it is false or indeterminate; the equivalent for a
 free function or Context& lambda is `ARIADNE_REQUIRE_CTX(context, condition)`.
 The recorded outcome is `Failed` for false evidence and `Inconclusive`
@@ -296,14 +312,14 @@ for indeterminate evidence, not `Error`. Exceptions thrown while evaluating
 prerequisites are errors. Other cases continue normally. Do not intercept
 this internal control-flow signal in a test's user-defined catch-all handler.
 
-`ARIADNE_EXPECT_THROWS_MESSAGE(std::runtime_error, action(), "keyword")`
+`ARIADNE_TESTING_EXPECT_THROWS_MESSAGE(std::runtime_error, action(), "keyword")`
 checks both a `std::exception`-derived type and a substring of `what()`.
 A `_CTX(context, ...)` form is available outside fixtures. The action is
 executed only after the numbered CHECK notification.
 
 ## Exception payload verification
 
-Use `ARIADNE_EXPECT_THROWS_PAYLOAD(Exception, statement, projector, expected)`
+Use `ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD(Exception, statement, projector, expected)`
 inside a fixture, or the `_CTX(context, ...)` form elsewhere. `projector`
 is a callable applied to the caught typed exception; the result is checked
 against `expected`. For example, a lambda can extract `error.code`.
@@ -313,10 +329,10 @@ is reported as a test Error, not confused with the operation's exception.
 
 ## Range comparisons
 
-Use `ARIADNE_EXPECT_RANGES(actual, expected)` within a fixture, or
-`ARIADNE_EXPECT_RANGES_CTX(context, actual, expected)` outside one.
-`ARIADNE_EXPECT_RANGES_BY(actual, expected, comparator)` accepts a
-custom evidence-preserving comparison; `ARIADNE_EXPECT_RANGES_AT(actual,
+Use `ARIADNE_TESTING_EXPECT_RANGES(actual, expected)` within a fixture, or
+`ARIADNE_TESTING_EXPECT_RANGES_CTX(context, actual, expected)` outside one.
+`ARIADNE_TESTING_EXPECT_RANGES_BY(actual, expected, comparator)` accepts a
+custom evidence-preserving comparison; `ARIADNE_TESTING_EXPECT_RANGES_AT(actual,
 expected, comparator, path)` additionally maps a zero-based index to a
 semantic path such as `node/3`. All have explicit-context `_CTX` variants.
 They accept C++20 input ranges, count both sequences, and report the first
