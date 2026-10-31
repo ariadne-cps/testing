@@ -268,6 +268,76 @@ std::string OracleIntegrity::description() const {
            "; repetition=" + std::to_string(first.id.repetition);
 }
 
+
+OracleReplayPlan plan_oracle_replay(std::span<OracleRow const> manifest,
+                                    std::span<OracleRowId const> requested) {
+    OracleReplayPlan plan;
+    plan.total_rows = manifest.size();
+
+    // The manifest must itself be a valid and complete independent frozen
+    // reference. Never infer it from the observed implementation's output.
+    auto const integrity = validate_oracle_rows(manifest, manifest);
+    if (!integrity.valid()) {
+        plan.valid = false;
+        plan.reason = "invalid frozen manifest: " + integrity.description();
+        return plan;
+    }
+
+    std::map<OracleRowId, std::size_t, OracleRowLess> known;
+    for (std::size_t i = 0; i < manifest.size(); ++i)
+        known.emplace(manifest[i].id, i);
+
+    if (requested.empty()) {
+        for (std::size_t i = 0; i < manifest.size(); ++i)
+            plan.indices.push_back(i);
+        plan.complete = true;
+        return plan;
+    }
+
+    std::map<OracleRowId, bool, OracleRowLess> selected;
+    for (auto const& id : requested) {
+        if (id.key.empty()) {
+            plan.valid = false;
+            plan.reason = "selected row has an empty key";
+            return plan;
+        }
+        if (!selected.emplace(id, true).second) {
+            plan.valid = false;
+            plan.reason = "duplicate selected row: " + id.key;
+            return plan;
+        }
+        if (!known.contains(id)) {
+            plan.valid = false;
+            plan.reason = "unknown selected row: " + id.key;
+            return plan;
+        }
+    }
+
+    for (std::size_t i = 0; i < manifest.size(); ++i)
+        if (selected.contains(manifest[i].id))
+            plan.indices.push_back(i);
+    plan.complete = plan.indices.size() == manifest.size();
+    return plan;
+}
+
+std::string OracleReplayPlan::description() const {
+    auto summary = "replay_selected=" + std::to_string(indices.size()) +
+                   "; manifest_total=" + std::to_string(total_rows);
+    if (!valid) return summary + "; invalid selection: " + reason;
+    if (!complete) return summary + "; partial replay, full coverage not established";
+    return summary + "; full replay";
+}
+
+void Context::expect_oracle_replay(OracleReplayPlan const& plan,
+                                   std::string_view description,
+                                   std::source_location location) {
+    auto const index = begin_check(description);
+    auto const result = !plan.valid ? Outcome::Error :
+                        plan.complete ? Outcome::Passed : Outcome::Inconclusive;
+    record(result, description, std::to_string(plan.indices.size()),
+           std::to_string(plan.total_rows), plan.description(), location, index);
+}
+
 void Context::register_oracle(OracleMetadata const& metadata) {
     if (metadata.reference.empty() || metadata.label.empty() ||
         metadata.row_key_column.empty() || metadata.precision_bits == 0)

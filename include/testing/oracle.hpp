@@ -96,5 +96,32 @@ struct OracleIntegrity {
 OracleIntegrity validate_oracle_rows(std::span<OracleRow const> manifest,
                                     std::span<OracleRow const> observed);
 
+/** @brief Explicit replay selection, never an assertion of full coverage.
+ *  @details Empty requested list means full replay. Nonempty requests are
+ *  matched by full composite row identity, never by substring or prefix.
+ *  Indices retain the frozen manifest's row order, even if requests are
+ *  supplied in a different order. Requests do not invoke any generators,
+ *  random engines, callbacks or readers.
+ */
+struct OracleReplayPlan {
+    std::size_t total_rows = 0;
+    std::vector<std::size_t> indices;
+    bool valid = true;
+    bool complete = false;
+    std::string reason;
+
+    std::string description() const;
+};
+
+/** @brief Resolve full or selected replay with no RNG side effects.
+ *  @param manifest Independently frozen complete reference rows.
+ *  @param requested Empty: all rows. Otherwise explicitly requested IDs.
+ *  @return Invalid plan for empty/invalid manifest, duplicate or unknown
+ *  requests. Valid partial replay still explicitly reports incomplete
+ *  coverage; by default it must NOT count as a passing full-suite check.
+ */
+OracleReplayPlan plan_oracle_replay(std::span<OracleRow const> manifest,
+                                   std::span<OracleRowId const> requested = {});
+
 } // namespace Ariadne::Testing
 #endif // ARIADNE_TESTING_ORACLE_HPP

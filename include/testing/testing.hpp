@@ -316,6 +316,15 @@ class Context {
                             std::string_view description,
                             std::source_location location = std::source_location::current());
 
+    /** @brief Assert full-replay coverage or identify an explicit subset.
+     *  @details A valid partial plan produces Inconclusive (default blocking),
+     *  not Passed. Malformed selections produce Error. The selector is pure
+     *  and never consumes or resets a shared random stream.
+     */
+    void expect_oracle_replay(OracleReplayPlan const& plan,
+                              std::string_view description,
+                              std::source_location location = std::source_location::current());
+
     // File expectations issue CHECK before inspecting the filesystem.
     /** @brief Check whether a path is an accessible regular file. */
     void expect_file_exists(std::filesystem::path const& path,
