@@ -32,6 +32,63 @@
 
 namespace Ariadne::Testing {
 
+namespace Detail {
+
+// Do not silently ignore status-returning setup or teardown hooks.
+template<class Fixture>
+void fixture_set_up(Fixture& fixture) {
+    if constexpr (requires(Fixture& value) { value.set_up(); }) {
+        static_assert(std::is_void_v<decltype(fixture.set_up())>,
+                      "Fixture set_up() must return void");
+        fixture.set_up();
+    }
+}
+template<class Fixture>
+void fixture_tear_down(Fixture& fixture) {
+    if constexpr (requires(Fixture& value) { value.tear_down(); }) {
+        static_assert(std::is_void_v<decltype(fixture.tear_down())>,
+                      "Fixture tear_down() must return void");
+        fixture.tear_down();
+    }
+}
+inline std::string fixture_failure_description(std::exception_ptr failure) {
+    try {
+        std::rethrow_exception(failure);
+    } catch (AbortCase const&) {
+        return "failed prerequisite";
+    } catch (std::exception const& e) {
+        return e.what();
+    } catch (...) {
+        return "non-standard exception";
+    }
+}
+template<class Fixture, class Operation>
+void run_fixture_lifecycle(Fixture& fixture, Operation&& operation) {
+    fixture_set_up(fixture); // No teardown if setup itself fails.
+    std::exception_ptr body_failure;
+    try {
+        std::invoke(std::forward<Operation>(operation), fixture);
+    } catch (...) {
+        body_failure = std::current_exception();
+    }
+    std::exception_ptr teardown_failure;
+    try {
+        fixture_tear_down(fixture);
+    } catch (...) {
+        teardown_failure = std::current_exception();
+    }
+    if (teardown_failure) {
+        if (body_failure) {
+            throw std::runtime_error(
+                "fixture body failed: " + fixture_failure_description(body_failure) +
+                "; tear_down failed: " + fixture_failure_description(teardown_failure));
+        }
+        std::rethrow_exception(teardown_failure);
+    }
+    if (body_failure) std::rethrow_exception(body_failure);
+}
+} // namespace Detail
+
 template<class Fixture>
 void add_fixture_test(Suite& suite, std::string_view method_name,
                       void (Fixture::*method)(),
@@ -42,12 +99,15 @@ void add_fixture_test(Suite& suite, std::string_view method_name,
     if (method_name.starts_with("test_")) method_name.remove_prefix(5);
     suite.add(std::string(method_name), [method, check](Context& context) {
         Fixture fixture(context);
-        if (check == FixtureCheck::NoThrow) {
-            context.expect_no_throw([&] { (fixture.*method)(); }, "operation completes");
-        } else {
-            // Suite::run records uncaught exceptions as an Error.
-            (fixture.*method)();
-        }
+        Detail::run_fixture_lifecycle(fixture, [&](Fixture& instance) {
+            if (check == FixtureCheck::NoThrow) {
+                context.expect_no_throw([&] { (instance.*method)(); },
+                                        "operation completes");
+            } else {
+                // Suite::run reports uncaught method exceptions as Error.
+                (instance.*method)();
+            }
+        });
     });
 }
 

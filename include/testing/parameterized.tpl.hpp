@@ -79,12 +79,14 @@ template<class Method>
             // Any failure in the factory is reported as Error by Suite::run.
             // No factory is invoked while cases are being registered.
             Fixture fixture = std::invoke(*factory, context);
-            if (check == FixtureCheck::NoThrow) {
-                context.expect_no_throw([&] { std::invoke(*operation, fixture); },
-                                        "operation completes");
-            } else {
-                std::invoke(*operation, fixture);
-            }
+            Detail::run_fixture_lifecycle(fixture, [&](Fixture& instance) {
+                if (check == FixtureCheck::NoThrow) {
+                    context.expect_no_throw([&] { std::invoke(*operation, instance); },
+                                            "operation completes");
+                } else {
+                    std::invoke(*operation, instance);
+                }
+            });
         });
     }
 

@@ -57,6 +57,14 @@ enum class FixtureCheck { Direct, NoThrow };
 /** @brief Register a fixture method as a separate case.
  *  @tparam Fixture Type constructible from Context&.
  *  @param check Whether an uncaught exception is a case Error or a failing check.
+ *  @details A fresh fixture is constructed per case. Optional void set_up()
+ *  and tear_down() hooks surround the method; teardown runs even after a
+ *  body exception or failed fatal prerequisite, but not after setup failure.
+ *  The fixture destructor always runs. If body and teardown both fail, the
+ *  resulting Error retains both descriptions. NoThrow affects the body
+ *  only, not the hooks.
+ *  @note Never reuse a Context-bound fixture across cases. Share separately
+ *  owned warm-start data explicitly through a fixture factory instead.
  */
 template<class Fixture>
 void add_fixture_test(Suite& suite, std::string_view method_name,
