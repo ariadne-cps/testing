@@ -1,6 +1,8 @@
 #include "ariadne-testing.hpp"
 
+#include <array>
 #include <chrono>
+#include <fstream>
 #include <filesystem>
 #include <functional>
 #include <future>
@@ -8,6 +10,12 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#if defined(_WIN32)
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
 
 using namespace Ariadne::Testing;
 
@@ -198,6 +206,109 @@ int main() {
             ok &= verify(future_report.cases[i].outcome == future_outcomes[i] &&
                          future_report.cases[i].assertions.size() == 1,
                          "future: wrong outcome " + std::to_string(i));
+    }
+
+    // Reproduce a stale directory and a stale regular file from an earlier
+    // process. The allocator must skip both, preserve their contents, and
+    // remove only the directory that it actually owns.
+#if defined(_WIN32)
+    auto const process_id = std::to_string(_getpid());
+#else
+    auto const process_id = std::to_string(getpid());
+#endif
+    auto const temp = std::filesystem::temp_directory_path();
+    auto const occupied_directory = temp / ("ariadne-case-" + process_id + "-0");
+    auto const occupied_file = temp / ("ariadne-case-" + process_id + "-1");
+    std::error_code allocation_error;
+    if (!std::filesystem::create_directory(occupied_directory, allocation_error) ||
+        allocation_error) {
+        std::cerr << "could not reserve a stale case directory: "
+                  << allocation_error.message() << '\n';
+        return 2;
+    }
+    {
+        std::ofstream output(occupied_directory / "original.txt");
+        output << "preserve this file";
+    }
+    {
+        std::ofstream output(occupied_file);
+        output << "preserve this ordinary file";
+    }
+    std::filesystem::path allocated;
+    Suite allocation_suite("pre-existing case path ownership");
+    allocation_suite.add("skip occupied paths", [&](Context& c) {
+        allocated = c.work_directory();
+        c.prove(allocated != occupied_directory && allocated != occupied_file,
+                "allocation must not adopt an occupied path");
+        c.prove(std::filesystem::is_regular_file(occupied_directory / "original.txt"),
+                "stale directory contents must survive allocation");
+        c.prove(std::filesystem::is_regular_file(occupied_file),
+                "stale regular file must survive allocation");
+    });
+    Capture allocation_capture;
+    auto const allocation_summary = allocation_suite.run(allocation_capture);
+    ok &= verify(allocation_summary.passed == 1 && allocation_summary.errors == 0 &&
+                 allocation_capture.cases.size() == 1,
+                 "stale case-path collision affected test outcome");
+    ok &= verify(!allocated.empty() && allocated != occupied_directory &&
+                 allocated != occupied_file && !std::filesystem::exists(allocated),
+                 "owned case directory was not cleaned");
+    ok &= verify(std::filesystem::is_regular_file(occupied_directory / "original.txt") &&
+                 std::filesystem::is_regular_file(occupied_file),
+                 "allocator damaged a pre-existing entry");
+    std::filesystem::remove_all(occupied_directory, allocation_error);
+    ok &= verify(!allocation_error, "could not clean reserved directory");
+    std::filesystem::remove(occupied_file, allocation_error);
+    ok &= verify(!allocation_error, "could not clean reserved regular file");
+
+    // std::cmp_* must be used for non-boolean integers; bool and floating
+    // operands must take their ordinary C++20 relational path. Assert every
+    // result, including the ordering of negative signed vs unsigned values.
+    Suite comparison_suite("comparison operand type contracts");
+    std::vector<std::array<bool, 5>> expected_comparisons;
+    auto add_pair = [&]<class A, class B>(std::string label, A actual, B expected,
+                                         std::array<bool, 5> outcomes) {
+        expected_comparisons.push_back(outcomes);
+        comparison_suite.add(std::move(label), [=](Context& c) {
+            c.check_compare<Comparison::NotEqual>([&] { return actual; },
+                [&] { return expected; }, "not equal");
+            c.check_compare<Comparison::Less>([&] { return actual; },
+                [&] { return expected; }, "less");
+            c.check_compare<Comparison::LessEqual>([&] { return actual; },
+                [&] { return expected; }, "less equal");
+            c.check_compare<Comparison::Greater>([&] { return actual; },
+                [&] { return expected; }, "greater");
+            c.check_compare<Comparison::GreaterEqual>([&] { return actual; },
+                [&] { return expected; }, "greater equal");
+        });
+    };
+    add_pair("boolean operands", true, false, {true, false, false, true, true});
+    add_pair("signed and boolean", -1, true, {true, true, true, false, false});
+    add_pair("boolean and signed", true, 2, {true, true, true, false, false});
+    add_pair("signed and unsigned", -1, 0u, {true, true, true, false, false});
+    add_pair("integer and floating", -1, 0.5, {true, true, true, false, false});
+    add_pair("floating and integer", 1.5, 2, {true, true, true, false, false});
+    add_pair("nonintegral objects", std::string("a"), std::string("b"),
+             {true, true, true, false, false});
+    Capture comparison_capture;
+    auto const comparison_summary = comparison_suite.run(comparison_capture);
+    ok &= verify(comparison_summary.failed == expected_comparisons.size() &&
+                 comparison_summary.errors == 0 &&
+                 comparison_capture.cases.size() == expected_comparisons.size(),
+                 "comparison type contract summary changed");
+    if (comparison_capture.cases.size() == expected_comparisons.size()) {
+        for (std::size_t i = 0; i < expected_comparisons.size(); ++i) {
+            auto const& result = comparison_capture.cases[i];
+            ok &= verify(result.assertions.size() == 5,
+                         "missing comparison check in " + result.name);
+            if (result.assertions.size() != 5) continue;
+            for (std::size_t j = 0; j < 5; ++j) {
+                auto const expected = expected_comparisons[i][j] ?
+                                      Outcome::Passed : Outcome::Failed;
+                ok &= verify(result.assertions[j].outcome == expected,
+                    "incorrect relation " + std::to_string(j) + " in " + result.name);
+            }
+        }
     }
 
 #if !defined(_WIN32)
