@@ -242,9 +242,25 @@ void Context::expect_file_equal(std::filesystem::path const& actual,
                !a ? "cannot open actual file" : "cannot open reference file",location,index);
         return;
     }
+    // Opening a directory as an input stream succeeds on some platforms.
+    // It must not be mistaken for an empty regular file.
+    bool const actual_regular = std::filesystem::is_regular_file(actual);
+    bool const reference_regular = std::filesystem::is_regular_file(reference);
+    if (!actual_regular || !reference_regular) {
+        record(Outcome::Failed,description,actual.string(),reference.string(),
+               !actual_regular ? "actual path is not a regular file"
+                               : "reference path is not a regular file",location,index);
+        return;
+    }
     std::size_t offset=0;
     for (;;) {
         int const x=a.get(),y=b.get();
+        if (a.bad() || b.bad()) {
+            record(Outcome::Error,description,actual.string(),reference.string(),
+                   a.bad() ? "error reading actual file" : "error reading reference file",
+                   location,index);
+            return;
+        }
         if (x!=y) {
             record(Outcome::Failed,description,actual.string(),reference.string(),
                    "first differing byte offset="+std::to_string(offset),location,index);
@@ -267,8 +283,18 @@ void Context::expect_file_signature(std::filesystem::path const& actual,
                "cannot open actual file",location,index);
         return;
     }
+    if (!std::filesystem::is_regular_file(actual)) {
+        record(Outcome::Failed,description,actual.string(),std::string(signature),
+               "actual path is not a regular file",location,index);
+        return;
+    }
     std::string found(signature.size(),'\0');
     stream.read(found.data(),static_cast<std::streamsize>(found.size()));
+    if (stream.bad()) {
+        record(Outcome::Error,description,actual.string(),std::string(signature),
+               "error reading actual file",location,index);
+        return;
+    }
     found.resize(static_cast<std::size_t>(stream.gcount()));
     bool const equal=found==signature;
     record(equal ? Outcome::Passed : Outcome::Failed,description,actual.string(),

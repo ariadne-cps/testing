@@ -130,6 +130,17 @@ int main() {
                                 "signature longer than file fails");
         c.expect_file_equal(shorter, shorter, "binary file equals itself");
     });
+    s.add("directories are not binary files", [](Context& c) {
+        auto const directory = c.work_directory();
+        auto const empty = directory / "empty.bin";
+        { std::ofstream output(empty, std::ios::binary); }
+        c.expect_file_equal(directory, directory, "two directories cannot compare equal");
+        c.expect_file_equal(directory, empty, "directory cannot be actual binary file");
+        c.expect_file_equal(empty, directory, "directory cannot be reference binary file");
+        c.expect_file_signature(directory, "", "directory cannot match an empty signature");
+        c.expect_file_signature(empty, "", "empty regular file matches empty signature");
+        c.expect_file_equal(empty, empty, "empty regular file equals itself");
+    });
     Capture r; auto sum=s.run(r);
     bool ok = true;
     auto verify = [&](bool condition, std::string const& description) {
@@ -138,7 +149,7 @@ int main() {
             ok = false;
         }
     };
-    verify(sum.passed == 5 && sum.failed == 5 && sum.inconclusive == 0 &&
+    verify(sum.passed == 5 && sum.failed == 6 && sum.inconclusive == 0 &&
            sum.skipped == 0 && sum.errors == 0,
            "unexpected suite summary: passed=" + std::to_string(sum.passed) +
            ", failed=" + std::to_string(sum.failed) +
@@ -150,8 +161,8 @@ int main() {
     verify(!std::filesystem::exists(removed), "successful case directory not removed");
     verify(std::filesystem::exists(retained), "failure artifacts not retained");
     verify(std::filesystem::exists(reference), "external golden reference disappeared");
-    verify(r.cases.size() == 10, "unexpected test case count");
-    if (r.cases.size() == 10) {
+    verify(r.cases.size() == 11, "unexpected test case count");
+    if (r.cases.size() == 11) {
         verify(r.cases[0].outcome == Outcome::Passed, "success-case outcome changed");
         verify(r.cases[1].outcome == Outcome::Failed, "golden-regression case must fail");
         verify(r.cases[2].outcome == Outcome::Failed, "missing file must be Failed, not Error");
@@ -174,7 +185,7 @@ int main() {
            "KeepOnFailure must not retain output from a successful case");
     verify(!always_retained.empty() && std::filesystem::exists(always_retained / "keep.bin"),
            "KeepAlways must retain output from a successful case");
-    if (r.cases.size() == 10) {
+    if (r.cases.size() == 11) {
         verify(r.cases[3].outcome == Outcome::Passed &&
                r.cases[3].assertions.size() == 1 &&
                r.cases[3].assertions[0].outcome == Outcome::Passed,
@@ -212,7 +223,7 @@ int main() {
            "file-as-parent case directory should be cleaned");
     verify(!binary_removed.empty() && !std::filesystem::exists(binary_removed),
            "binary prefix case directory should be cleaned");
-    if (r.cases.size() == 10) {
+    if (r.cases.size() == 11) {
         auto const& invalid_parent = r.cases[8];
         verify(invalid_parent.outcome == Outcome::Failed &&
                invalid_parent.assertions.size() == 1 &&
@@ -236,6 +247,21 @@ int main() {
                    "a signature longer than the file must fail");
             verify(binary.assertions[4].outcome == Outcome::Passed,
                    "binary file must equal itself");
+        }
+    }
+    if (r.cases.size() == 11) {
+        auto const& directory = r.cases[10];
+        verify(directory.outcome == Outcome::Failed && directory.assertions.size() == 6,
+               "directory binary-check summary changed");
+        if (directory.assertions.size() == 6) {
+            for (std::size_t i = 0; i < 4; ++i)
+                verify(directory.assertions[i].outcome == Outcome::Failed &&
+                       (directory.assertions[i].detail.find("not a regular file") != std::string::npos ||
+                        directory.assertions[i].detail.find("cannot open") != std::string::npos),
+                       "a directory was accepted as a binary file");
+            verify(directory.assertions[4].outcome == Outcome::Passed &&
+                   directory.assertions[5].outcome == Outcome::Passed,
+                   "an empty regular file was rejected");
         }
     }
     std::error_code error;
