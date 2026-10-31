@@ -79,24 +79,51 @@ inline int run_suite(Suite const& suite, std::ostream& output = std::cout) {
 } // namespace Ariadne::Testing
 
 // Only the name/stringification is a macro; semantics are type-checked C++.
-#define ARIADNE_ADD_TEST_TO(suite, Fixture, method) \
+#define ARIADNE_TESTING_ADD_TEST_TO(suite, Fixture, method) \
     ::Ariadne::Testing::add_fixture_test<Fixture>((suite), #method, &Fixture::method)
 
-#define ARIADNE_ADD_TEST_NO_THROW_TO(suite, Fixture, method) \
+#define ARIADNE_TESTING_ADD_TEST_NO_THROW_TO(suite, Fixture, method) \
     ::Ariadne::Testing::add_fixture_test<Fixture>((suite), #method, &Fixture::method, \
         ::Ariadne::Testing::FixtureCheck::NoThrow)
 
 // Conventional single-suite main; explicit *_TO supports multiple suites.
-#define ARIADNE_TEST_SUITE(name) ::Ariadne::Testing::Suite ariadne_test_suite(name)
+#define ARIADNE_TESTING_SUITE(name) ::Ariadne::Testing::Suite ariadne_test_suite(name)
 
-#define ARIADNE_ADD_TEST(Fixture, method) \
-    ARIADNE_ADD_TEST_TO(ariadne_test_suite, Fixture, method)
+#define ARIADNE_TESTING_ADD_TEST(Fixture, method) \
+    ARIADNE_TESTING_ADD_TEST_TO(ariadne_test_suite, Fixture, method)
 
-#define ARIADNE_ADD_TEST_NO_THROW(Fixture, method) \
-    ARIADNE_ADD_TEST_NO_THROW_TO(ariadne_test_suite, Fixture, method)
+#define ARIADNE_TESTING_ADD_TEST_NO_THROW(Fixture, method) \
+    ARIADNE_TESTING_ADD_TEST_NO_THROW_TO(ariadne_test_suite, Fixture, method)
 
-#define ARIADNE_RUN_TESTS() ::Ariadne::Testing::run_suite(ariadne_test_suite)
+#define ARIADNE_TESTING_RUN_TESTS() ::Ariadne::Testing::run_suite(ariadne_test_suite)
 
 #include "testing/fixture.tpl.hpp"
+
+
+/** @name Transitional compatibility aliases
+ *  @brief Deprecated names; use ARIADNE_TESTING_* instead.
+ *  @details These aliases preserve existing consumers without changing their
+ *  semantics. No alias is exported for D11 ARIADNE_TEST_CONCEPT,
+ *  ARIADNE_TEST_TRAIT or ARIADNE_TEST_SAME_TYPE: legacy Macro owns them.
+ *  @{ */
+#ifndef ARIADNE_ADD_TEST_TO
+#define ARIADNE_ADD_TEST_TO ARIADNE_TESTING_ADD_TEST_TO
+#endif
+#ifndef ARIADNE_ADD_TEST_NO_THROW_TO
+#define ARIADNE_ADD_TEST_NO_THROW_TO ARIADNE_TESTING_ADD_TEST_NO_THROW_TO
+#endif
+#ifndef ARIADNE_TEST_SUITE
+#define ARIADNE_TEST_SUITE ARIADNE_TESTING_SUITE
+#endif
+#ifndef ARIADNE_ADD_TEST
+#define ARIADNE_ADD_TEST ARIADNE_TESTING_ADD_TEST
+#endif
+#ifndef ARIADNE_ADD_TEST_NO_THROW
+#define ARIADNE_ADD_TEST_NO_THROW ARIADNE_TESTING_ADD_TEST_NO_THROW
+#endif
+#ifndef ARIADNE_RUN_TESTS
+#define ARIADNE_RUN_TESTS ARIADNE_TESTING_RUN_TESTS
+#endif
+/** @} */
 
 #endif // ARIADNE_TESTING_FIXTURE_HPP
