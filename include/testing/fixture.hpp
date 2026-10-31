@@ -2,7 +2,6 @@
  *            fixture.hpp
  *
  *  Copyright  2026  Luca Geretti
- *  Author     Luca Geretti
  *
  ****************************************************************************/
 
@@ -23,6 +22,9 @@
  *  along with Ariadne Testing. If not, see <https://www.gnu.org/licenses/>.
  */
 
+/** @file testing/fixture.hpp
+ *  @brief Public declarations for this testing module.
+ */
 #ifndef ARIADNE_TESTING_FIXTURE_HPP
 #define ARIADNE_TESTING_FIXTURE_HPP
 
@@ -36,6 +38,7 @@
 namespace Ariadne::Testing {
 
 // Each test case constructs its own fixture with a valid Context reference.
+/** @brief Fixture base exposing its case-local Context to checks. */
 class ContextFixture {
   public:
     explicit ContextFixture(Context& context) noexcept : _context(context) { }
@@ -48,26 +51,17 @@ class ContextFixture {
     Context& _context;
 };
 
+/** @brief How exceptions from a fixture operation are classified. */
 enum class FixtureCheck { Direct, NoThrow };
 
+/** @brief Register a fixture method as a separate case.
+ *  @tparam Fixture Type constructible from Context&.
+ *  @param check Whether an uncaught exception is a case Error or a failing check.
+ */
 template<class Fixture>
 void add_fixture_test(Suite& suite, std::string_view method_name,
                       void (Fixture::*method)(),
-                      FixtureCheck check = FixtureCheck::Direct) {
-    static_assert(std::is_constructible_v<Fixture, Context&>,
-                  "Fixture must be constructible from Ariadne::Testing::Context&");
-    // Display "map_get" for a method named "test_map_get".
-    if (method_name.starts_with("test_")) method_name.remove_prefix(5);
-    suite.add(std::string(method_name), [method, check](Context& context) {
-        Fixture fixture(context);
-        if (check == FixtureCheck::NoThrow) {
-            context.expect_no_throw([&] { (fixture.*method)(); }, "operation completes");
-        } else {
-            // Suite::run records uncaught exceptions as an Error.
-            (fixture.*method)();
-        }
-    });
-}
+                      FixtureCheck check = FixtureCheck::Direct);
 
 inline int run_suite(Suite const& suite, std::ostream& output = std::cout) {
     ConsoleReporter reporter(output);
@@ -94,5 +88,7 @@ inline int run_suite(Suite const& suite, std::ostream& output = std::cout) {
     ARIADNE_ADD_TEST_NO_THROW_TO(ariadne_test_suite, Fixture, method)
 
 #define ARIADNE_RUN_TESTS() ::Ariadne::Testing::run_suite(ariadne_test_suite)
+
+#include "testing/fixture.tpl.hpp"
 
 #endif // ARIADNE_TESTING_FIXTURE_HPP

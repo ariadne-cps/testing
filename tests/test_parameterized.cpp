@@ -2,7 +2,6 @@
  *            test_parameterized.cpp
  *
  *  Copyright  2026  Luca Geretti
- *  Author     Luca Geretti
  *
  ****************************************************************************/
 

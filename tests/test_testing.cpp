@@ -2,7 +2,6 @@
  *            test_testing.cpp
  *
  *  Copyright  2026  Luca Geretti
- *  Author     Luca Geretti
  *
  ****************************************************************************/
 

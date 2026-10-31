@@ -2,7 +2,6 @@
  *            testing.hpp
  *
  *  Copyright  2026  Luca Geretti
- *  Author     Luca Geretti
  *
  ****************************************************************************/
 
@@ -23,6 +22,13 @@
  *  along with Ariadne Testing. If not, see <https://www.gnu.org/licenses/>.
  */
 
+/** @file testing/testing.hpp
+ *  @brief Public test outcomes, reporters, case contexts, assertions, and suites.
+ *
+ *  All checks classify a result as Passed, Failed, Inconclusive, Skipped, or
+ *  Error. Deferred checks evaluate arguments once, after check_started().
+ *  Template implementations are provided by testing.tpl.hpp.
+ */
 #ifndef ARIADNE_TESTING_TESTING_HPP
 #define ARIADNE_TESTING_TESTING_HPP
 
@@ -52,19 +58,26 @@
 
 namespace Ariadne::Testing {
 
+/** @brief Three-valued mathematical evidence; Indeterminate is not a boolean pass. */
 enum class Evidence { False, True, Indeterminate };
+/** @brief Operational classification of a case or assertion. */
 enum class Outcome { Passed, Failed, Inconclusive, Skipped, Error };
 
 // The relation is selected at compile time; predicate evidence stays three-valued.
+/** @brief Compile-time selection of a binary comparison relation. */
 enum class Comparison { NotEqual, Less, LessEqual, Greater, GreaterEqual };
 
 // Desired evidence, not an algorithm's return code or an operational outcome.
+/** @brief Expectation for a three-valued logical result. */
 enum class EvidenceExpectation { DefinitelyTrue, PossiblyTrue, NotPossibly, Indeterminate };
 
 // Diagnostic events are not assertions and cannot change the test outcome.
+/** @brief Kind of non-asserting diagnostic notification. */
 enum class DiagnosticKind { Scope, Note, Warning, Value, Elapsed };
+/** @brief Verbose or concise console diagnostic rendering. */
 enum class ConsoleDetail { All, Concise };
 
+/** @brief Diagnostic event emitted during case execution; it does not change the outcome. */
 struct DiagnosticEvent {
     DiagnosticKind kind;
     std::string description;
@@ -75,6 +88,7 @@ struct DiagnosticEvent {
     std::uint_least32_t line = 0;
 };
 
+/** @brief Captured assertion, including source location and nested diagnostic context. */
 struct AssertionRecord {
     Outcome outcome;
     std::string description;
@@ -88,9 +102,12 @@ struct AssertionRecord {
 };
 
 // The framework only records these references; adapters decide file formats.
+/** @brief Role of a registered artifact, independent of its retention policy. */
 enum class ArtifactKind { Output, Reference, Difference };
+/** @brief Ownership and retention policy for an artifact's path. */
 enum class ArtifactLifetime { External, Temporary, KeepOnFailure, KeepAlways };
 
+/** @brief Metadata reference for an output, reference or difference artifact. */
 struct ArtifactRecord {
     std::filesystem::path path;
     std::string label;
@@ -100,6 +117,7 @@ struct ArtifactRecord {
     std::vector<std::pair<std::string, std::string>> metadata;
 };
 
+/** @brief Per-case execution result, assertions, diagnostics and artifacts. */
 struct CaseResult {
     std::string name;
     Outcome outcome = Outcome::Passed;
@@ -113,14 +131,18 @@ struct CaseResult {
 };
 
 // Exit-gate policy only: assertion outcomes and summary counts never change.
+/** @brief Whether an inconclusive case blocks overall acceptance. */
 enum class InconclusivePolicy { Blocking, NonBlocking };
+/** @brief Whether a skipped case blocks overall acceptance. */
 enum class SkippedPolicy { NonBlocking, Blocking };
 
+/** @brief Exit-gate policy; does not rewrite assertion classifications. */
 struct AcceptancePolicy {
     InconclusivePolicy inconclusive = InconclusivePolicy::Blocking;
     SkippedPolicy skipped = SkippedPolicy::NonBlocking;
 };
 
+/** @brief Aggregated counts and the exit-gate acceptance decision. */
 struct Summary {
     std::size_t passed = 0;
     std::size_t failed = 0;
@@ -137,6 +159,7 @@ struct Summary {
     bool successful() const { return acceptable({}); }
 };
 
+/** @brief Callback interface for live case and diagnostic reporting. */
 class Reporter {
   public:
     virtual ~Reporter() = default;
@@ -148,6 +171,7 @@ class Reporter {
     virtual void suite_finished(std::string_view name, Summary const& summary) = 0;
 };
 
+/** @brief Human-readable reporter with configurable diagnostic verbosity. */
 class ConsoleReporter final : public Reporter {
   public:
     explicit ConsoleReporter(std::ostream& output, ConsoleDetail detail = ConsoleDetail::All);
@@ -162,25 +186,11 @@ class ConsoleReporter final : public Reporter {
     ConsoleDetail _detail;
 };
 
+/** @cond INTERNAL */
 namespace Detail {
 
 template<class T>
-Evidence evidence(T const& value) {
-    if constexpr (std::is_same_v<std::remove_cvref_t<T>, Evidence>) {
-        return value;
-    } else if constexpr (requires { definitely(value); possibly(value); }) {
-        bool const definite = static_cast<bool>(definitely(value));
-        bool const possible = static_cast<bool>(possibly(value));
-        if (definite && !possible) {
-            throw std::logic_error("Inconsistent logical evidence: definitely true but not possibly true");
-        }
-        if (definite) return Evidence::True;
-        if (!possible) return Evidence::False;
-        return Evidence::Indeterminate;
-    } else {
-        return static_cast<bool>(value) ? Evidence::True : Evidence::False;
-    }
-}
+Evidence evidence(T const& value);
 
 // Negating a proof must not turn uncertainty into a boolean success.
 inline Evidence negate(Evidence value) {
@@ -193,59 +203,33 @@ inline Evidence negate(Evidence value) {
 }
 
 template<class T>
-std::string render(T const& value) {
-    if constexpr (requires(std::ostream& os) { os << value; }) {
-        std::ostringstream os;
-        os << std::boolalpha << value;
-        return os.str();
-    } else {
-        return "<unprintable>";
-    }
-}
+std::string render(T const& value);
 
 // Use the same evidence-preserving equality and integral signedness rules
 // for ordinary checks and exception payload comparisons.
 template<class Actual, class Expected>
-Evidence equal_evidence(Actual const& actual, Expected const& expected) {
-    using A = std::remove_cvref_t<Actual>;
-    using B = std::remove_cvref_t<Expected>;
-    if constexpr (std::is_integral_v<A> && std::is_integral_v<B>
-                  && !std::is_same_v<A, bool> && !std::is_same_v<B, bool>) {
-        return evidence(std::cmp_equal(actual, expected));
-    } else {
-        return evidence(actual == expected);
-    }
-}
+Evidence equal_evidence(Actual const& actual, Expected const& expected);
 
 // Retain non-copyable lvalue callables by reference and own temporaries.
 // Wrapping named functions also avoids MSVC's inability to deduce a
  // decltype(auto) return directly from a function designator.
 template<class Callable>
-auto capture_callable(Callable&& callable) {
-    if constexpr (std::is_lvalue_reference_v<Callable>)
-        return std::ref(callable);
-    else
-        return std::forward<Callable>(callable);
-}
+auto capture_callable(Callable&& callable);
 
 template<class T>
-auto magnitude(T const& value) {
-    if constexpr (requires { mag(value); }) {
-        return mag(value);
-    } else {
-        using std::abs;
-        return abs(value);
-    }
-}
+auto magnitude(T const& value);
 
 // Internal case-abort marker, not a user-observable test exception.
 struct AbortCase {};
 
 } // namespace Detail
+/** @endcond */
 
+/** @brief Per-case context for assertions, diagnostics, files and fatal prerequisites. */
 class Context {
   public:
     // Move-only guard: a nested diagnostic scope always restores its parent.
+/** @brief Move-only RAII guard for a nested diagnostic scope. */
     class Scope {
       public:
         Scope(Scope const&) = delete;
@@ -269,9 +253,16 @@ class Context {
     ~Context() noexcept;
 
     // Lazily allocated, uniquely created directory for this case's outputs.
+    /** @brief Return this case's lazily allocated private work directory.
+     *  @return Owned path, unique across concurrent test processes.
+     */
     std::filesystem::path const& work_directory();
 
     // Attach metadata only. Never writes or regenerates a reference file.
+    /** @brief Register artifact metadata without modifying the referenced file.
+     *  @throws std::invalid_argument for empty identifiers or managed paths
+     *          outside the current case directory (including symlink escapes).
+     */
     void artifact(std::filesystem::path path, std::string label,
                   std::string media_type = "application/octet-stream",
                   ArtifactKind kind = ArtifactKind::Output,
@@ -279,13 +270,16 @@ class Context {
                   std::vector<std::pair<std::string,std::string>> metadata = {});
 
     // File expectations issue CHECK before inspecting the filesystem.
+    /** @brief Check whether a path is an accessible regular file. */
     void expect_file_exists(std::filesystem::path const& path,
                             std::string_view description,
                             std::source_location location = std::source_location::current());
+    /** @brief Compare binary files byte for byte and record the first difference. */
     void expect_file_equal(std::filesystem::path const& actual,
                            std::filesystem::path const& reference,
                            std::string_view description,
                            std::source_location location = std::source_location::current());
+    /** @brief Compare a file's initial bytes against a binary signature. */
     void expect_file_signature(std::filesystem::path const& actual,
                                std::string_view signature,
                                std::string_view description,
@@ -295,566 +289,240 @@ class Context {
     Scope scope(std::string label,
                 std::source_location location = std::source_location::current());
 
-    template<class T>
+    /** @brief Begin a named diagnostic scope. The returned guard restores its parent on destruction.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class T>
     Scope scope(std::string name, T const& value,
-                std::source_location location = std::source_location::current()) {
-        return scope(std::move(name) + "=" + Detail::render(value), location);
-    }
+                std::source_location location = std::source_location::current());
 
     void note(std::string description,
               std::source_location location = std::source_location::current());
     void warning(std::string description,
                  std::source_location location = std::source_location::current());
 
-    template<class T>
+    /** @brief Record a named value without changing the case outcome.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class T>
     void inspect(std::string name, T const& value,
-                 std::source_location location = std::source_location::current()) {
-        emit(DiagnosticKind::Value, std::move(name), Detail::render(value), {}, location);
-    }
+                 std::source_location location = std::source_location::current());
 
     void elapsed(std::string description, std::chrono::nanoseconds duration,
                  std::source_location location = std::source_location::current());
 
     // For an arbitrary operation, emit its duration even if it throws.
     // A hanging operation is diagnosed by the preceding scope event.
-    template<class Callable>
+    /** @brief Measure a void operation and emit elapsed time even if it throws; exceptions propagate.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class Callable>
     void measure(std::string description, Callable&& operation,
-                 std::source_location location = std::source_location::current()) {
-        static_assert(std::is_void_v<std::invoke_result_t<Callable&>>,
-                      "measure() requires a void callable");
-        auto const start = std::chrono::steady_clock::now();
-        try {
-            std::invoke(std::forward<Callable>(operation));
-        } catch (...) {
-            elapsed(description, std::chrono::steady_clock::now() - start, location);
-            throw;
-        }
-        elapsed(description, std::chrono::steady_clock::now() - start, location);
-    }
+                 std::source_location location = std::source_location::current());
 
-    template<class T>
+    /** @brief Record a direct mathematical proposition, retaining indeterminate evidence.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class T>
     void prove(T const& predicate, std::string_view description,
-               std::source_location location = std::source_location::current()) {
-        auto const index = begin_check(description);
-        record(outcome(Detail::evidence(predicate)), description, {}, {}, {}, location, index);
-    }
+               std::source_location location = std::source_location::current());
 
     // Test a specified mathematical evidence classification. A deliberately
     // expected indeterminate result is a passing test, not a proven statement.
-    template<class PredicateFn>
+    /** @brief Compare a deferred proposition against the specified three-valued expectation.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class PredicateFn>
     void expect_evidence(PredicateFn&& predicate_fn, EvidenceExpectation expected,
                          std::string_view description,
-                         std::source_location location = std::source_location::current()) {
-        auto const index = begin_check(description);
-        auto const actual = Detail::evidence(std::invoke(std::forward<PredicateFn>(predicate_fn)));
-        Outcome status = Outcome::Failed;
-        switch (expected) {
-            case EvidenceExpectation::DefinitelyTrue:
-                status = outcome(actual);
-                break;
-            case EvidenceExpectation::PossiblyTrue:
-                status = actual == Evidence::False ? Outcome::Failed : Outcome::Passed;
-                break;
-            case EvidenceExpectation::NotPossibly:
-                status = actual == Evidence::False ? Outcome::Passed
-                       : actual == Evidence::Indeterminate ? Outcome::Inconclusive : Outcome::Failed;
-                break;
-            case EvidenceExpectation::Indeterminate:
-                status = actual == Evidence::Indeterminate ? Outcome::Passed : Outcome::Failed;
-                break;
-            default:
-                status = Outcome::Error;
-                break;
-        }
-        auto const evidence_name = [](Evidence value) -> std::string {
-            switch (value) {
-                case Evidence::True: return "true";
-                case Evidence::False: return "false";
-                case Evidence::Indeterminate: return "indeterminate";
-                default: return "invalid";
-            }
-        };
-        auto const expected_name = [](EvidenceExpectation value) -> std::string {
-            switch (value) {
-                case EvidenceExpectation::DefinitelyTrue: return "definitely true";
-                case EvidenceExpectation::PossiblyTrue: return "possibly true";
-                case EvidenceExpectation::NotPossibly: return "not possibly true";
-                case EvidenceExpectation::Indeterminate: return "indeterminate";
-                default: return "invalid";
-            }
-        };
-        record(status, description, evidence_name(actual), expected_name(expected),
-               {}, location, index);
-    }
+                         std::source_location location = std::source_location::current());
 
     // Deferred operands: emit CHECK before evaluating each expression once.
-    template<class ActualFn, class ExpectedFn>
+    /** @brief Evaluate deferred operands once and compare their equality.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class ActualFn, class ExpectedFn>
     void check_equal(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
                      std::string_view description,
-                     std::source_location location = std::source_location::current()) {
-        auto const index = begin_check(description);
-        decltype(auto) actual = std::invoke(std::forward<ActualFn>(actual_fn));
-        decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
-        auto const verdict = Detail::equal_evidence(actual, expected);
-        record(outcome(verdict), description,
-               Detail::render(actual), Detail::render(expected), {}, location, index);
-    }
+                     std::source_location location = std::source_location::current());
 
     // Compare two input ranges without copying their elements. Both ranges
     // and the comparator/path selectors are evaluated once after CHECK.
     // A non-true predicate is retained as evidence, not coerced to bool.
-    template<class ActualFn, class ExpectedFn, class ComparatorFn, class PathFn>
+    /** @brief Compare input ranges, retaining first mismatch, uncertainty and element path.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class ActualFn, class ExpectedFn, class ComparatorFn, class PathFn>
     void check_ranges(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
                       ComparatorFn&& comparator_fn, PathFn&& path_fn,
                       std::string_view description,
-                      std::source_location location = std::source_location::current()) {
-        auto const check_index = begin_check(description);
-        decltype(auto) actual = std::invoke(std::forward<ActualFn>(actual_fn));
-        decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
-        static_assert(std::ranges::input_range<decltype(actual)>);
-        static_assert(std::ranges::input_range<decltype(expected)>);
-        decltype(auto) comparator = std::invoke(std::forward<ComparatorFn>(comparator_fn));
-        decltype(auto) path = std::invoke(std::forward<PathFn>(path_fn));
+                      std::source_location location = std::source_location::current());
 
-        auto a = std::ranges::begin(actual);
-        auto e = std::ranges::begin(expected);
-        auto const a_end = std::ranges::end(actual);
-        auto const e_end = std::ranges::end(expected);
-        std::size_t actual_count = 0;
-        std::size_t expected_count = 0;
-        std::optional<std::size_t> first_failure;
-        std::optional<std::size_t> first_unknown;
-        std::string failure_actual;
-        std::string failure_expected;
-        std::string unknown_actual;
-        std::string unknown_expected;
-        auto snippet = [](auto const& value) {
-            std::string text = Detail::render(value);
-            constexpr std::size_t max_length = 96;
-            if (text.size() > max_length) {
-                text.resize(max_length - 3);
-                text += "...";
-            }
-            return text;
-        };
-        while (a != a_end && e != e_end) {
-            auto const comparison = std::invoke(comparator, *a, *e);
-            auto const verdict = [&] {
-                if constexpr (std::is_same_v<std::remove_cvref_t<decltype(comparison)>, Evidence>)
-                    return comparison;
-                else return Detail::evidence(comparison);
-            }();
-            if (verdict == Evidence::False && !first_failure) {
-                first_failure = actual_count;
-                failure_actual = snippet(*a);
-                failure_expected = snippet(*e);
-            } else if (verdict == Evidence::Indeterminate && !first_unknown) {
-                first_unknown = actual_count;
-                unknown_actual = snippet(*a);
-                unknown_expected = snippet(*e);
-            }
-            ++a;
-            ++e;
-            ++actual_count;
-            ++expected_count;
-        }
-        if (a != a_end && !first_failure) {
-            first_failure = actual_count;
-            failure_actual = snippet(*a);
-            failure_expected = "<end>";
-        }
-        if (e != e_end && !first_failure) {
-            first_failure = expected_count;
-            failure_actual = "<end>";
-            failure_expected = snippet(*e);
-        }
-        for (; a != a_end; ++a) ++actual_count;
-        for (; e != e_end; ++e) ++expected_count;
-
-        // Count mismatches always fail, even when earlier elements are
-        // mathematically indeterminate.
-        auto const status = first_failure || actual_count != expected_count
-            ? Outcome::Failed : first_unknown ? Outcome::Inconclusive
-            : Outcome::Passed;
-        std::string info = "actual_count=" + std::to_string(actual_count)
-                         + ", expected_count=" + std::to_string(expected_count);
-        auto const mismatch = first_failure ? first_failure : first_unknown;
-        std::string actual_detail = "count=" + std::to_string(actual_count);
-        std::string expected_detail = "count=" + std::to_string(expected_count);
-        if (mismatch) {
-            info += ", first_mismatch_index=" + std::to_string(*mismatch);
-            info += ", path=" + Detail::render(std::invoke(path, *mismatch));
-            actual_detail += ", value=" + (first_failure ? failure_actual : unknown_actual);
-            expected_detail += ", value=" + (first_failure ? failure_expected : unknown_expected);
-        }
-        if (first_unknown && first_failure) {
-            info += ", first_indeterminate_index=" + std::to_string(*first_unknown);
-        }
-        record(status, description, std::move(actual_detail),
-               std::move(expected_detail), std::move(info), location, check_index);
-    }
-
-    template<class ActualFn, class ExpectedFn, class ComparatorFn>
+    /** @brief Compare input ranges, retaining first mismatch, uncertainty and element path.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class ActualFn, class ExpectedFn, class ComparatorFn>
     void check_ranges(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
                       ComparatorFn&& comparator_fn, std::string_view description,
-                      std::source_location location = std::source_location::current()) {
-        check_ranges(std::forward<ActualFn>(actual_fn),
-                     std::forward<ExpectedFn>(expected_fn),
-                     std::forward<ComparatorFn>(comparator_fn),
-                     [] { return [](std::size_t index) { return std::to_string(index); }; },
-                     description, location);
-    }
+                      std::source_location location = std::source_location::current());
 
-    template<class ActualFn, class ExpectedFn>
+    /** @brief Compare input ranges, retaining first mismatch, uncertainty and element path.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class ActualFn, class ExpectedFn>
     void check_ranges(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
                       std::string_view description,
-                      std::source_location location = std::source_location::current()) {
-        check_ranges(std::forward<ActualFn>(actual_fn),
-                     std::forward<ExpectedFn>(expected_fn),
-                     [] { return [](auto const& a, auto const& b) {
-                         return Detail::equal_evidence(a, b);
-                     }; },
-                     description, location);
-    }
+                      std::source_location location = std::source_location::current());
 
     // Each relation is selected at compile time and evaluates its operands once,
     // left-to-right, after the live CHECK notification.
-    template<Comparison Relation, class ActualFn, class ExpectedFn>
+    /** @brief Compare deferred operands with the selected compile-time relation.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<Comparison Relation, class ActualFn, class ExpectedFn>
     void check_compare(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
                        std::string_view description,
-                       std::source_location location = std::source_location::current()) {
-        auto const index = begin_check(description);
-        decltype(auto) actual = std::invoke(std::forward<ActualFn>(actual_fn));
-        decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
-        using A = std::remove_cvref_t<decltype(actual)>;
-        using B = std::remove_cvref_t<decltype(expected)>;
-        constexpr bool built_in_integers =
-            std::is_integral_v<A> && std::is_integral_v<B>
-            && !std::is_same_v<A,bool> && !std::is_same_v<B,bool>;
-        // Built-in arithmetic comparisons promote bool to int. Apply the
-        // same promotion explicitly so MSVC does not reject bool relational
-        // operators when warnings are treated as errors. Domain-specific
-        // operators still receive their original types for ADL.
-        constexpr bool boolean_arithmetic =
-            (std::is_same_v<A, bool> || std::is_same_v<B, bool>) &&
-            std::is_arithmetic_v<A> && std::is_arithmetic_v<B>;
-        decltype(auto) comparable_actual = [&]() -> decltype(auto) {
-            if constexpr (boolean_arithmetic)
-                return static_cast<std::common_type_t<int, A, B>>(actual);
-            else return (actual);
-        }();
-        decltype(auto) comparable_expected = [&]() -> decltype(auto) {
-            if constexpr (boolean_arithmetic)
-                return static_cast<std::common_type_t<int, A, B>>(expected);
-            else return (expected);
-        }();
-        auto const verdict = [&]() -> Evidence {
-            if constexpr (Relation == Comparison::NotEqual) {
-                if constexpr (built_in_integers) return Detail::evidence(!std::cmp_equal(comparable_actual, comparable_expected));
-                else return Detail::evidence(comparable_actual != comparable_expected);
-            } else if constexpr (Relation == Comparison::Less) {
-                if constexpr (built_in_integers) return Detail::evidence(std::cmp_less(comparable_actual, comparable_expected));
-                else return Detail::evidence(comparable_actual < comparable_expected);
-            } else if constexpr (Relation == Comparison::LessEqual) {
-                if constexpr (built_in_integers) return Detail::evidence(std::cmp_less_equal(comparable_actual, comparable_expected));
-                else return Detail::evidence(comparable_actual <= comparable_expected);
-            } else if constexpr (Relation == Comparison::Greater) {
-                if constexpr (built_in_integers) return Detail::evidence(std::cmp_greater(comparable_actual, comparable_expected));
-                else return Detail::evidence(comparable_actual > comparable_expected);
-            } else {
-                static_assert(Relation == Comparison::GreaterEqual);
-                if constexpr (built_in_integers) return Detail::evidence(std::cmp_greater_equal(comparable_actual, comparable_expected));
-                else return Detail::evidence(comparable_actual >= comparable_expected);
-            }
-        }();
-        record(outcome(verdict), description,
-               Detail::render(actual), Detail::render(expected), {}, location, index);
-    }
+                       std::source_location location = std::source_location::current());
 
-    template<class Predicate, class OperandFn>
+    /** @brief Apply a deferred unary predicate with optional evidence negation.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class Predicate, class OperandFn>
     void check_unary(Predicate&& predicate, OperandFn&& operand_fn,
                      std::string_view description, bool negate = false,
-                     std::source_location location = std::source_location::current()) {
-        auto const index = begin_check(description);
-        decltype(auto) operand = std::invoke(std::forward<OperandFn>(operand_fn));
-        auto verdict = Detail::evidence(std::invoke(std::forward<Predicate>(predicate), operand));
-        if (negate) verdict = Detail::negate(verdict);
-        record(outcome(verdict), description, Detail::render(operand), {}, {}, location, index);
-    }
+                     std::source_location location = std::source_location::current());
 
-    template<class Predicate, class LeftFn, class RightFn>
+    /** @brief Apply a deferred binary predicate with optional evidence negation.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class Predicate, class LeftFn, class RightFn>
     void check_binary(Predicate&& predicate, LeftFn&& left_fn, RightFn&& right_fn,
                       std::string_view description, bool negate = false,
-                      std::source_location location = std::source_location::current()) {
-        auto const index = begin_check(description);
-        decltype(auto) left = std::invoke(std::forward<LeftFn>(left_fn));
-        decltype(auto) right = std::invoke(std::forward<RightFn>(right_fn));
-        auto verdict = Detail::evidence(std::invoke(std::forward<Predicate>(predicate), left, right));
-        if (negate) verdict = Detail::negate(verdict);
-        record(outcome(verdict), description,
-               Detail::render(left), Detail::render(right), {}, location, index);
-    }
+                      std::source_location location = std::source_location::current());
 
-    template<class A, class B>
+    /** @brief Convenience equality check for already-evaluated operands.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class A, class B>
     void expect_equal(A const& actual, B const& expected,
                       std::string_view description = "equality",
-                      std::source_location location = std::source_location::current()) {
-        check_equal([&]() -> A const& { return actual; },
-                    [&]() -> B const& { return expected; }, description, location);
-    }
+                      std::source_location location = std::source_location::current());
 
-    template<class ActualFn, class ExpectedFn>
+    /** @brief Compare semantic identity through the ADL-discovered same() operation.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class ActualFn, class ExpectedFn>
     void check_same(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
                     std::string_view description,
-                    std::source_location location = std::source_location::current()) {
-        auto const index = begin_check(description);
-        decltype(auto) actual = std::invoke(std::forward<ActualFn>(actual_fn));
-        decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
-        auto const relation = same(actual, expected); // ADL: numerical domain
-        record(outcome(Detail::evidence(relation)), description,
-               Detail::render(actual), Detail::render(expected), {}, location, index);
-    }
+                    std::source_location location = std::source_location::current());
 
-    template<class A, class B>
+    /** @brief Convenience semantic identity check for values.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class A, class B>
     void expect_same(A const& actual, B const& expected,
                      std::string_view description = "identity",
-                     std::source_location location = std::source_location::current()) {
-        check_same([&]() -> A const& { return actual; },
-                   [&]() -> B const& { return expected; }, description, location);
-    }
+                     std::source_location location = std::source_location::current());
 
-    template<class ActualFn, class ExpectedFn, class ToleranceFn>
+    /** @brief Compare a computed error against a tolerance.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class ActualFn, class ExpectedFn, class ToleranceFn>
     void check_within(ActualFn&& actual_fn, ExpectedFn&& expected_fn, ToleranceFn&& tolerance_fn,
                       std::string_view description,
-                      std::source_location location = std::source_location::current()) {
-        auto const index = begin_check(description);
-        decltype(auto) actual = std::invoke(std::forward<ActualFn>(actual_fn));
-        decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
-        decltype(auto) tolerance = std::invoke(std::forward<ToleranceFn>(tolerance_fn));
-        auto const error = Detail::magnitude(actual - expected);
-        auto const relation = (error <= tolerance);
-        record(outcome(Detail::evidence(relation)), description,
-               Detail::render(actual), Detail::render(expected),
-               "error=" + Detail::render(error) + ", tolerance=" + Detail::render(tolerance), location, index);
-    }
+                      std::source_location location = std::source_location::current());
 
-    template<class A, class B, class Tolerance>
+    /** @brief Convenience bounded-error check for already-evaluated values.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class A, class B, class Tolerance>
     void expect_within(A const& actual, B const& expected, Tolerance const& tolerance,
                        std::string_view description = "bounded error",
-                       std::source_location location = std::source_location::current()) {
-        check_within([&]() -> A const& { return actual; },
-                     [&]() -> B const& { return expected; },
-                     [&]() -> Tolerance const& { return tolerance; }, description, location);
-    }
+                       std::source_location location = std::source_location::current());
 
     // Stop only this case if a prerequisite is false or indeterminate.
     // The check is recorded before aborting, retaining its original outcome.
-    template<class Callable>
+    /** @brief Record a prerequisite and abort only the current case if not Passed.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class Callable>
     void require(Callable&& predicate, std::string_view description,
-                 std::source_location location = std::source_location::current()) {
-        auto const index = begin_check(description);
-        auto const evidence = Detail::evidence(std::invoke(std::forward<Callable>(predicate)));
-        auto const status = outcome(evidence);
-        record(status, description, {}, {}, {}, location, index);
-        if (status != Outcome::Passed) throw Detail::AbortCase{};
-    }
+                 std::source_location location = std::source_location::current());
 
-    template<class Exception, class Callable>
+    /** @brief Require a particular exception type from an operation.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class Exception, class Callable>
     void expect_throws(Callable&& action, std::string_view description = "expected exception",
-                       std::source_location location = std::source_location::current()) {
-        auto const index = begin_check(description);
-        try { std::invoke(std::forward<Callable>(action)); }
-        catch (Detail::AbortCase const&) { throw; }
-        catch (Exception const&) { record(Outcome::Passed, description, {}, {}, {}, location, index); return; }
-        catch (std::exception const& e) {
-            record(Outcome::Failed, description, {}, {}, std::string("unexpected exception: ") + e.what(), location, index); return;
-        }
-        catch (...) { record(Outcome::Failed, description, {}, {}, "unexpected exception type", location, index); return; }
-        record(Outcome::Failed, description, {}, {}, "no exception thrown", location, index);
-    }
+                       std::source_location location = std::source_location::current());
     // Both the exception type and the message substring must match.
-    template<class Exception, class Callable>
+    /** @brief Require an exception type and a substring in its message.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class Exception, class Callable>
     void expect_throws_message(Callable&& action, std::string_view substring,
                                std::string_view description = "expected exception message",
-                               std::source_location location = std::source_location::current()) {
-        static_assert(std::is_base_of_v<std::exception, Exception>,
-                      "Exception message checks require a std::exception-derived type");
-        auto const index = begin_check(description);
-        try { std::invoke(std::forward<Callable>(action)); }
-        catch (Detail::AbortCase const&) { throw; }
-        catch (Exception const& e) {
-            std::string const actual(e.what());
-            bool const matches = actual.find(substring) != std::string::npos;
-            record(matches ? Outcome::Passed : Outcome::Failed, description,
-                   actual, std::string(substring),
-                   matches ? "" : "exception message mismatch", location, index);
-            return;
-        }
-        catch (std::exception const& e) {
-            record(Outcome::Failed, description, e.what(), std::string(substring),
-                   "unexpected exception type", location, index);
-            return;
-        }
-        catch (...) {
-            record(Outcome::Failed, description, {}, std::string(substring),
-                   "unexpected non-standard exception", location, index);
-            return;
-        }
-        record(Outcome::Failed, description, {}, std::string(substring),
-               "no exception thrown", location, index);
-    }
+                               std::source_location location = std::source_location::current());
 
     // Extract one caller-selected field from a typed exception and compare
     // it with a separately evaluated expectation. Both are deferred until
     // after CHECK and the tested operation; no domain dependency is needed.
-    template<class Exception, class Action, class ProjectorFn, class ExpectedFn>
+    /** @brief Project an expected exception into a value and compare its payload.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class Exception, class Action, class ProjectorFn, class ExpectedFn>
     void expect_throws_payload(Action&& action, ProjectorFn&& projector_fn,
                                ExpectedFn&& expected_fn, std::string_view description,
-                               std::source_location location = std::source_location::current()) {
-        static_assert(std::is_base_of_v<std::exception, Exception>,
-                      "Payload checking requires a std::exception-derived type");
-        auto const index = begin_check(description);
-        try { std::invoke(std::forward<Action>(action)); }
-        catch (Detail::AbortCase const&) { throw; }
-        catch (Exception const& exception) {
-            try {
-                decltype(auto) projector =
-                    std::invoke(std::forward<ProjectorFn>(projector_fn));
-                decltype(auto) actual = std::invoke(projector, exception);
-                decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
-                auto const verdict = Detail::equal_evidence(actual, expected);
-                record(outcome(verdict), description, Detail::render(actual),
-                       Detail::render(expected), {}, location, index);
-            } catch (Detail::AbortCase const&) {
-                throw;
-            } catch (std::exception const& error) {
-                record(Outcome::Error, description, {}, {},
-                       std::string("payload verification threw: ") + error.what(),
-                       location, index);
-            } catch (...) {
-                record(Outcome::Error, description, {}, {},
-                       "payload verification threw a non-standard exception",
-                       location, index);
-            }
-            return;
-        }
-        catch (std::exception const& error) {
-            record(Outcome::Failed, description, error.what(), {},
-                   "unexpected exception type", location, index);
-            return;
-        }
-        catch (...) {
-            record(Outcome::Failed, description, {}, {},
-                   "unexpected non-standard exception", location, index);
-            return;
-        }
-        record(Outcome::Failed, description, {}, {},
-               "no exception thrown", location, index);
-    }
+                               std::source_location location = std::source_location::current());
 
-    template<class Callable>
+    /** @brief Verify that an operation throws any exception.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class Callable>
     void expect_exception(Callable&& action, std::string_view description = "exception expected",
-                          std::source_location location = std::source_location::current()) {
-        auto const index = begin_check(description);
-        try { std::invoke(std::forward<Callable>(action)); }
-        catch (Detail::AbortCase const&) { throw; }
-        catch (...) { record(Outcome::Passed, description, {}, {}, {}, location, index); return; }
-        record(Outcome::Failed, description, {}, {}, "no exception thrown", location, index);
-    }
-    template<class Callable>
+                          std::source_location location = std::source_location::current());
+    /** @brief Verify that an operation completes without throwing.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class Callable>
     void expect_no_throw(Callable&& action, std::string_view description = "no exception expected",
-                         std::source_location location = std::source_location::current()) {
-        auto const index = begin_check(description);
-        try { std::invoke(std::forward<Callable>(action)); }
-        catch (Detail::AbortCase const&) { throw; }
-        catch (std::exception const& e) {
-            record(Outcome::Failed, description, {}, {}, e.what(), location, index); return;
-        }
-        catch (...) { record(Outcome::Failed, description, {}, {}, "unexpected exception", location, index); return; }
-        record(Outcome::Passed, description, {}, {}, {}, location, index);
-    }
+                         std::source_location location = std::source_location::current());
 
     // Bounded waits observe externally synchronized state; they do not
     // cancel worker threads. The caller owns the future and its lifetime.
-    template<class Future, class Rep, class Period>
+    /** @brief Check a future's readiness within a nonnegative timeout.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class Future, class Rep, class Period>
     void expect_ready(Future& future, std::chrono::duration<Rep, Period> timeout,
                       std::string_view description,
-                      std::source_location location = std::source_location::current()) {
-        auto const index = begin_check(description);
-        if (timeout < timeout.zero()) {
-            record(Outcome::Error, description, {}, {}, "negative timeout", location, index);
-            return;
-        }
-        auto const start = std::chrono::steady_clock::now();
-        auto const status = future.wait_for(timeout);
-        auto const elapsed_time = std::chrono::steady_clock::now() - start;
-        std::string observed;
-        Outcome result;
-        switch (status) {
-            case std::future_status::ready:
-                observed = "ready";
-                result = Outcome::Passed;
-                break;
-            case std::future_status::timeout:
-                observed = "timeout";
-                result = Outcome::Failed;
-                break;
-            case std::future_status::deferred:
-                observed = "deferred";
-                result = Outcome::Failed;
-                break;
-            default:
-                observed = "unexpected future status";
-                result = Outcome::Error;
-                break;
-        }
-        record(result, description, observed, "ready",
-               "waited=" + Detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                elapsed_time).count()) + "ms; limit=" +
-               Detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                timeout).count()) + "ms",
-               location, index);
-    }
+                      std::source_location location = std::source_location::current());
 
     // Use wait_for's predicate overload to handle spurious wakeups. The
     // predicate executes while the caller's unique_lock is held.
-    template<class Lock, class Predicate, class Rep, class Period>
+    /** @brief Wait on a condition variable until a predicate succeeds or timeout expires.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class Lock, class Predicate, class Rep, class Period>
     void expect_eventually(std::condition_variable_any& condition, Lock& lock,
                            Predicate&& predicate, std::chrono::duration<Rep, Period> timeout,
                            std::string_view description,
-                           std::source_location location = std::source_location::current()) {
-        auto const index = begin_check(description);
-        if (timeout < timeout.zero()) {
-            record(Outcome::Error, description, {}, {}, "negative timeout", location, index);
-            return;
-        }
-        auto const start = std::chrono::steady_clock::now();
-        bool const completed = condition.wait_for(lock, timeout,
-                                                  std::forward<Predicate>(predicate));
-        auto const elapsed_time = std::chrono::steady_clock::now() - start;
-        record(completed ? Outcome::Passed : Outcome::Failed, description,
-               completed ? "condition satisfied" : "timeout", "condition satisfied",
-               "waited=" + Detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                elapsed_time).count()) + "ms; limit=" +
-               Detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                timeout).count()) + "ms",
-               location, index);
-    }
+                           std::source_location location = std::source_location::current());
 
     // Deferred checker: emit progress before evaluating its potentially costly predicate.
-    template<class Callable>
+    /** @brief Record the evidence of a deferred proposition.
+ *  @note Arguments supplied as callables are evaluated at check time.
+ */
+template<class Callable>
     void check(Callable&& predicate, std::string_view description,
-               std::source_location location = std::source_location::current()) {
-        auto const index = begin_check(description);
-        auto const value = std::invoke(std::forward<Callable>(predicate));
-        record(outcome(Detail::evidence(value)), description, {}, {}, {}, location, index);
-    }
+               std::source_location location = std::source_location::current());
 
     void skip(std::string_view reason,
               std::source_location location = std::source_location::current());
 
   private:
-    friend class Suite;
+    friend /** @brief Ordered collection of cases executed with a reporter. */
+class Suite;
     static Outcome outcome(Evidence value);
     std::size_t enter_scope(std::string label, std::source_location location);
     void leave_scope(std::size_t depth, int uncaught_at_entry) noexcept;
@@ -887,5 +555,7 @@ class Suite {
 };
 
 } // namespace Ariadne::Testing
+
+#include "testing/testing.tpl.hpp"
 
 #endif // ARIADNE_TESTING_TESTING_HPP
