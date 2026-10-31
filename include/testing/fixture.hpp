@@ -78,25 +78,6 @@ inline int run_suite(Suite const& suite, std::ostream& output = std::cout) {
 
 } // namespace Ariadne::Testing
 
-// Only the name/stringification is a macro; semantics are type-checked C++.
-#define ARIADNE_TESTING_ADD_TEST_TO(suite, Fixture, method) \
-    ::Ariadne::Testing::add_fixture_test<Fixture>((suite), #method, &Fixture::method)
-
-#define ARIADNE_TESTING_ADD_TEST_NO_THROW_TO(suite, Fixture, method) \
-    ::Ariadne::Testing::add_fixture_test<Fixture>((suite), #method, &Fixture::method, \
-        ::Ariadne::Testing::FixtureCheck::NoThrow)
-
-// Conventional single-suite main; explicit *_TO supports multiple suites.
-#define ARIADNE_TESTING_SUITE(name) ::Ariadne::Testing::Suite ariadne_test_suite(name)
-
-#define ARIADNE_TESTING_ADD_TEST(Fixture, method) \
-    ARIADNE_TESTING_ADD_TEST_TO(ariadne_test_suite, Fixture, method)
-
-#define ARIADNE_TESTING_ADD_TEST_NO_THROW(Fixture, method) \
-    ARIADNE_TESTING_ADD_TEST_NO_THROW_TO(ariadne_test_suite, Fixture, method)
-
-#define ARIADNE_TESTING_RUN_TESTS() ::Ariadne::Testing::run_suite(ariadne_test_suite)
-
 #include "testing/fixture.tpl.hpp"
 
 

@@ -1,38 +1,48 @@
 /***************************************************************************
- *            checks.hpp
+ *            macros.hpp
  *
  *  Copyright  2026  Luca Geretti
- *
  ****************************************************************************/
-
 /*
- *  This file is part of Ariadne Testing.
- *
- *  Ariadne Testing is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  Ariadne Testing is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with Ariadne Testing. If not, see <https://www.gnu.org/licenses/>.
+ *  This file is part of Ariadne Testing; GPLv3 or later.
+ *  Ariadne Testing comes WITHOUT ANY WARRANTY.
  */
-
-/** @file testing/checks.hpp
- *  @brief Single-evaluation assertion macros for Context and ContextFixture.
- *  @details Expression operands are evaluated lazily after a live CHECK event;
- *  the *_CTX macros take an explicit Context, while their counterparts use
- *  the current fixture context. Parenthesize arguments containing commas.
+/** @file testing/macros.hpp
+ *  @brief The single home of all public ARIADNE_TESTING_* macros.
+ *  @details Use C++ APIs where possible; macros preserve expression text,
+ *  source locations and compile-time diagnostics. No compatibility aliases.
  */
-#ifndef ARIADNE_TESTING_CHECKS_HPP
-#define ARIADNE_TESTING_CHECKS_HPP
+#ifndef ARIADNE_TESTING_MACROS_HPP
+#define ARIADNE_TESTING_MACROS_HPP
 
 #include "testing/testing.hpp"
+#include "testing/fixture.hpp"
+#include "testing/parameterized.hpp"
+#include <type_traits>
 
+// Compile-time constraints; these produce static_assert diagnostics.
+/** @def ARIADNE_TESTING_COMPILE_CONCEPT
+ *  @brief Require a C++20 concept expression at compile time.
+ */
+#define ARIADNE_TESTING_COMPILE_CONCEPT(condition) \
+    static_assert((condition), "ARIADNE compile-time concept requirement failed: " #condition)
+
+/** @def ARIADNE_TESTING_COMPILE_TRAIT
+ *  @brief Require a compile-time boolean trait.
+ */
+#define ARIADNE_TESTING_COMPILE_TRAIT(condition) \
+    static_assert((condition), "ARIADNE compile-time trait requirement failed: " #condition)
+
+/** @def ARIADNE_TESTING_COMPILE_SAME_TYPE
+ *  @brief Require exact type identity rather than convertibility.
+ */
+#define ARIADNE_TESTING_COMPILE_SAME_TYPE(first, second) \
+    static_assert(std::is_same_v<first, second>, \
+                  "ARIADNE compile-time type identity failed: " #first " vs " #second)
+
+
+
+// Runtime assertions; explicit Context forms and fixture shorthands.
 /** @name Explicit-context assertion macros
  *  @brief Usable in lambdas, free functions and fixture methods.
  *  @details Operands are deferred and stringified for diagnostics. Parenthesize
@@ -657,4 +667,39 @@
 #define ARIADNE_TESTING_EXPECT_ORACLE_REPLAY(plan) \
     ARIADNE_TESTING_EXPECT_ORACLE_REPLAY_CTX(this->ctx(), plan)
 
-#endif // ARIADNE_TESTING_CHECKS_HPP
+
+
+// Fixture and suite registration helpers.
+// Only the name/stringification is a macro; semantics are type-checked C++.
+#define ARIADNE_TESTING_ADD_TEST_TO(suite, Fixture, method) \
+    ::Ariadne::Testing::add_fixture_test<Fixture>((suite), #method, &Fixture::method)
+
+#define ARIADNE_TESTING_ADD_TEST_NO_THROW_TO(suite, Fixture, method) \
+    ::Ariadne::Testing::add_fixture_test<Fixture>((suite), #method, &Fixture::method, \
+        ::Ariadne::Testing::FixtureCheck::NoThrow)
+
+// Conventional single-suite main; explicit *_TO supports multiple suites.
+#define ARIADNE_TESTING_SUITE(name) ::Ariadne::Testing::Suite ariadne_test_suite(name)
+
+#define ARIADNE_TESTING_ADD_TEST(Fixture, method) \
+    ARIADNE_TESTING_ADD_TEST_TO(ariadne_test_suite, Fixture, method)
+
+#define ARIADNE_TESTING_ADD_TEST_NO_THROW(Fixture, method) \
+    ARIADNE_TESTING_ADD_TEST_NO_THROW_TO(ariadne_test_suite, Fixture, method)
+
+#define ARIADNE_TESTING_RUN_TESTS() ::Ariadne::Testing::run_suite(ariadne_test_suite)
+
+
+
+// Parameterized/variant registration helpers.
+// Only stringify the method name; member access is checked by the compiler.
+// The variant group already knows the fixture type, so it is not repeated.
+#define ARIADNE_TESTING_ADD_VARIANT_TEST(group, method) \
+    (group).add(#method, [](auto& fixture) { fixture.method(); })
+
+#define ARIADNE_TESTING_ADD_VARIANT_TEST_NO_THROW(group, method) \
+    (group).add(#method, [](auto& fixture) { fixture.method(); }, \
+                ::Ariadne::Testing::FixtureCheck::NoThrow)
+
+
+#endif // ARIADNE_TESTING_MACROS_HPP
