@@ -168,7 +168,10 @@ manually measures durations; numeric test files annotate frozen TSV cases.
       Shared absolute-deadline coordination is now provided by
       `expect_ready_until`, `expect_eventually_until`, and
       `expect_atomic_until`, with paired fixture/Context macros.
-      Verification on the new CI commit remains required.
+      Shared absolute-deadline coordination is now CI-verified. Structured
+      wait observations additionally retain a typed completion status,
+      elapsed wait and available budget; verification of this new addition
+      is pending its CI matrix.
 - [x] Define ownership, synchronization and aggregation for checks issued
       from worker threads; never allow concurrent writes to unprotected
       \`Context\`/Reporter state. Define reporting order and worker exception
@@ -177,8 +180,10 @@ manually measures durations; numeric test files annotate frozen TSV cases.
       or deadlocked code; do not promise safe forced cancellation of a
       hung C++ thread from inside the same process. Framework self-tests
       now use a 90-second CTest watchdog; consumers must set their own.
-- [ ] Preserve the distinction between timing-dependent test failure,
-      scheduler slowdown and benchmark duration.
+- [x] Preserve the distinction between timing-dependent test failure,
+      scheduler slowdown and benchmark duration. Timed assertions now store
+      optional `WaitObservation` metadata without attributing a timeout to
+      a scheduler or deadlock; `elapsed` remains a nonasserting measurement.
 
 **Evidence:** [threading/test_thread_pool.cpp](https://github.com/ariadne-cps/threading/blob/main/tests/test_thread_pool.cpp),
 [threading/test_buffer.cpp](https://github.com/ariadne-cps/threading/blob/main/tests/test_buffer.cpp),

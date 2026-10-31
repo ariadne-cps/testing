@@ -1005,3 +1005,22 @@ The test no longer asserts an unspecified property of the standard library
 or makes an OS-specific exclusion. No runtime logic or expected progress
 outcome has changed. The CI matrix on this follow-up commit is required
 to establish full verification.
+
+## 2026-10-31 — D05 structured waiting observations
+
+All six bounded future, condition-variable and atomic wait checks (relative
+and shared absolute deadlines) now attach optional `WaitObservation` data to
+the `AssertionRecord`, preserving the previous outcome and textual diagnostic.
+The recorded `WaitStatus` is one of Ready, Timeout, Deferred, InvalidTimeout
+or Unexpected, with elapsed waiting time and the budget available at check
+start (negative for invalid relative timeouts). An absolute-deadline flag
+distinguishes original shared budgets from relative timeouts. No observation
+assigns a cause to a timeout: scheduler slowdown, starvation, deadlock and
+a functional failure remain distinct possibilities. `elapsed` and `measure`
+remain nonasserting diagnostics rather than performance verdicts.
+
+`test_timing.cpp` verifies ready, timeout, deferred and invalid observations,
+both deadline modes, budget preservation and separation from elapsed notes.
+Existing assertion construction remains source-compatible because the new
+field is optional with a default. No platform-specific tests were excluded.
+This increment requires CI verification.

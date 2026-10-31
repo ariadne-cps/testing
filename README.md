@@ -174,6 +174,16 @@ a separate D05 task. Atomic waits use a bounded poll instead of the
 non-timed C++20 `atomic::wait`. This facility does not stop hung workers;
 the repository's CTest self-tests have a separate 90-second watchdog.
 
+## Structured wait observations
+
+All bounded waits attach `AssertionRecord::wait` when applicable. The
+optional `WaitObservation` contains a typed `WaitStatus`, elapsed waiting
+time, available time budget and whether the deadline was absolute.
+A timeout reports unmet progress within a time budget, not proof of deadlock
+or scheduler slowdown. Ordinary assertions have no wait metadata;
+`Context::elapsed` and `measure` remain separate nonasserting diagnostics.
+Existing public wait macros automatically populate these observations.
+
 ## Shared monotonic deadlines
 
 For multi-stage asynchronous tests, create one absolute deadline and reuse
