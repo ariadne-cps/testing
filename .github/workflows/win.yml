@@ -81,3 +81,7 @@ jobs:
           path: ctest-junit.xml
           reporter: java-junit
           list-tests: failed
+          # CTest is the failure gate; publishing a valid failing report is not
+          # a reporting error. Missing XML remains an error.
+          fail-on-error: 'false'
+          fail-on-empty: 'true'

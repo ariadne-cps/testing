@@ -1285,3 +1285,22 @@ smoke tests for `results.hpp`, `reporters.hpp`, `testing.hpp` and
 C++ positive/negative concept/type tests remain unchanged. All checks
 are cross-platform without warning exclusions. This correction requires
 its own green CI matrix before the refactor can be considered verified.
+
+## 2026-10-31 — Separate test verdict from report publication
+
+The first GitHub Actions JUnit integration used dorny/test-reporter's
+default `fail-on-error: true`. Its reporting step therefore failed when
+the JUnit input correctly contained a failed test, duplicating the failure
+already enforced by CTest's nonzero exit status. This is not a second
+test failure or a reporter malfunction, and the earlier instruction
+that disabling it would hide the regression was incorrect.
+
+Now all nine per-platform Debug/sanitizer publishing steps explicitly
+set `fail-on-error: false` and `fail-on-empty: true`. CTest remains
+the authoritative fail-closed test gate, with its existing
+`--output-on-failure --output-junit` invocation unchanged. The
+publishing step can complete successfully for an accurate failure
+report, but still fails for absent JUnit input or a genuine reporting
+error. GitHub Checks may separately convey that the tests failed.
+No `continue-on-error`, disabled tests, or changed test expectations
+were introduced. CI for this workflow adjustment is required.

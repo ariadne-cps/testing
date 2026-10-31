@@ -68,6 +68,12 @@ report; scroll to Artifacts at the bottom of the run page to download
 `ctest-...`. Pull requests (especially external forks) upload the
 artifact but do not publish Checks because fork tokens can be read-only.
 The ordinary CTest exit code still determines the job result.
+The reporter is configured with `fail-on-error: false` and
+`fail-on-empty: true`: a successfully published report is not a failed
+reporting step merely because the reported tests failed. A failing test
+still makes CTest fail and keeps the CI job red. If XML is missing, the
+reporting step fails as an infrastructure/reporting error. The separate
+test-result Check can still reflect failed tests.
 
 CTest reports one entry per registered CTest executable/test. To report
 individual internal `Suite` cases instead, a consumer must instantiate
