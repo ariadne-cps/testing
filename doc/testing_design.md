@@ -757,3 +757,28 @@ allocator exhaustion and toolchain-specific per-instantiation
 branches. These are not targeted with artificial tests merely to
 satisfy coverage metrics. A fresh official LLVM report is needed
 to confirm the effect of the newly published tests.
+
+## 2026-10-31 — Coverage playbook: checks.hpp macro-operand branches
+
+The user-provided LLVM 21 report `Archivio 7(6).zip` shows
+`include/testing/checks.hpp` with 58/58 functions, 58/58 lines,
+72/75 regions and 9/14 branches. All five uncovered branches are
+attributed to expressions expanded inside the one-evaluation macro
+wrappers: one at line 42 (`ARIADNE_EXPECT_EQUAL_CTX`) and four at
+lines 105-106 (`ARIADNE_EXPECT_LESS_CTX`). Their source is conditional
+error handling in `test_testing.cpp`'s CHECK-before-evaluation and
+operand-order tests, not independent conditions of the macros themselves.
+
+The same lexical macro invocations are now exercised repeatedly under
+both successful and failing conditions. When a console reporter does
+not emit progress to the guarded output stream, or an operand detects
+the wrong evaluation order, its exception must propagate to
+`Suite::run` as a single Error record. The positive execution is
+unchanged; separate test runs verify the first-operand, missing-CHECK
+and second-operand failures with their actual error messages. Reusing
+the same lambda bodies, rather than duplicating them, is essential to
+exercise the instrumented branch instances in the uploaded report.
+No assertion expectations were weakened and no framework source or
+coverage selection changed. A fresh official LLVM report must
+confirm the branch and region delta before declaring `checks.hpp`
+fully covered.

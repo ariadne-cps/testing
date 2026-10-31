@@ -224,6 +224,20 @@ int main() {
     });
     ConsoleReporter ordering_reporter(ordering_output);
     if (!ordering.run(ordering_reporter).successful()) return 38;
+    // Rerun the SAME macro expansion without a console reporter.
+    // The operand's CHECK-presence precondition now throws; the runner
+    // must report that evaluation error instead of silently passing.
+    ordering_output.str("");
+    ordering_output.clear();
+    CaptureReporter ordering_without_console;
+    auto const no_console_summary = ordering.run(ordering_without_console);
+    if (no_console_summary.errors != 1 || no_console_summary.passed != 0 ||
+        ordering_without_console.results.size() != 1 ||
+        ordering_without_console.results[0].assertions.size() != 1 ||
+        ordering_without_console.results[0].assertions[0].outcome != Outcome::Error ||
+        ordering_without_console.results[0].assertions[0].detail !=
+            "CHECK event missing before operand evaluation")
+        return 89;
     // D01: relational comparisons preserve built-in signedness and ADL evidence.
     Suite relations("relations");
     CaptureReporter relation_capture;
@@ -271,10 +285,12 @@ int main() {
     Suite evaluation("single evaluation");
     std::ostringstream live_comparisons;
     int order = 0;
+    int right_order_offset = 0;
     evaluation.add("left, right, predicate", [&](Context& t) {
         ARIADNE_EXPECT_LESS_CTX(t, ([&] {
             if (order++ != 0 || live_comparisons.str().find("[CHECK 1.1]") == std::string::npos)
                 throw std::logic_error("left operand evaluated before CHECK");
+            order += right_order_offset;
             return 1;
         }()), ([&] {
             if (order++ != 1) throw std::logic_error("wrong operand order");
@@ -295,6 +311,46 @@ int main() {
     ConsoleReporter live_relation_reporter(live_comparisons);
     if (!evaluation.run(live_relation_reporter).successful() || order != 5) return 46;
     if (live_comparisons.str().find("[CHECK 1.2] ordered predicate") == std::string::npos) return 47;
+
+    // The existing single-evaluation macro expansion is exercised with
+    // three genuine operand failures, not copied into new template
+    // instantiations (which would leave the original branches uncovered).
+    // First: an incorrect initial evaluation order.
+    order = 7;
+    CaptureReporter wrong_initial_order;
+    auto const initial_order_summary = evaluation.run(wrong_initial_order);
+    if (initial_order_summary.errors != 1 ||
+        wrong_initial_order.results.size() != 1 ||
+        wrong_initial_order.results[0].assertions.size() != 1 ||
+        wrong_initial_order.results[0].assertions[0].detail !=
+            "left operand evaluated before CHECK")
+        return 90;
+
+    // Second: the left operand's progress precondition fails when no
+    // console CHECK output is available, even with a correct order.
+    live_comparisons.str("");
+    live_comparisons.clear();
+    order = 0;
+    CaptureReporter missing_check_output;
+    auto const missing_check_summary = evaluation.run(missing_check_output);
+    if (missing_check_summary.errors != 1 ||
+        missing_check_output.results.size() != 1 ||
+        missing_check_output.results[0].assertions.size() != 1 ||
+        missing_check_output.results[0].assertions[0].detail !=
+            "left operand evaluated before CHECK")
+        return 91;
+
+    // Third: the right operand sees a bad order. The adjustable offset
+    // emulates an intervening evaluation while the lexical macro site
+    // remains the same; this also verifies that CHECK was announced.
+    right_order_offset = 1;
+    order = 0;
+    // The guard observes the original console stream, allowing the
+    // left operand to succeed and the right operand to detect the fault.
+    auto const right_order_summary = evaluation.run(live_relation_reporter);
+    if (right_order_summary.errors != 1 ||
+        live_comparisons.str().find("wrong operand order") == std::string::npos)
+        return 92;
     // D02: an expected indeterminate value must not become an inconclusive test.
     Suite expectations("evidence expectations");
     CaptureReporter expected_capture;
