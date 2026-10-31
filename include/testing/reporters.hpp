@@ -8,18 +8,53 @@
  *  Ariadne Testing comes WITHOUT ANY WARRANTY.
  */
 /** @file testing/reporters.hpp
- *  @brief Structured JSON/JUnit and live fan-out reporters without dependencies.
+ *  @brief Live console, structured JSON/JUnit and fan-out reporters.
  */
 #ifndef ARIADNE_TESTING_REPORTERS_HPP
 #define ARIADNE_TESTING_REPORTERS_HPP
 
-#include "testing/testing.hpp"
+#include "testing/results.hpp"
 #include <functional>
 #include <initializer_list>
 #include <iosfwd>
 #include <vector>
 
 namespace Ariadne::Testing {
+
+/** @brief Verbose or concise console diagnostic rendering. */
+enum class ConsoleDetail { All, Concise };
+
+/** @brief Callback interface for live case and diagnostic reporting. */
+class Reporter {
+  public:
+    virtual ~Reporter() = default;
+    // Optional lifecycle notifications, compatible with existing reporters.
+    /** @brief Called before any selected case, only for active filters. */
+    virtual void selection_started(SelectionInfo const&) { }
+    virtual void case_started(CaseResult const&) { }
+    virtual void check_started(CaseResult const&, std::size_t, std::string_view) { }
+    virtual void diagnostic_emitted(CaseResult const&, DiagnosticEvent const&) { }
+    virtual void case_finished(CaseResult const& result) = 0;
+    virtual void suite_finished(std::string_view name, Summary const& summary) = 0;
+};
+
+/** @brief Human-readable reporter with configurable diagnostic verbosity. */
+class ConsoleReporter final : public Reporter {
+  public:
+    explicit ConsoleReporter(std::ostream& output, ConsoleDetail detail = ConsoleDetail::All);
+    void selection_started(SelectionInfo const& info) override;
+    void diagnostic_emitted(CaseResult const& result, DiagnosticEvent const& event) override;
+    void case_started(CaseResult const& result) override;
+    void check_started(CaseResult const& result, std::size_t index,
+                       std::string_view description) override;
+    void case_finished(CaseResult const& result) override;
+    void suite_finished(std::string_view name, Summary const& summary) override;
+  private:
+    std::ostream& _output;
+    ConsoleDetail _detail;
+};
+
+
 
 /** @brief One JSON document per completed suite, with full result fidelity.
  *  @details All five outcomes, ordered assertions, nested contexts, wait

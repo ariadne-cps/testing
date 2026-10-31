@@ -39,17 +39,6 @@
 namespace Ariadne::Testing {
 namespace {
 
-std::string_view outcome_name(Outcome result) {
-    switch (result) {
-        case Outcome::Passed: return "PASS";
-        case Outcome::Failed: return "FAIL";
-        case Outcome::Inconclusive: return "INCONCLUSIVE";
-        case Outcome::Skipped: return "SKIP";
-        case Outcome::Error: return "ERROR";
-        default: return "UNKNOWN";
-    }
-}
-
 int priority(Outcome result) {
     switch (result) {
         case Outcome::Passed: return 0;
@@ -61,109 +50,8 @@ int priority(Outcome result) {
     }
 }
 
-std::string summary_text(std::string_view name, Summary const& summary) {
-    std::ostringstream os;
-    os << name << ": " << summary.passed << " passed, " << summary.failed << " failed, "
-       << summary.inconclusive << " inconclusive, " << summary.skipped << " skipped, "
-       << summary.errors << " errors";
-    return os.str();
-}
 
 } // namespace
-
-ConsoleReporter::ConsoleReporter(std::ostream& output, ConsoleDetail detail)
-    : _output(output), _detail(detail) { }
-
-void ConsoleReporter::diagnostic_emitted(CaseResult const& result, DiagnosticEvent const& event) {
-    // Scopes and warnings are always flushed for hang diagnosis and safety.
-    if (_detail == ConsoleDetail::Concise &&
-        event.kind != DiagnosticKind::Scope && event.kind != DiagnosticKind::Warning) return;
-    switch (event.kind) {
-        case DiagnosticKind::Scope:
-            _output << "[SCOPE " << result.case_index << "] ";
-            break;
-        case DiagnosticKind::Note: _output << "[NOTE] "; break;
-        case DiagnosticKind::Warning: _output << "[WARN] "; break;
-        case DiagnosticKind::Value: _output << "[VALUE] "; break;
-        case DiagnosticKind::Elapsed: _output << "[TIME] "; break;
-        default: _output << "[INFO] "; break;
-    }
-    if (!event.context.empty()) {
-        for (std::size_t i = 0; i < event.context.size(); ++i) {
-            if (i != 0) _output << " / ";
-            _output << event.context[i];
-        }
-        if (event.kind != DiagnosticKind::Scope) _output << " / ";
-    }
-    if (event.kind != DiagnosticKind::Scope) _output << event.description;
-    if (event.kind == DiagnosticKind::Value) _output << " = " << event.value;
-    if (event.kind == DiagnosticKind::Elapsed) _output << " = " << event.duration.count() << " ns";
-    _output << '\n' << std::flush;
-}
-
-void ConsoleReporter::selection_started(SelectionInfo const& info) {
-    _output << "[SELECTION " << info.selected << '/' << info.registered << "] ";
-    if (!info.filter.name_contains.empty())
-        _output << "name_contains=" << info.filter.name_contains << ' ';
-    if (!info.filter.implementation.empty())
-        _output << "implementation=" << info.filter.implementation << ' ';
-    if (!info.filter.any_tags.empty()) {
-        _output << "any_tags=";
-        for (std::size_t i = 0; i < info.filter.any_tags.size(); ++i) {
-            if (i) _output << ',';
-            _output << info.filter.any_tags[i];
-        }
-        _output << ' ';
-    }
-    _output << (info.complete() ? "complete" : "partial") << '\n' << std::flush;
-}
-
-void ConsoleReporter::case_started(CaseResult const& result) {
-    _output << "[RUN " << result.case_index << '/' << result.case_total << "] "
-            << result.suite_name << " / " << result.name << '\n' << std::flush;
-}
-
-void ConsoleReporter::check_started(CaseResult const& result, std::size_t index,
-                                    std::string_view description) {
-    _output << "[CHECK " << result.case_index << '.' << index << "] "
-            << description << '\n' << std::flush;
-}
-
-void ConsoleReporter::case_finished(CaseResult const& result) {
-    _output << '[' << outcome_name(result.outcome) << "] " << result.name << '\n';
-    if (result.outcome == Outcome::Passed) return;
-    // In concise mode successful notes are hidden, but restored for a failing case.
-    if (_detail == ConsoleDetail::Concise) {
-        for (auto const& event : result.diagnostics) {
-            if (event.kind == DiagnosticKind::Scope || event.kind == DiagnosticKind::Warning)
-                continue; // Already printed while executing.
-            _output << "  diagnostic: " << event.description;
-            if (event.kind == DiagnosticKind::Value) _output << " = " << event.value;
-            if (event.kind == DiagnosticKind::Elapsed) _output << " = " << event.duration.count() << " ns";
-            _output << '\n';
-        }
-    }
-    for (auto const& assertion : result.assertions) {
-        if (assertion.outcome == Outcome::Passed) continue;
-        _output << "  " << outcome_name(assertion.outcome) << ": " << assertion.description << '\n';
-        if (!assertion.context.empty()) {
-            _output << "    context: ";
-            for (std::size_t i = 0; i < assertion.context.size(); ++i) {
-                if (i != 0) _output << " / ";
-                _output << assertion.context[i];
-            }
-            _output << '\n';
-        }
-        if (!assertion.actual.empty()) _output << "    actual: " << assertion.actual << '\n';
-        if (!assertion.expected.empty()) _output << "    expected: " << assertion.expected << '\n';
-        if (!assertion.detail.empty()) _output << "    detail: " << assertion.detail << '\n';
-        if (!assertion.file.empty()) _output << "    at " << assertion.file << ':' << assertion.line << '\n';
-    }
-}
-
-void ConsoleReporter::suite_finished(std::string_view name, Summary const& summary) {
-    _output << summary_text(name,summary) << '\n';
-}
 
 Context::~Context() noexcept {
     if (!_work_directory) return;
