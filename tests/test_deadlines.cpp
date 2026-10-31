@@ -150,7 +150,7 @@ int main() {
     };
     verify(summary.passed == 6 && summary.failed == 3 && summary.errors == 1 &&
            summary.inconclusive == 0 && summary.skipped == 0 &&
-           capture.results.size() == 10 && capture.checks == 17 &&
+           capture.results.size() == 10 && capture.checks == 18 &&
            condition_calls == 3 && atomic_calls == 3,
            "shared deadline summary, predicate calls or CHECK count");
     if (capture.results.size() == 10) {
