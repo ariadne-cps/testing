@@ -846,3 +846,15 @@ fixture is retained as a separate, POSIX-specific link behavior; Windows
 is never left without an actual assertion for the shared Error contract.
 The two previous Windows-only guesses are removed, not turned into skipped
 or vacuous tests. MSVC CI confirmation is still required.
+
+## 2026-10-31 — D08 part 1: typed domain status expectations
+
+The new `Context::expect_status` checks exact typed domain statuses after
+announcing CHECK, and conditionally verifies the returned result only when its
+status is permitted. The verification predicate returns bool or three-valued
+mathematical evidence: its uncertainty produces Inconclusive, but a deliberately
+expected domain UNKNOWN with the correct reason passes. `test_status.cpp`
+exercises SAT, UNSAT, UNKNOWN/reason, missing witnesses, unsupported statuses,
+uncertain postconditions, error propagation, evaluation counts and CHECK order.
+No domain library dependencies or platform-specific test omissions were added.
+D08's separate result/exception alternatives remain to be implemented.

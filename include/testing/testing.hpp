@@ -40,6 +40,7 @@
 #include <cstdint>
 #include <functional>
 #include <future>
+#include <initializer_list>
 #include <condition_variable>
 #include <mutex>
 #include <algorithm>
@@ -474,6 +475,23 @@ template<class Exception, class Action, class ProjectorFn, class ExpectedFn>
     void expect_throws_payload(Action&& action, ProjectorFn&& projector_fn,
                                ExpectedFn&& expected_fn, std::string_view description,
                                std::source_location location = std::source_location::current());
+
+    /** @brief Check an allowed typed domain status and conditional postcondition.
+     *  CHECK is announced before evaluating the operation. Only accepted exact
+     *  statuses are validated; an expected UNKNOWN is not Inconclusive.
+     */
+    template<class Operation, class Selector, class Status, class Verify>
+    void expect_status(Operation&& operation, Selector&& selector,
+                       std::initializer_list<Status> permitted, Verify&& verify,
+                       std::string_view description,
+                       std::source_location location = std::source_location::current());
+
+    /** @brief Check only a typed domain status, without a postcondition. */
+    template<class Operation, class Selector, class Status>
+    void expect_status(Operation&& operation, Selector&& selector,
+                       std::initializer_list<Status> permitted,
+                       std::string_view description,
+                       std::source_location location = std::source_location::current());
 
     /** @brief Verify that an operation throws any exception.
  *  @note Arguments supplied as callables are evaluated at check time.

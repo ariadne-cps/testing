@@ -216,7 +216,7 @@ checks image data and pixels.
 
 ### D08. Explicit domain-status expectations and alternative execution paths
 
-- [ ] Offer typed outcome expectations for allowed return statuses
+- [x] Offer typed outcome expectations for allowed return statuses
       (SAT, UNSAT, UNKNOWN with reason, feasible/infeasible, etc.) and
       conditional witness/model postconditions, without mapping domain
       UNKNOWN automatically to \`Outcome::Inconclusive\`.

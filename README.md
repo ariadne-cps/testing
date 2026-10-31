@@ -90,6 +90,14 @@ with a definite mathematical proof. The report retains observed evidence.
 
 `Summary::successful()` is strict; explicit `summary.acceptable(AcceptancePolicy{InconclusivePolicy::NonBlocking, SkippedPolicy::NonBlocking})` allows a caller to tolerate inconclusives only when choosing an exit status. It does not change stored outcomes, reporter labels or counters, does not allow failures/errors, and still requires at least one genuinely passing case. Solver UNKNOWN is an ordinary domain value, not automatically a testing Inconclusive.
 
+## Domain status expectations
+
+`Context::expect_status(operation, selector, {allowed...}, verifier, description)`
+checks permitted typed domain statuses and evaluates a conditional result
+postcondition. An expected UNKNOWN with the required reason is Passed;
+uncertain postcondition evidence is Inconclusive. A shorter overload checks
+only status. An unpermitted status fails without running the verifier.
+
 ## Parameterized suites and fixture factories
 
 The umbrella header also provides implementation/precision variants.

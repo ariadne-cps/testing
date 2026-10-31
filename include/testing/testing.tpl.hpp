@@ -529,6 +529,52 @@ template<class Exception, class Action, class ProjectorFn, class ExpectedFn>
                "no exception thrown", location, index);
     }
 
+
+template<class Operation, class Selector, class Status, class Verify>
+void Context::expect_status(Operation&& operation, Selector&& selector,
+                            std::initializer_list<Status> permitted, Verify&& verify,
+                            std::string_view description,
+                            std::source_location location) {
+    auto const index = begin_check(description);
+    decltype(auto) result = std::invoke(std::forward<Operation>(operation));
+    decltype(auto) actual = std::invoke(std::forward<Selector>(selector), std::as_const(result));
+    static_assert(std::is_same_v<std::remove_cvref_t<decltype(actual)>, Status>,
+                  "Selected status and permitted statuses must have the same type");
+    static_assert(std::is_convertible_v<
+                  decltype(std::declval<Status const&>() == std::declval<Status const&>()), bool>,
+                  "Domain status equality must produce bool");
+    std::string expected = "one of [";
+    bool accepted = false;
+    bool first = true;
+    for (auto const& candidate : permitted) {
+        if (!first) expected += ", ";
+        first = false;
+        expected += Detail::render(candidate);
+        if (static_cast<bool>(actual == candidate)) accepted = true;
+    }
+    expected += "]";
+    if (!accepted) {
+        record(Outcome::Failed, description, Detail::render(actual), expected,
+               "domain status not permitted", location, index);
+        return;
+    }
+    auto const verdict = Detail::evidence(
+        std::invoke(std::forward<Verify>(verify), std::as_const(result)));
+    record(outcome(verdict), description, Detail::render(actual), expected,
+           verdict == Evidence::False ? "status postcondition failed" :
+           verdict == Evidence::Indeterminate ? "status postcondition indeterminate" : "",
+           location, index);
+}
+
+template<class Operation, class Selector, class Status>
+void Context::expect_status(Operation&& operation, Selector&& selector,
+                            std::initializer_list<Status> permitted,
+                            std::string_view description,
+                            std::source_location location) {
+    expect_status(std::forward<Operation>(operation), std::forward<Selector>(selector),
+                  permitted, [](auto const&) { return true; }, description, location);
+}
+
 template<class Callable>
     void Context::expect_exception(Callable&& action, std::string_view description,
                           std::source_location location){
