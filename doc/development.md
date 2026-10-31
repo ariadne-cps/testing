@@ -415,3 +415,12 @@ For compile-time assertions use `ARIADNE_TESTING_COMPILE_CONCEPT`,
 `ARIADNE_TESTING_COMPILE_TRAIT` and
 `ARIADNE_TESTING_COMPILE_SAME_TYPE`. New regressions and examples use
 canonical names exclusively. CI across supported compilers is required.
+
+## D13 CI evidence (2026-10-31)
+
+The JUnit path is now integrated into GitHub Actions for executable
+CTest targets via CTest's own XML export, upload-artifact and
+test-reporter on trusted pushes. This does not yet expose internal
+Suite cases as independent CTest targets, nor automatically use the
+framework's per-case JUnitReporter. JSON remains supported; the
+future optional per-case CTest listing is distinct work.

@@ -51,6 +51,31 @@ builds them serially in the current configuration. The independent
 unittest cases only when an interpreter exists, without requiring Python.
 CTest labels distinguish compile, cmake and python checks.
 
+## GitHub Actions: CTest JUnit reports
+
+The Debug jobs for Ubuntu, macOS and Windows, and both sanitizer jobs,
+run CTest with `--output-on-failure --output-junit`. Each job uploads
+`ctest-junit.xml` as an Actions artifact; on pushes to `main`,
+`dorny/test-reporter` additionally publishes failing CTest tests as
+GitHub Checks annotations and a checks summary. Each matrix job has
+a unique artifact name. Artifacts remain available even if CTest fails,
+provided CTest managed to write the XML. A compilation failure cannot
+produce a test report.
+
+**Where to find it:** Repository > Actions > select workflow run >
+select Debug/sanitizer job > Checks or Summary for the `CTest ...`
+report; scroll to Artifacts at the bottom of the run page to download
+`ctest-...`. Pull requests (especially external forks) upload the
+artifact but do not publish Checks because fork tokens can be read-only.
+The ordinary CTest exit code still determines the job result.
+
+CTest reports one entry per registered CTest executable/test. To report
+individual internal `Suite` cases instead, a consumer must instantiate
+`JUnitReporter` and export its output: this is not done automatically
+by `ctest --output-junit`. JSON reporting remains fully supported and
+is unaffected by the CI integration. Coverage workflows already have
+their own reporting and are intentionally unchanged.
+
 ## Structured JSON/JUnit and live console reporting
 
 `JsonReporter` serializes each completed suite to one JSON document

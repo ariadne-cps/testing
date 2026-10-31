@@ -1241,3 +1241,25 @@ tag rejection on all platforms. Optional per-case CTest discovery
 remains deferred because no test-executable listing CLI exists yet.
 No implicit sample filtering is added to D12 oracle replay and no
 third-party Logging dependency is introduced. CI is required.
+
+## 2026-10-31 — D13 GitHub Actions integration for JUnit
+
+Added CTest `--output-junit` to every executable-test job: Ubuntu/macOS/
+Windows Debug and the ThreadSanitizer and AddressSanitizer/UBSan jobs.
+CTest's own stdout remains in the job log, including per-executable
+failure diagnostics and streaming RUN/CHECK output on failure.
+The JUnit XML is uploaded as an independent artifact even on test
+failure (when available). On trusted push events, dorny/test-reporter
+renders results as GitHub Checks. Publication of Checks is gated on
+push, not external pull requests with restricted tokens. The workflow
+grants explicit scoped checks:write permissions. Matrix artifacts are
+uniquely named. Compilation errors are not test reports; absent
+XML cannot fabricate successful results. Release and Coverage jobs
+keep their original separate semantics.
+
+This first-stage integration uses CTest's JUnit exporter, which reports
+CTest test identities, not internal Suite cases. The framework's
+JUnitReporter is preserved for consumers that emit deeper per-case XML.
+JsonReporter is retained without change. No outcome policy, test
+coverage selection, test watchdog or external framework dependency
+changed. Full GitHub Actions CI remains the acceptance gate.
