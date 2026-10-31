@@ -257,6 +257,15 @@
 
 /** @} */
 
+/** @def ARIADNE_TESTING_EXPECT_ORACLE_ROWS_CTX
+ *  @brief Require all parsed oracle row identities to match a frozen manifest.
+ *  @details Both arguments are containers of OracleRow. The reader/parser
+ *  must already have produced them and must not silently filter rows.
+ *  This is a complete integrity check, not an expected-value generator.
+ */
+#define ARIADNE_TESTING_EXPECT_ORACLE_ROWS_CTX(context, manifest, observed) \
+    (context).expect_oracle_rows((manifest), (observed), #observed " matches " #manifest)
+
 /** @name Relational checks
  *  @brief Evaluate left/right once after the live CHECK event.
  *  @{ */
@@ -623,5 +632,11 @@
 
 /** @} */
 
+
+/** @def ARIADNE_TESTING_EXPECT_ORACLE_ROWS
+ *  @brief Fixture shorthand for full frozen-oracle row integrity.
+ */
+#define ARIADNE_TESTING_EXPECT_ORACLE_ROWS(manifest, observed) \
+    ARIADNE_TESTING_EXPECT_ORACLE_ROWS_CTX(this->ctx(), manifest, observed)
 
 #endif // ARIADNE_TESTING_CHECKS_HPP

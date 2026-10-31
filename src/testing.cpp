@@ -192,6 +192,116 @@ std::filesystem::path const& Context::work_directory() {
     return *_work_directory;
 }
 
+
+namespace {
+bool valid_oracle_id(OracleRow const& row) {
+    return row.parsed && !row.id.key.empty();
+}
+struct OracleRowLess {
+    bool operator()(OracleRowId const& a, OracleRowId const& b) const {
+        return std::tie(a.key, a.iteration, a.repetition) <
+               std::tie(b.key, b.iteration, b.repetition);
+    }
+};
+char const* oracle_issue_name(OracleIssueKind kind) {
+    switch (kind) {
+        case OracleIssueKind::InvalidManifest: return "invalid manifest";
+        case OracleIssueKind::Malformed: return "malformed row";
+        case OracleIssueKind::Duplicate: return "duplicate row";
+        case OracleIssueKind::Missing: return "missing row";
+        case OracleIssueKind::Extra: return "extra row";
+        case OracleIssueKind::OutOfOrder: return "out-of-order row";
+        default: return "unknown oracle issue";
+    }
+}
+} // namespace
+
+OracleIntegrity validate_oracle_rows(std::span<OracleRow const> manifest,
+                                    std::span<OracleRow const> observed) {
+    OracleIntegrity report{manifest.size(), observed.size(), {}};
+    std::map<OracleRowId, std::size_t, OracleRowLess> required;
+    if (manifest.empty())
+        report.issues.push_back({OracleIssueKind::InvalidManifest, 0, {}});
+    for (std::size_t i = 0; i < manifest.size(); ++i) {
+        auto const& row = manifest[i];
+        if (!valid_oracle_id(row) || !required.emplace(row.id, i).second)
+            report.issues.push_back({OracleIssueKind::InvalidManifest, i, row.id});
+    }
+    if (report.invalid_manifest()) return report;
+    std::map<OracleRowId, std::size_t, OracleRowLess> found;
+    for (std::size_t i = 0; i < observed.size(); ++i) {
+        auto const& row = observed[i];
+        if (!valid_oracle_id(row)) {
+            report.issues.push_back({OracleIssueKind::Malformed, i, row.id});
+            continue;
+        }
+        if (!found.emplace(row.id, i).second)
+            report.issues.push_back({OracleIssueKind::Duplicate, i, row.id});
+        if (!required.contains(row.id))
+            report.issues.push_back({OracleIssueKind::Extra, i, row.id});
+    }
+    for (auto const& [id, i] : required)
+        if (!found.contains(id))
+            report.issues.push_back({OracleIssueKind::Missing, i, id});
+
+    // Report ordering only if the exact multiset agrees: otherwise the
+    // earlier missing/duplicate/extra/malformed issue is more actionable.
+    if (report.issues.empty())
+        for (std::size_t i = 0; i < manifest.size(); ++i)
+            if (!(manifest[i].id == observed[i].id)) {
+                report.issues.push_back({OracleIssueKind::OutOfOrder, i, observed[i].id});
+                break;
+            }
+    return report;
+}
+
+std::string OracleIntegrity::description() const {
+    auto summary = "expected_rows=" + std::to_string(expected_rows) +
+                   "; observed_rows=" + std::to_string(observed_rows);
+    if (issues.empty()) return summary + "; integrity verified";
+    auto const& first = issues.front();
+    return summary + "; issues=" + std::to_string(issues.size()) +
+           "; first=" + oracle_issue_name(first.kind) +
+           " at index=" + std::to_string(first.index) +
+           "; key=" + first.id.key +
+           "; iteration=" + std::to_string(first.id.iteration) +
+           "; repetition=" + std::to_string(first.id.repetition);
+}
+
+void Context::register_oracle(OracleMetadata const& metadata) {
+    if (metadata.reference.empty() || metadata.label.empty() ||
+        metadata.row_key_column.empty() || metadata.precision_bits == 0)
+        throw std::invalid_argument("Oracle reference, label and row key must be nonempty and precision positive");
+    std::vector<std::pair<std::string,std::string>> attrs{
+        {"oracle.row_key_column", metadata.row_key_column}
+    };
+    if (metadata.seed)
+        attrs.emplace_back("oracle.seed", std::to_string(*metadata.seed));
+    if (metadata.precision_bits)
+        attrs.emplace_back("oracle.precision_bits", std::to_string(*metadata.precision_bits));
+    std::map<std::string, bool> seen;
+    for (auto const& [name, value] : metadata.input_attributes) {
+        if (name.empty() || value.empty() || !seen.emplace(name, true).second)
+            throw std::invalid_argument("Oracle input attribute names/values must be nonempty and unique");
+        attrs.emplace_back("input." + name, value);
+    }
+    artifact(metadata.reference, metadata.label, "application/octet-stream",
+             ArtifactKind::Reference, ArtifactLifetime::External, std::move(attrs));
+}
+
+void Context::expect_oracle_rows(std::span<OracleRow const> manifest,
+                                 std::span<OracleRow const> observed,
+                                 std::string_view description,
+                                 std::source_location location) {
+    auto const index = begin_check(description);
+    auto const report = validate_oracle_rows(manifest, observed);
+    record(report.valid() ? Outcome::Passed :
+           report.invalid_manifest() ? Outcome::Error : Outcome::Failed,
+           description, std::to_string(report.observed_rows),
+           std::to_string(report.expected_rows), report.description(),
+           location, index);
+}
+
 void Context::artifact(std::filesystem::path path, std::string label,
                        std::string media_type, ArtifactKind kind,
                        ArtifactLifetime lifetime,

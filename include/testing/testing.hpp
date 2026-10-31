@@ -50,6 +50,8 @@
 #include <algorithm>
 #include <iterator>
 #include <optional>
+#include <span>
+#include "testing/oracle.hpp"
 #include <ranges>
 #include <iosfwd>
 #include <source_location>
@@ -293,6 +295,26 @@ class Context {
                   ArtifactKind kind = ArtifactKind::Output,
                   ArtifactLifetime lifetime = ArtifactLifetime::External,
                   std::vector<std::pair<std::string,std::string>> metadata = {});
+
+    /** @brief Register immutable-oracle provenance as an external reference.
+     *  @details Only metadata is recorded: the reference is never opened,
+     *  modified or regenerated. Call expect_file_exists separately when
+     *  filesystem presence is part of the test's contract.
+     *  @throws std::invalid_argument for invalid identifiers or duplicate
+     *  input attribute names.
+     */
+    void register_oracle(OracleMetadata const& metadata);
+
+    /** @brief Assert complete and ordered frozen-oracle row identities.
+     *  @details Invalid manifests produce Error; absent, duplicated,
+     *  malformed, extra or reordered actual rows produce Failed.
+     *  The domain's reader supplies all rows; this method never filters or
+     *  reseeds them. A CHECK is announced before validation.
+     */
+    void expect_oracle_rows(std::span<OracleRow const> manifest,
+                            std::span<OracleRow const> observed,
+                            std::string_view description,
+                            std::source_location location = std::source_location::current());
 
     // File expectations issue CHECK before inspecting the filesystem.
     /** @brief Check whether a path is an accessible regular file. */

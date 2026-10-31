@@ -32,5 +32,6 @@
 #include "testing/parameterized.hpp"
 #include "testing/state.hpp"
 #include "testing/worker.hpp"
+#include "testing/oracle.hpp"
 
 #endif // ARIADNE_TESTING_UMBRELLA_HPP
