@@ -68,6 +68,16 @@ report; scroll to Artifacts at the bottom of the run page to download
 `ctest-...`. Pull requests (especially external forks) upload the
 artifact but do not publish Checks because fork tokens can be read-only.
 The ordinary CTest exit code still determines the job result.
+Reports now use `use-actions-summary: true`, `list-tests: all` and
+`collapsed: never`. To inspect every CTest case (even when all pass),
+open **Actions → a workflow run → Summary**, then locate the heading
+**CTest JUnit results** under the Debug/sanitizer job. The job's
+**Details** link in commit Checks only opens the usual Actions job,
+not a dedicated test browser. When GitHub does not display a separate
+report Check, the Summary and the downloadable XML artifact are the
+reliable destinations. CTest reports CTest test targets rather than
+internal Suite cases.
+
 The reporter is configured with `fail-on-error: false` and
 `fail-on-empty: true`: a successfully published report is not a failed
 reporting step merely because the reported tests failed. A failing test

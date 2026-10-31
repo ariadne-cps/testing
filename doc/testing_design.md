@@ -1304,3 +1304,23 @@ report, but still fails for absent JUnit input or a genuine reporting
 error. GitHub Checks may separately convey that the tests failed.
 No `continue-on-error`, disabled tests, or changed test expectations
 were introduced. CI for this workflow adjustment is required.
+
+## 2026-10-31 — Make the JUnit report discoverable on GitHub Actions
+
+GitHub's commit Checks panel in an observed passing run exposed only
+the 18 standard GitHub Actions job checks; no separately identifiable
+CTest Check appeared there, despite the dorny/test-reporter step ending
+successfully. The earlier direction to click those job Details links
+was therefore insufficient, as they just open the normal job details.
+
+Furthermore, `list-tests: failed` intentionally hid every successful
+case from the rendered report, making a green run visually identical to
+the normal workflow summary. To expose useful information on green
+runs, all five reporter steps now explicitly use
+`use-actions-summary: true`, `report-title: CTest JUnit results`,
+`list-suites: all`, `list-tests: all` and `collapsed: never`.
+The report remains limited to the JUnit CTest targets and GitHub's
+summary-size limits, independent of the internal Suite cases.
+`fail-on-error: false` and `fail-on-empty: true` are unchanged;
+CTest remains the execution gate. This is a presentation-only change,
+subject to CI verification.

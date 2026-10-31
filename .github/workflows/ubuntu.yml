@@ -85,7 +85,12 @@ jobs:
           name: CTest ${{ matrix.config.name }} [Debug]
           path: ctest-junit.xml
           reporter: java-junit
-          list-tests: failed
+          # Explicitly expose passed cases as well as failures in Actions Summary.
+          use-actions-summary: 'true'
+          report-title: 'CTest JUnit results'
+          list-suites: all
+          list-tests: all
+          collapsed: never
           # CTest is the failure gate; publishing a valid failing report is not
           # a reporting error. Missing XML remains an error.
           fail-on-error: 'false'
