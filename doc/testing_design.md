@@ -661,3 +661,19 @@ constructor-inheritance requirement. File names, CMake targets and
 test-only integration are unchanged. Utility restores the original
 test-source namespace qualifications and updates its pinned `ss/tst`
 gitlink to this restoration commit.
+
+## 2026-10-31 — testing.cpp coverage: move ownership of a diagnostic scope
+
+The user's LLVM 21 report from 2026-10-31 confirms `parameterized.hpp`
+at 15/15 functions, 79/79 lines and 8/8 branches, so the earlier
+parameterized coverage intervention is closed without further tests.
+It identifies a single unexecuted function in `src/testing.cpp`, the
+`Context::Scope` move constructor. Its valid behavior is transferring
+ownership of scope closure without prematurely leaving the diagnostic
+context or closing twice. A targeted case in `test_testing.cpp` now
+constructs a scope, explicitly moves it, verifies the active scope on the
+first assertion and verifies that the context has been closed at the
+second assertion. The expected suite count and RUN/CHECK indices are
+updated to reflect the additional case. The framework implementation is
+untouched. A fresh coverage report for this commit is required before
+claiming complete function coverage for `testing.cpp`.
