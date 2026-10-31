@@ -17,6 +17,7 @@
 #include <functional>
 #include <initializer_list>
 #include <iosfwd>
+#include <optional>
 #include <vector>
 
 namespace Ariadne::Testing {
@@ -65,11 +66,13 @@ class ConsoleReporter final : public Reporter {
 class JsonReporter final : public Reporter {
   public:
     explicit JsonReporter(std::ostream& output) : _output(output) {}
+    void selection_started(SelectionInfo const& info) override;
     void case_finished(CaseResult const& result) override;
     void suite_finished(std::string_view name, Summary const& summary) override;
   private:
     std::ostream& _output;
     std::vector<CaseResult> _cases;
+    std::optional<SelectionInfo> _selection;
 };
 
 /** @brief JUnit XML reporter with non-lossy outcome classification.
@@ -78,15 +81,20 @@ class JsonReporter final : public Reporter {
  *  assertion contexts and artifact references are included in system-out;
  *  artifacts also appear as testcase properties. JUnit cannot represent
  *  indeterminate evidence natively, so the failure type retains its label.
+ *  Explicit incomplete selection adds a clearly labelled synthetic failure
+ *  in JUnit only, so consuming that report cannot mistake partial coverage
+ *  for a fully passing regression; actual CaseResult data remain unchanged.
  */
 class JUnitReporter final : public Reporter {
   public:
     explicit JUnitReporter(std::ostream& output) : _output(output) {}
+    void selection_started(SelectionInfo const& info) override;
     void case_finished(CaseResult const& result) override;
     void suite_finished(std::string_view name, Summary const& summary) override;
   private:
     std::ostream& _output;
     std::vector<CaseResult> _cases;
+    std::optional<SelectionInfo> _selection;
 };
 
 /** @brief Forward every Reporter event in order to several owned-by-caller reporters.
@@ -97,6 +105,7 @@ class JUnitReporter final : public Reporter {
 class ReporterFanout final : public Reporter {
   public:
     explicit ReporterFanout(std::initializer_list<std::reference_wrapper<Reporter>> targets);
+    void selection_started(SelectionInfo const& info) override;
     void case_started(CaseResult const& result) override;
     void check_started(CaseResult const& result, std::size_t index,
                        std::string_view description) override;

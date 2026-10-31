@@ -196,7 +196,11 @@ void json_case(std::ostream& out, CaseResult const& c) {
     out << ",\"case_index\":" << c.case_index
         << ",\"case_total\":" << c.case_total << ",\"outcome\":";
     json_string(out, outcome_string(c.outcome));
-    out << ",\"duration_ns\":" << c.duration.count() << ",\"assertions\":[";
+    out << ",\"duration_ns\":" << c.duration.count() << ",\"implementation\":";
+    json_string(out, c.implementation);
+    out << ",\"tags\":";
+    json_strings(out, c.tags);
+    out << ",\"assertions\":[";
     for (std::size_t i = 0; i < c.assertions.size(); ++i) {
         if (i != 0) out.put(',');
         json_assertion(out, c.assertions[i]);
@@ -366,10 +370,43 @@ void ConsoleReporter::suite_finished(std::string_view name, Summary const& summa
     _output << summary_text(name,summary) << '\n';
 }
 
+namespace {
+SelectionInfo effective_selection(std::optional<SelectionInfo> const& selection,
+                                  std::size_t case_count) {
+    return selection.value_or(SelectionInfo{case_count, case_count, {}});
+}
+void json_selection(std::ostream& out, SelectionInfo const& selection, bool filtered) {
+    out << "{\"registered\":" << selection.registered
+        << ",\"selected\":" << selection.selected
+        << ",\"complete\":" << (selection.complete() ? "true" : "false")
+        << ",\"filtered\":" << (filtered ? "true" : "false")
+        << ",\"filter\":{";
+    json_field(out, "name_contains", selection.filter.name_contains);
+    out << ',';
+    json_field(out, "implementation", selection.filter.implementation);
+    out << ",\"any_tags\":";
+    json_strings(out, selection.filter.any_tags);
+    out << "}}";
+}
+void xml_suite_property(std::ostream& out, std::string_view name, std::string_view value) {
+    out << "    <property";
+    xml_attribute(out, "name", name);
+    xml_attribute(out, "value", value);
+    out << "/>\n";
+}
+} // namespace
+
+void JsonReporter::selection_started(SelectionInfo const& info) { _selection = info; }
 void JsonReporter::case_finished(CaseResult const& result) { _cases.push_back(result); }
 void JsonReporter::suite_finished(std::string_view name, Summary const& summary) {
     _output << "{\"suite\":";
     json_string(_output, name);
+    auto const selection = effective_selection(_selection, _cases.size());
+    _output << ",\"selection\":";
+    json_selection(_output, selection, _selection.has_value());
+    _output << ",\"selected_successful\":" << (summary.successful() ? "true" : "false")
+            << ",\"full_suite_successful\":"
+            << ((selection.complete() && summary.successful()) ? "true" : "false");
     _output << ",\"summary\":{\"passed\":" << summary.passed
             << ",\"failed\":" << summary.failed
             << ",\"inconclusive\":" << summary.inconclusive
@@ -381,27 +418,55 @@ void JsonReporter::suite_finished(std::string_view name, Summary const& summary)
     }
     _output << "]}\n" << std::flush;
     _cases.clear();
+    _selection.reset();
 }
+void JUnitReporter::selection_started(SelectionInfo const& info) { _selection = info; }
 void JUnitReporter::case_finished(CaseResult const& result) { _cases.push_back(result); }
 void JUnitReporter::suite_finished(std::string_view name, Summary const& summary) {
+    auto const selection = effective_selection(_selection, _cases.size());
+    bool const incomplete = !selection.complete();
     std::chrono::nanoseconds total{};
     for (auto const& c : _cases) total += c.duration;
     _output << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<testsuite";
     xml_attribute(_output, "name", name);
-    xml_attribute(_output, "tests", std::to_string(_cases.size()));
-    xml_attribute(_output, "failures", std::to_string(summary.failed + summary.inconclusive));
+    xml_attribute(_output, "tests", std::to_string(_cases.size() + (incomplete ? 1u : 0u)));
+    xml_attribute(_output, "failures",
+                  std::to_string(summary.failed + summary.inconclusive + (incomplete ? 1u : 0u)));
     xml_attribute(_output, "errors", std::to_string(summary.errors));
     xml_attribute(_output, "skipped", std::to_string(summary.skipped));
     xml_attribute(_output, "time", seconds(total));
-    _output << ">\n";
+    _output << ">\n  <properties>\n";
+    xml_suite_property(_output, "selection.registered", std::to_string(selection.registered));
+    xml_suite_property(_output, "selection.selected", std::to_string(selection.selected));
+    xml_suite_property(_output, "selection.complete", selection.complete() ? "true" : "false");
+    xml_suite_property(_output, "selection.filtered", _selection ? "true" : "false");
+    xml_suite_property(_output, "selection.name_contains", selection.filter.name_contains);
+    xml_suite_property(_output, "selection.implementation", selection.filter.implementation);
+    for (std::size_t i = 0; i < selection.filter.any_tags.size(); ++i)
+        xml_suite_property(_output, "selection.any_tag." + std::to_string(i),
+                           selection.filter.any_tags[i]);
+    _output << "  </properties>\n";
+    if (incomplete) {
+        _output << "  <testcase name=\"__incomplete_selection__\"";
+        xml_attribute(_output, "classname", name);
+        _output << " time=\"0\">\n    <failure type=\"incomplete_coverage\"";
+        xml_attribute(_output, "message", "Selected " + std::to_string(selection.selected) +
+                      " of " + std::to_string(selection.registered) + " registered cases");
+        _output << ">Explicit partial selection cannot establish full-suite coverage"
+                << "</failure>\n  </testcase>\n";
+    }
     for (auto const& c : _cases) {
         _output << "  <testcase";
         xml_attribute(_output, "name", c.name);
         xml_attribute(_output, "classname", c.suite_name);
         xml_attribute(_output, "time", seconds(c.duration));
         _output << ">\n";
-        if (!c.artifacts.empty()) {
+        if (!c.artifacts.empty() || !c.tags.empty() || !c.implementation.empty()) {
             _output << "    <properties>\n";
+            if (!c.implementation.empty())
+                xml_suite_property(_output, "implementation", c.implementation);
+            for (std::size_t i = 0; i < c.tags.size(); ++i)
+                xml_suite_property(_output, "tag." + std::to_string(i), c.tags[i]);
             for (std::size_t i = 0; i < c.artifacts.size(); ++i) {
                 _output << "      <property";
                 xml_attribute(_output, "name", "artifact." + std::to_string(i) + ".path");
@@ -429,10 +494,14 @@ void JUnitReporter::suite_finished(std::string_view name, Summary const& summary
     }
     _output << "</testsuite>\n" << std::flush;
     _cases.clear();
+    _selection.reset();
 }
 ReporterFanout::ReporterFanout(std::initializer_list<std::reference_wrapper<Reporter>> targets)
     : _targets(targets) {
     if (_targets.empty()) throw std::invalid_argument("ReporterFanout requires a reporter");
+}
+void ReporterFanout::selection_started(SelectionInfo const& info) {
+    for (auto& r : _targets) r.get().selection_started(info);
 }
 void ReporterFanout::case_started(CaseResult const& result) {
     for (auto& r : _targets) r.get().case_started(result);
