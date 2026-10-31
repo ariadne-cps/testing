@@ -9,7 +9,7 @@ on:
 env:
   SCCACHE_GHA_ENABLED: "true"
   # Allow Windows runners up to 60s to initialize the local cache server.
-  SCCACHE_CONF: ${{ github.workspace }}/.github/sccache-windows.toml
+  SCCACHE_CONF: ${{ github.workspace }}/.github/sccache.toml
 
 jobs:
   build-test:
@@ -37,33 +37,13 @@ jobs:
 
       - name: Set up sccache
         uses: mozilla-actions/sccache-action@v0.0.11
+        # Cache setup must not block a valid compilation.
+        continue-on-error: true
         with:
           version: "v0.18.0"
 
-      - name: Initialize optional sccache before parallel compilation
-        shell: pwsh
-        run: |
-          # Trigger one daemon startup ahead of Ninja's concurrent compiler
-          # invocations. Cache is an optimization, not a compilation prerequisite.
-          $cacheReady = $false
-          for ($attempt = 1; $attempt -le 3; $attempt++) {
-            Write-Host "Checking sccache server (attempt $attempt/3)"
-            & sccache --show-stats
-            if ($LASTEXITCODE -eq 0) {
-              $cacheReady = $true
-              break
-            }
-            if ($attempt -lt 3) { Start-Sleep -Seconds 3 }
-          }
-          if ($cacheReady) {
-            "SCCACHE_LAUNCHER=sccache" >> $env:GITHUB_ENV
-            Write-Host "sccache server initialized; enabling compiler launcher"
-          } else {
-            # Never turn an optional cache service outage into a false
-            # C++ compilation failure. MSVC flags and all tests are unchanged.
-            "SCCACHE_LAUNCHER=" >> $env:GITHUB_ENV
-            Write-Warning "sccache unavailable; compiling directly with MSVC"
-          }
+      - name: Initialize optional sccache before compilation
+        run: cmake -P cmake/InitializeSccache.cmake
 
       - name: Configure CMake
         run: |

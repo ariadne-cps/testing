@@ -1,0 +1,2 @@
+# 60-second startup timeout shared across GitHub-hosted CI runners.
+server_startup_timeout_ms = 60000

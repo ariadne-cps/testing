@@ -1360,3 +1360,23 @@ optimization, not a correctness gate, so this fallback prevents its
 availability from falsifying the result of C++ compilation. Neither
 tests nor semantics nor supported platforms were excluded. Subsequent
 CI must verify the workflow on both Windows architectures.
+
+## 2026-10-31 — Optional compiler-cache preflight on all CI platforms
+
+The previous Windows sccache preflight used `--show-stats`, which in
+sccache 0.18.0 can return success without any running server. It did not
+guarantee daemon startup. Fixed this and extended the optional cache
+policy to all build workflows: Ubuntu and macOS Debug/Release, Coverage
+on macOS/Ubuntu, and both Linux Sanitizers jobs.
+
+The shared `cmake/InitializeSccache.cmake` calls `--zero-stats`, which
+connects to or starts the cache daemon; it retries up to three times.
+`.github/sccache.toml` increases its startup deadline to 60 seconds on
+all platforms. The previous Windows-only file was removed. Optional
+sccache-action setup errors no longer prevent a full direct-compiler
+build. The preflight writes a resolved launcher or empty launcher to
+`GITHUB_ENV` for CMake and makes the fallback explicit in logs.
+Compilers, options, warnings-as-errors, test targets, coverage,
+sanitizers and report publishing are unchanged. Post-configuration
+cache failures are not silently retried. Complete CI matrix verification
+is required.

@@ -1,4 +1,0 @@
-# Windows runners may be slow to initialize the sccache background server.
-# Default sccache startup deadline is 10 seconds; this file only changes it
-# for the Windows GitHub Actions workflow via SCCACHE_CONF.
-server_startup_timeout_ms = 60000

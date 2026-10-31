@@ -482,12 +482,18 @@ selection, a synthetic `__incomplete_selection__` failure with
 not an executed C++ case and does not change `Suite::run_selected()`
 outcomes. A completed full run never receives this synthetic row.
 
-## Windows CI compiler-cache startup
+## Cross-platform CI compiler-cache startup
 
-Windows jobs try to start the optional sccache server before Ninja
-starts concurrent compilers, with a 60-second server startup deadline
-and three preflight attempts. If the cache cannot initialize, the job
-logs a warning and compiles directly with MSVC. This fallback does
-**not** skip compilation, alter compiler flags or suppress failing
-tests. It prevents an unavailable cache daemon from making a valid
-C++ build look like a source-code failure.
+All Windows, Ubuntu and macOS builds, including Coverage and Sanitizers,
+treat `sccache` as optional. The shared `cmake/InitializeSccache.cmake`
+preflight connects to (or starts) the daemon using `sccache --zero-stats`
+before compilation; unlike `--show-stats`, it cannot silently succeed
+without connecting to a daemon. `.github/sccache.toml` configures a
+60-second server startup timeout. Three attempts are allowed.
+
+If installation or initialization fails, CMake uses the original compiler
+directly. This does not skip builds/tests or relax compiler flags, coverage,
+sanitizers, or CI failure criteria. The decision is made before CMake
+configuration: a daemon crash later during compilation is not automatically
+recovered, and must be investigated instead of hiding C++ failures.
+
