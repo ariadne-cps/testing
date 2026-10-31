@@ -340,7 +340,8 @@ void Context::expect_oracle_replay(OracleReplayPlan const& plan,
 
 void Context::register_oracle(OracleMetadata const& metadata) {
     if (metadata.reference.empty() || metadata.label.empty() ||
-        metadata.row_key_column.empty() || metadata.precision_bits == 0)
+        metadata.row_key_column.empty() ||
+        (metadata.precision_bits.has_value() && *metadata.precision_bits == std::uint32_t{0}))
         throw std::invalid_argument("Oracle reference, label and row key must be nonempty and precision positive");
     std::vector<std::pair<std::string,std::string>> attrs{
         {"oracle.row_key_column", metadata.row_key_column}

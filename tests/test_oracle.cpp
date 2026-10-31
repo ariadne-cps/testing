@@ -57,19 +57,33 @@ int main(){
         try{c.register_oracle(m);}catch(std::invalid_argument const&){rejected=true;}
         c.prove(rejected && c.work_directory()!=std::filesystem::path{}, "duplicates rejected");
     });
+    suite.add("reject zero precision",[](Context& c){
+        OracleMetadata m; m.reference="frozen.tsv"; m.label="oracle";
+        m.row_key_column="id"; m.precision_bits=std::uint32_t{0};
+        bool rejected=false;
+        try { c.register_oracle(m); } catch(std::invalid_argument const&) { rejected=true; }
+        c.prove(rejected,"zero precision must not be accepted");
+    });
+    suite.add("absent precision is optional",[](Context& c){
+        OracleMetadata m; m.reference="frozen.tsv"; m.label="oracle";
+        m.row_key_column="id";
+        c.register_oracle(m);
+        c.prove(true,"absent precision is permitted");
+    });
     Capture capture;auto summary=suite.run(capture);
     bool ok=true;
     auto check=[&](bool condition,std::string const& label){if(!condition){std::cerr<<label<<'\n';ok=false;}};
-    check(summary.passed==3 && summary.failed==5 && summary.errors==3 &&
-          capture.cases.size()==11 && capture.checks==11,
+    check(summary.passed==5 && summary.failed==5 && summary.errors==3 &&
+          capture.cases.size()==13 && capture.checks==13,
           "oracle outcomes: passed="+std::to_string(summary.passed)+
           " failed="+std::to_string(summary.failed)+
           " errors="+std::to_string(summary.errors));
-    if(capture.cases.size()==11){
+    if(capture.cases.size()==13){
         const std::vector<Outcome> expect{
             Outcome::Passed,Outcome::Failed,Outcome::Failed,Outcome::Failed,
             Outcome::Failed,Outcome::Failed,Outcome::Error,Outcome::Error,
-            Outcome::Error,Outcome::Passed,Outcome::Passed};
+            Outcome::Error,Outcome::Passed,Outcome::Passed,
+            Outcome::Passed,Outcome::Passed};
         for(std::size_t i=0;i<expect.size();++i)
             check(capture.cases[i].outcome==expect[i],"wrong case outcome "+std::to_string(i));
         const char* labels[]={"missing row","duplicate row","extra row",
