@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <stdexcept>
 #include <vector>
 using namespace Ariadne::Testing;
 struct Capture : Reporter {
@@ -13,6 +14,7 @@ struct Capture : Reporter {
 int main() {
     Suite s("artifacts");
     std::filesystem::path retained, removed, reference;
+    std::filesystem::path equal_removed, invalid_removed, always_retained, conditional_removed;
     s.add("success cleanup", [&](Context& c) {
         removed=c.work_directory();
         auto f=removed/"output.bin";
@@ -41,6 +43,63 @@ int main() {
         c.expect_file_equal(c.work_directory()/"absent",c.work_directory()/"other",
                             "cannot compare");
     });
+    s.add("identical golden content", [&](Context& c) {
+        equal_removed = c.work_directory();
+        auto const actual = equal_removed / "matching-actual.bin";
+        auto const golden = equal_removed / "matching-golden.bin";
+        { std::ofstream out(actual, std::ios::binary); out << "ABC"; }
+        { std::ofstream out(golden, std::ios::binary); out << "ABC"; }
+        c.artifact(actual, "matching output", "application/octet-stream",
+                   ArtifactKind::Output, ArtifactLifetime::Temporary);
+        c.expect_file_equal(actual, golden, "identical binary output");
+    });
+    s.add("reject invalid artifact registration", [&](Context& c) {
+        invalid_removed = c.work_directory();
+        auto const valid = invalid_removed / "valid.bin";
+        auto const outside = invalid_removed.parent_path() / "not-owned-by-this-case.bin";
+        auto rejects = [&](std::filesystem::path const& target,
+                           std::string const& label, ArtifactLifetime lifetime) {
+            try {
+                c.artifact(target, label, "application/octet-stream",
+                           ArtifactKind::Output, lifetime);
+            } catch (std::invalid_argument const&) {
+                return true;
+            }
+            return false;
+        };
+        c.prove(rejects({}, "missing path", ArtifactLifetime::External),
+                "reject empty artifact path");
+        c.prove(rejects(valid, "", ArtifactLifetime::External),
+                "reject empty artifact label");
+        c.prove(rejects(outside, "outside case", ArtifactLifetime::Temporary),
+                "reject managed output outside case directory");
+        c.prove(rejects(invalid_removed, "case root", ArtifactLifetime::KeepAlways),
+                "reject managed artifact equal to case root");
+    });
+    s.add("keep always on passing case", [&](Context& c) {
+        always_retained = c.work_directory();
+        auto const output = always_retained / "keep.bin";
+        { std::ofstream out(output, std::ios::binary); out << "keep"; }
+        c.artifact(output, "preserved output", "application/octet-stream",
+                   ArtifactKind::Output, ArtifactLifetime::KeepAlways,
+                   {{"generator", "test_artifacts"}});
+        c.expect_file_exists(output, "preserved file exists");
+    });
+    s.add("keep on failure cleans passing case", [&](Context& c) {
+        conditional_removed = c.work_directory();
+        auto const output = conditional_removed / "conditional.bin";
+        { std::ofstream out(output, std::ios::binary); out << "temporary"; }
+        c.artifact(output, "conditional output", "application/octet-stream",
+                   ArtifactKind::Output, ArtifactLifetime::KeepOnFailure);
+        c.expect_file_exists(output, "output exists before cleanup");
+    });
+    s.add("missing golden and signature", [](Context& c) {
+        auto const actual = c.work_directory() / "actual.bin";
+        auto const missing = c.work_directory() / "missing-golden.bin";
+        { std::ofstream out(actual, std::ios::binary); out << "ABC"; }
+        c.expect_file_equal(actual, missing, "missing reference fails");
+        c.expect_file_signature(missing, "ABC", "missing signature fails");
+    });
     Capture r; auto sum=s.run(r);
     bool ok = true;
     auto verify = [&](bool condition, std::string const& description) {
@@ -49,7 +108,7 @@ int main() {
             ok = false;
         }
     };
-    verify(sum.passed == 1 && sum.failed == 2 && sum.inconclusive == 0 &&
+    verify(sum.passed == 5 && sum.failed == 3 && sum.inconclusive == 0 &&
            sum.skipped == 0 && sum.errors == 0,
            "unexpected suite summary: passed=" + std::to_string(sum.passed) +
            ", failed=" + std::to_string(sum.failed) +
@@ -61,8 +120,8 @@ int main() {
     verify(!std::filesystem::exists(removed), "successful case directory not removed");
     verify(std::filesystem::exists(retained), "failure artifacts not retained");
     verify(std::filesystem::exists(reference), "external golden reference disappeared");
-    verify(r.cases.size() == 3, "unexpected test case count");
-    if (r.cases.size() == 3) {
+    verify(r.cases.size() == 8, "unexpected test case count");
+    if (r.cases.size() == 8) {
         verify(r.cases[0].outcome == Outcome::Passed, "success-case outcome changed");
         verify(r.cases[1].outcome == Outcome::Failed, "golden-regression case must fail");
         verify(r.cases[2].outcome == Outcome::Failed, "missing file must be Failed, not Error");
@@ -77,7 +136,53 @@ int main() {
             verify(r.cases[1].assertions[0].detail.find("offset=2") != std::string::npos,
                    "first differing byte offset must be 2");
     }
+    verify(!equal_removed.empty() && !std::filesystem::exists(equal_removed),
+           "identical-file case directory should be cleaned");
+    verify(!invalid_removed.empty() && !std::filesystem::exists(invalid_removed),
+           "invalid-artifact case directory should be cleaned");
+    verify(!conditional_removed.empty() && !std::filesystem::exists(conditional_removed),
+           "KeepOnFailure must not retain output from a successful case");
+    verify(!always_retained.empty() && std::filesystem::exists(always_retained / "keep.bin"),
+           "KeepAlways must retain output from a successful case");
+    if (r.cases.size() == 8) {
+        verify(r.cases[3].outcome == Outcome::Passed &&
+               r.cases[3].assertions.size() == 1 &&
+               r.cases[3].assertions[0].outcome == Outcome::Passed,
+               "identical binary files must compare equal");
+        verify(r.cases[4].outcome == Outcome::Passed &&
+               r.cases[4].assertions.size() == 4 &&
+               r.cases[4].artifacts.empty(),
+               "all invalid artifact registrations must be rejected without side effects");
+        for (auto const& assertion : r.cases[4].assertions)
+            verify(assertion.outcome == Outcome::Passed,
+                   "invalid artifact registration did not reject the input");
+        verify(r.cases[5].outcome == Outcome::Passed &&
+               r.cases[5].artifacts.size() == 1 &&
+               r.cases[5].artifacts[0].metadata.size() == 1 &&
+               r.cases[5].artifacts[0].metadata[0].first == "generator" &&
+               r.cases[5].artifacts[0].metadata[0].second == "test_artifacts",
+               "KeepAlways artifact metadata or outcome changed");
+        verify(r.cases[6].outcome == Outcome::Passed &&
+               r.cases[6].artifacts.size() == 1,
+               "KeepOnFailure output must be registered on passing case");
+        verify(r.cases[7].outcome == Outcome::Failed &&
+               r.cases[7].assertions.size() == 2,
+               "missing reference and signature must fail");
+        if (r.cases[7].assertions.size() == 2) {
+            verify(r.cases[7].assertions[0].outcome == Outcome::Failed &&
+                   r.cases[7].assertions[0].detail == "cannot open reference file",
+                   "reference-file open failure diagnostic changed");
+            verify(r.cases[7].assertions[1].outcome == Outcome::Failed &&
+                   r.cases[7].assertions[1].detail == "cannot open actual file",
+                   "signature-file open failure diagnostic changed");
+        }
+    }
     std::error_code error;
+    std::filesystem::remove_all(always_retained, error);
+    if (error) {
+        verify(false, "could not clean KeepAlways fixture: " + error.message());
+        error.clear();
+    }
     std::filesystem::remove_all(retained,error);
     std::filesystem::remove(reference,error);
     return ok ? 0 : 1;

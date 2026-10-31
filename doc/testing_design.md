@@ -698,3 +698,30 @@ guard outcomes and the exception handler should be exercised by this
 change. No framework implementation or coverage object selection
 changed. Verify the exact delta against the next official coverage
 report before marking these gaps closed.
+
+## 2026-10-31 — LLVM coverage playbook: D06 managed artifact semantics
+
+The user-supplied macOS LLVM 21 archive dated 2026-10-31 13:51, after
+commit `bf9d7ba`, reports 172/172 functions (100%), 898/1001 lines
+(89.71%), and 265/370 branches (71.62%). Compared with the preceding
+895/1001 and 263/370 baseline, this is +3 lines and +2 branches.
+`testing.cpp` is 31/31 functions, 276/301 lines and 163/206 branches.
+`fixture.hpp`, `parameterized.hpp` and `state.hpp` remain fully
+covered for applicable metrics.
+
+Inspection of `coverage/branches.txt` points to real, untested D06
+behaviors in `testing.cpp`: empty artifact path and label (line 188),
+managed path not inside the owned directory (lines 195-197), successful
+byte-for-byte file equality (lines 241-245), missing golden reference
+(lines 228-231), missing file signature (lines 253-257), KeepAlways
+retention and conditional cleanup on success (lines 150-152).
+The self-test adds corresponding end-to-end cases, verifying exact
+outcomes, diagnostic strings, the absence of rejected artifact records,
+metadata preservation, filesystem cleanup and retention. It uses
+isolated per-case directories and explicitly removes retained test data.
+No production code or coverage scope is modified.
+
+The allocator's exhaustion and exceptional filesystem branches, invalid
+internal enum defaults and other practically unreachable paths are not
+targeted merely to increase branch counts. A new official LLVM report
+is required before claiming a coverage increase from this test change.
