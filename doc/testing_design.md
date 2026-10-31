@@ -1139,3 +1139,31 @@ and public headers for obsolete macro invocations; the only deliberate
 legacy-name occurrences in C++ source are the `#ifdef` checks in
 `tests/compile/positive.cpp` that assert the aliases remain unavailable.
 Full platform CI on the correction commit is still the release gate.
+
+## 2026-10-31 — D12: frozen oracle provenance and row completeness
+
+Introduced independent `OracleMetadata`, `OracleRowId`, `OracleRow`,
+`OracleIntegrity` and `validate_oracle_rows` types with no format-specific
+parser or numerical-library dependency. Each row identity consists of the
+domain-provided key, iteration and repetition. Consumers parse ALL rows and
+mark invalid source records as `parsed=false`. The validator diagnoses
+missing, duplicate, malformed, extra and out-of-order rows, and rejects
+invalid/empty or repeated-key manifests as setup errors rather than vacuous
+passes. The manifest is a frozen independent reference, never populated
+from the observed data. No implicit selection, skipped rows or RNG reseeding.
+
+`Context::register_oracle` records immutable-reference provenance as an
+external ArtifactRecord with structured optional seed, precision, row-key
+column and input attributes. It neither opens nor writes the reference;
+the caller may separately assert filesystem presence or content. The
+public `expect_oracle_rows` check reports the first problem with row
+identity and row counts, classifying invalid manifests as Error and
+observed integrity discrepancies as Failed. The canonical
+`ARIADNE_TESTING_EXPECT_ORACLE_ROWS[_CTX]` macros expose this check.
+
+The new `test_oracle.cpp` exercises exact replay, malformed/missing/
+duplicate/extra/unordered records, invalid manifests, unchanged reference
+bytes and metadata. The API deliberately leaves domain-specific TSV/CSV
+readers, independent generators, and random-stream advancement entirely
+with consumers. There are no platform-specific exclusions. CI remains
+the acceptance gate.

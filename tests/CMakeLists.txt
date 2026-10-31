@@ -149,5 +149,13 @@ ariadne_add_cmake_script_test(NAME cmake_compile_driver
  SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_compile_driver.cmake" LABELS d11)
 ariadne_add_python_unittest_test(NAME python_compile_interface
  DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/python" LABELS d11)
+add_executable(test_oracle test_oracle.cpp)
+target_link_libraries(test_oracle PRIVATE ariadne-testing testing)
+add_test(NAME test_oracle COMMAND $<TARGET_FILE:test_oracle>)
+if(WIN32)
+    set_tests_properties(test_oracle PROPERTIES
+        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:ariadne-testing>")
+endif()
+set_tests_properties(test_oracle PROPERTIES TIMEOUT 90)
 add_custom_target(tests)
-add_dependencies(tests test_testing test_parameterized test_requirements test_payload test_ranges test_artifacts test_state test_boundary_matrix test_evidence_enum test_status test_alternatives test_progress test_check_macros test_worker test_deadlines test_timing test_relations test_lifecycle)
+add_dependencies(tests test_testing test_parameterized test_requirements test_payload test_ranges test_artifacts test_state test_boundary_matrix test_evidence_enum test_status test_alternatives test_progress test_check_macros test_worker test_deadlines test_timing test_relations test_lifecycle test_oracle)

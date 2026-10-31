@@ -340,6 +340,24 @@ difference with short value excerpts. Pairwise indeterminate evidence yields
 an Inconclusive check unless another pair definitely differs or counts differ.
 Parenthesize macro arguments containing commas, such as braced sequences.
 
+## Frozen oracle provenance and complete row checks
+
+`OracleMetadata` registers a reference path, row-key column, optional
+deterministic seed and precision, plus input attributes. Call
+`context.register_oracle(metadata)` to attach this read-only provenance
+to the case; it neither reads nor generates an oracle.
+
+A domain-owned parser supplies a complete vector of `OracleRow`, including
+`parsed=false` records for malformed input. Validate against the independently
+frozen manifest using
+`ARIADNE_TESTING_EXPECT_ORACLE_ROWS_CTX(context, manifest, observed)`
+(or the corresponding fixture macro without `_CTX`). Each identity contains
+a key, iteration and repetition. Missing, duplicate, malformed, extra and
+out-of-order rows fail. An invalid or empty manifest is an Error rather than
+a vacuous pass. The comparison neither filters cases nor alters random
+stream state. Independent golden-data generation belongs outside Testing;
+do not derive expected values from the implementation under test.
+
 ## Artifact files and golden references
 
 `Context::work_directory()` creates a temporary directory isolated to the running case. Use `Context::artifact(path, label, media_type, kind, lifetime)` to record artifacts and request retention; the default lifetime is `External`, which never changes an existing file. For managed outputs choose `Temporary`, `KeepOnFailure`, or `KeepAlways`; managed paths must be within the case directory.
