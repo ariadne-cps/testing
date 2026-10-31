@@ -75,6 +75,25 @@ The output streams and delegated reporters must outlive the fan-out.
 Report generation does not change test results or enforce benchmark
 timing thresholds.
 
+## Opt-in case and implementation selection
+
+`Suite::run(reporter)` still executes every registered case.
+`Suite::add(name, body, CaseMetadata{tags, implementation})` attaches
+optional case labels; `suite_variant` also records the implementation
+name independently of the displayed case prefix. Use
+`suite.run_selected(reporter, CaseFilter{name_contains, any_tags, implementation})`
+for explicit intersection-based selection. Tags use any-of matching.
+
+The returned `SelectionResult` distinguishes
+`selected_successful()` (all *selected* checks passed) from
+`successful()` (full registered coverage **and** acceptance).
+Empty selections cannot pass. Filter notices are emitted to the reporter
+before execution; `ConsoleReporter` flushes `[SELECTION n/m]` immediately.
+Selected cases retain original registration indices for diagnostics.
+The default run path and original CTest targets are unchanged; optional
+per-case CTest discovery is deferred until a reliable executable interface
+is defined. No Logging or third-party dependency is introduced.
+
 ## Example
 
 ```cpp

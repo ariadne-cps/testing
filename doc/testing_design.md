@@ -1218,3 +1218,26 @@ suite identities. `test_reporters.cpp` checks all five outcomes,
 streaming progress during test execution, escaping, scopes, diagnostics,
 artifacts, summary counts and reporter reuse. CI verification remains
 the acceptance gate.
+
+## 2026-10-31 — D13 opt-in case filtering and coverage disclosure
+
+Added optional CaseMetadata (tags and exact implementation identity)
+and CaseFilter (name substring, any-of tags, exact implementation).
+Filters intersect, do not mutate the registered Suite, and dispatch
+only matching cases. Suite::run remains the original full-execution API.
+Suite::run_selected returns SelectionResult, making the distinction
+between selected_successful() and successful() explicit. A partial
+selection is never accepted as complete regression coverage. Empty
+selections do not pass; the selected and registered counts are observable
+in SelectionInfo and a reporter selection_started event, flushed by
+ConsoleReporter before any selected body. Original case indices remain
+stable under filtering. SuiteVariant and FixtureVariant automatically
+record implementation identities, preserving per-case fresh fixtures.
+
+The new test_selection.cpp checks exact implementation/tag/name
+selection, isolation of excluded bodies, zero-match behavior, explicit
+incomplete-coverage semantics, stable progress indices and duplicate
+tag rejection on all platforms. Optional per-case CTest discovery
+remains deferred because no test-executable listing CLI exists yet.
+No implicit sample filtering is added to D12 oracle replay and no
+third-party Logging dependency is introduced. CI is required.
