@@ -840,6 +840,8 @@ int main() {
                 case TimedBehavior::AbortRequirement:
                     ARIADNE_REQUIRE_CTX(c, false);
                     return;
+                default:
+                    throw std::logic_error("unknown timed test behavior");
             }
         });
         ++successful_continuations;
