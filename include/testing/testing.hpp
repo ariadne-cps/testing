@@ -166,7 +166,9 @@ namespace detail {
 
 template<class T>
 Evidence evidence(T const& value) {
-    if constexpr (requires { definitely(value); possibly(value); }) {
+    if constexpr (std::is_same_v<std::remove_cvref_t<T>, Evidence>) {
+        return value;
+    } else if constexpr (requires { definitely(value); possibly(value); }) {
         bool const definite = static_cast<bool>(definitely(value));
         bool const possible = static_cast<bool>(possibly(value));
         if (definite && !possible) {
