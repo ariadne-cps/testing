@@ -100,30 +100,4 @@ inline int run_suite(Suite const& suite, std::ostream& output = std::cout) {
 #include "testing/fixture.tpl.hpp"
 
 
-/** @name Transitional compatibility aliases
- *  @brief Deprecated names; use ARIADNE_TESTING_* instead.
- *  @details These aliases preserve existing consumers without changing their
- *  semantics. No alias is exported for D11 ARIADNE_TEST_CONCEPT,
- *  ARIADNE_TEST_TRAIT or ARIADNE_TEST_SAME_TYPE: legacy Macro owns them.
- *  @{ */
-#ifndef ARIADNE_ADD_TEST_TO
-#define ARIADNE_ADD_TEST_TO ARIADNE_TESTING_ADD_TEST_TO
-#endif
-#ifndef ARIADNE_ADD_TEST_NO_THROW_TO
-#define ARIADNE_ADD_TEST_NO_THROW_TO ARIADNE_TESTING_ADD_TEST_NO_THROW_TO
-#endif
-#ifndef ARIADNE_TEST_SUITE
-#define ARIADNE_TEST_SUITE ARIADNE_TESTING_SUITE
-#endif
-#ifndef ARIADNE_ADD_TEST
-#define ARIADNE_ADD_TEST ARIADNE_TESTING_ADD_TEST
-#endif
-#ifndef ARIADNE_ADD_TEST_NO_THROW
-#define ARIADNE_ADD_TEST_NO_THROW ARIADNE_TESTING_ADD_TEST_NO_THROW
-#endif
-#ifndef ARIADNE_RUN_TESTS
-#define ARIADNE_RUN_TESTS ARIADNE_TESTING_RUN_TESTS
-#endif
-/** @} */
-
 #endif // ARIADNE_TESTING_FIXTURE_HPP

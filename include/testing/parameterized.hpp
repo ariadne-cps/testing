@@ -108,18 +108,4 @@ auto fixture_variant(Suite& suite, std::string name);
 #include "testing/parameterized.tpl.hpp"
 
 
-/** @name Transitional compatibility aliases
- *  @brief Deprecated names; use ARIADNE_TESTING_* instead.
- *  @details These aliases preserve existing consumers without changing their
- *  semantics. No alias is exported for D11 ARIADNE_TEST_CONCEPT,
- *  ARIADNE_TEST_TRAIT or ARIADNE_TEST_SAME_TYPE: legacy Macro owns them.
- *  @{ */
-#ifndef ARIADNE_ADD_VARIANT_TEST
-#define ARIADNE_ADD_VARIANT_TEST ARIADNE_TESTING_ADD_VARIANT_TEST
-#endif
-#ifndef ARIADNE_ADD_VARIANT_TEST_NO_THROW
-#define ARIADNE_ADD_VARIANT_TEST_NO_THROW ARIADNE_TESTING_ADD_VARIANT_TEST_NO_THROW
-#endif
-/** @} */
-
 #endif // ARIADNE_TESTING_PARAMETERIZED_HPP
