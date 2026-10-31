@@ -1065,3 +1065,26 @@ short-circuiting, teardown failures, simultaneous body/teardown
 errors, NoThrow body classification, variant lifecycle and explicitly
 shared resources. All cases run on every supported OS/compiler. CI
 verification of the current main commit remains required.
+
+## 2026-10-31 — D11: compile-only and non-C++ orchestration
+
+Compile-time names `ARIADNE_TEST_CONCEPT`, `ARIADNE_TEST_TRAIT`
+and `ARIADNE_TEST_SAME_TYPE` are thin static_assert wrappers in
+`testing/compile.hpp`, exported from the umbrella header. They do
+not create runtime Suite cases or conceal native compiler diagnostics.
+
+`cmake/TestingOrchestration.cmake` registers compile-only OBJECT targets,
+excluded from normal builds and built only from the matching CTest test.
+Negative compilation requires both a nonzero build result and a specified
+diagnostic marker; unrelated failures do not pass. The nested CMake build
+is serialized by CTest. Independent CMake -P and optional Python unittest
+registrations retain their native execution models. Python is discovered
+only when requested and is not a production or build dependency. CTest
+labels are assigned without replacing existing executable targets.
+
+Positive compilation, an expected negative compile, and rejection of
+the wrong diagnostic were executed in an isolated CMake/Ninja/GCC harness.
+Repository-level coverage includes the concept and type-negative cases,
+the driver's missing-input contract, and an optional Python API test;
+CI remains the cross-platform release gate. The existing per-case
+discovery work remains intentionally deferred.

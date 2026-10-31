@@ -132,5 +132,22 @@ if(WIN32)
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:ariadne-testing>")
 endif()
 set_tests_properties(test_lifecycle PROPERTIES TIMEOUT 90)
+# D11 standalone compile-only, negative compilation and script checks.
+include("${PROJECT_SOURCE_DIR}/cmake/TestingOrchestration.cmake")
+ariadne_add_compile_check(NAME compile_positive
+ SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/compile/positive.cpp"
+ LINK_LIBRARIES testing LABELS d11)
+ariadne_add_compile_check(NAME compile_negative_concept
+ SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/compile/negative_concept.cpp"
+ LINK_LIBRARIES testing EXPECT_FAILURE
+ EXPECTED_DIAGNOSTIC "ARIADNE compile-time concept requirement failed" LABELS d11)
+ariadne_add_compile_check(NAME compile_negative_type
+ SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/compile/negative_type.cpp"
+ LINK_LIBRARIES testing EXPECT_FAILURE
+ EXPECTED_DIAGNOSTIC "ARIADNE compile-time type identity failed" LABELS d11)
+ariadne_add_cmake_script_test(NAME cmake_compile_driver
+ SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_compile_driver.cmake" LABELS d11)
+ariadne_add_python_unittest_test(NAME python_compile_interface
+ DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/python" LABELS d11)
 add_custom_target(tests)
 add_dependencies(tests test_testing test_parameterized test_requirements test_payload test_ranges test_artifacts test_state test_boundary_matrix test_evidence_enum test_status test_alternatives test_progress test_check_macros test_worker test_deadlines test_timing test_relations test_lifecycle)

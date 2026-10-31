@@ -294,14 +294,14 @@ works with singleton Logger state.
 
 ### D11. Compile-time checks and non-C++ test orchestration
 
-- [ ] Add a lightweight naming/convenience API for compile-time
+- [x] Add a lightweight naming/convenience API for compile-time
       concepts, traits and type equality, while keeping \`static_assert\`
       and C++ diagnostics authoritative.
-- [ ] Support CMake/CTest registration of compile-only source targets,
+- [x] Support CMake/CTest registration of compile-only source targets,
       negative compilation fixtures where justified, Python unittest
       and CMake-script tests. Do not force them into a C++ \`Suite\`
       or add a Python runtime to Testing.
-- [ ] Preserve CTest executable targets and testing labels; consider
+- [x] Preserve CTest executable targets and testing labels; consider
       optional per-case discovery and filters only after reliable
       suite identity and parameterization.
 
