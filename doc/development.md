@@ -356,6 +356,14 @@ and [README-sampling.md](https://github.com/ariadne-cps/numeric/blob/main/tests/
    registration and frozen-oracle replay tests.
 7. D13–D14 only after migration requirements and regression tests are green.
 
+**Public assertion API gate:** when a new user-facing `Context` assertion
+has a useful expression-style shorthand, ship and Doxygen-document both
+`ARIADNE_..._CTX` and fixture `ARIADNE_...` macros, plus README usage
+and self-tests for CHECK-first and single-evaluation behavior. When a
+user-facing operation should remain C++-only (e.g. ownership/lifecycle or
+structured resources), document the reason. Never introduce a macro whose
+semantics differ from its Context API just for convenience.
+
 **Release gate for each item:** GCC/Clang/MSVC Debug and Release where CI
 supports them, strict warning flags, sanitizers as applicable, no new
 production dependencies, self-tests proving unchanged rigorous semantics,

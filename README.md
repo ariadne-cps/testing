@@ -112,6 +112,43 @@ Inconclusive, and validator exceptions produce Error. Nonstandard operation
 exceptions are rejected. CHECK is announced before the operation and only
 the selected validator executes.
 
+### Domain, alternative and concurrency macros
+
+The user-facing checks also have optional, documented macro wrappers.
+Use the `_CTX` forms in free functions or `Suite::add` lambdas and the
+short forms inside a `ContextFixture`:
+
+```cpp
+ARIADNE_EXPECT_STATUS_CTX(c, solve(), [](auto const& r) { return r.status; },
+    (std::initializer_list<Status>{Status::SAT, Status::UNKNOWN}),
+    [](auto const& r) { return valid_witness_or_reason(r); });
+
+ARIADNE_EXPECT_STATUS_ONLY_CTX(c, solve(), [](auto const& r) { return r.status; },
+    (std::initializer_list<Status>{Status::UNSAT}));
+
+ARIADNE_EXPECT_ALTERNATIVE_CTX(c, compute(),
+    [](auto const& result) { return verify_result(result); },
+    [](std::exception const& error) { return permitted_exception(error); });
+
+ARIADNE_EXPECT_ATOMIC_CTX(c, progress,
+    [](int observed) { return observed >= 10; }, std::chrono::seconds(5));
+ARIADNE_EXPECT_READY_CTX(c, future, std::chrono::seconds(5));
+ARIADNE_EXPECT_EVENTUALLY_CTX(c, cv, lock,
+    [&] { return finished; }, std::chrono::seconds(5));
+```
+
+The corresponding fixture macros omit `_CTX` and the context argument:
+`ARIADNE_EXPECT_STATUS`, `ARIADNE_EXPECT_STATUS_ONLY`,
+`ARIADNE_EXPECT_ALTERNATIVE`, `ARIADNE_EXPECT_ATOMIC`,
+`ARIADNE_EXPECT_READY`, and `ARIADNE_EXPECT_EVENTUALLY`.
+Wrap initializer-list expressions containing commas in parentheses, as
+shown above; callbacks are invoked only when their selected check requires
+them, and the operation expression is evaluated once after CHECK.
+The pre-existing status-set, future/atomic object, lock, and timeout are
+regular C++ arguments and are not deferred. These macros remain thin
+wrappers for the corresponding `Context` methods; the C++ APIs are
+equally supported and preferred when explicit descriptions are needed.
+
 ## Parameterized suites and fixture factories
 
 The umbrella header also provides implementation/precision variants.

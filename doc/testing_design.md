@@ -912,3 +912,24 @@ be safely cancelled inside a C++ test process. Downstream repositories
 remain responsible for their CTest timeout policies. No compiler- or
 OS-specific skip was added. CI validation is required before marking
 this increment as fully verified.
+
+## 2026-10-31 — Public macro parity for D05 and D08
+
+An audit showed `checks.hpp` had not acquired shorthand macros for the
+public `expect_status`, `expect_alternative`, `expect_atomic`,
+`expect_ready`, and `expect_eventually` methods. This was a gap in the
+public API conventions, not a missing implementation of the underlying
+assertions. Added documented paired `ARIADNE_EXPECT_*_CTX` (explicit
+Context) and fixture `ARIADNE_EXPECT_*` wrappers, including a status-only
+overload. The expression-style operations and predicate callbacks are
+deferred through lambdas; existing status lists, synchronization objects
+and timeout values are ordinary C++ arguments. Because C preprocessor
+arguments split at commas, inline `std::initializer_list` expressions
+must be parenthesized. All semantic classifications remain within the
+original `Context` APIs. `test_check_macros.cpp` covers the explicit
+Context and fixture variants, result and exception alternatives, deferred
+evaluation and CHECK notifications, positive/negative outcomes and
+diagnostic descriptions. Added a maintenance rule to the development
+backlog requiring macro parity or an explicit rationale for C++-only APIs.
+The change does not special-case any OS or compiler. CI results on the
+published commit are required before the new wrappers are called verified.

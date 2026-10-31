@@ -141,6 +141,88 @@
 
 /** @} */
 
+/** @name Status, alternative and concurrency expectations
+ *  @brief User-facing wrappers for typed statuses, alternative completions,
+ *         future/condition waits and atomic progress.
+ *  @details The operation/predicate expression executes only after CHECK.
+ *  Named callback expressions are invoked once in the selected branch;
+ *  allowed status lists and duration arguments are C++ configuration
+ *  arguments, evaluated when calling the checker.
+ *  Parenthesize initializer lists containing commas, e.g.
+ *  (std::initializer_list<Status>{Status::Sat, Status::Unknown}).
+ *  @{ */
+ 
+/** @def ARIADNE_EXPECT_STATUS_CTX
+ *  @brief Check a deferred result's permitted typed status and postcondition.
+ *  @param operation Result-producing expression evaluated once after CHECK.
+ *  @param selector Callable extracting the typed status from the result.
+ *  @param permitted std::initializer_list of allowed statuses, parenthesized if needed.
+ *  @param verifier Callable checking the result only when status is permitted.
+ */
+#define ARIADNE_EXPECT_STATUS_CTX(context, operation, selector, permitted, verifier) \
+    (context).expect_status( \
+        [&]() -> decltype(auto) { return (operation); }, \
+        [&](auto const& ariadne_result) -> decltype(auto) { \
+            return std::invoke((selector), ariadne_result); \
+        }, (permitted), \
+        [&](auto const& ariadne_result) -> decltype(auto) { \
+            return std::invoke((verifier), ariadne_result); \
+        }, #operation " status in " #permitted)
+
+/** @def ARIADNE_EXPECT_STATUS_ONLY_CTX
+ *  @brief Check a deferred result's typed status without a postcondition.
+ */
+#define ARIADNE_EXPECT_STATUS_ONLY_CTX(context, operation, selector, permitted) \
+    (context).expect_status( \
+        [&]() -> decltype(auto) { return (operation); }, \
+        [&](auto const& ariadne_result) -> decltype(auto) { \
+            return std::invoke((selector), ariadne_result); \
+        }, (permitted), #operation " status in " #permitted)
+
+/** @def ARIADNE_EXPECT_ALTERNATIVE_CTX
+ *  @brief Verify either a completed result or a permitted exception alternative.
+ *  @details Exactly one validator runs; a throwing validator is Error, not
+ *  an accepted exception. Both callbacks return bool or mathematical evidence.
+ *  For void operations the result validator receives std::monostate.
+ */
+#define ARIADNE_EXPECT_ALTERNATIVE_CTX(context, operation, verify_result, verify_exception) \
+    (context).expect_alternative( \
+        [&]() -> decltype(auto) { return (operation); }, \
+        [&](auto const& ariadne_result) -> decltype(auto) { \
+            return std::invoke((verify_result), ariadne_result); \
+        }, \
+        [&](std::exception const& ariadne_error) -> decltype(auto) { \
+            return std::invoke((verify_exception), ariadne_error); \
+        }, #operation " result or exception")
+
+/** @def ARIADNE_EXPECT_ATOMIC_CTX
+ *  @brief Wait for a predicate on atomic state, retaining last observation.
+ *  @note The atomic object must remain alive during the bounded wait;
+ *  predicate is called by the case thread, never by the producer.
+ */
+#define ARIADNE_EXPECT_ATOMIC_CTX(context, state, predicate, timeout) \
+    (context).expect_atomic((state), \
+        [&](auto const& ariadne_observed) -> decltype(auto) { \
+            return std::invoke((predicate), ariadne_observed); \
+        }, (timeout), #state " satisfies " #predicate)
+
+/** @def ARIADNE_EXPECT_READY_CTX
+ *  @brief Check a future's readiness within a duration (without consuming it).
+ */
+#define ARIADNE_EXPECT_READY_CTX(context, future, timeout) \
+    (context).expect_ready((future), (timeout), #future " becomes ready")
+
+/** @def ARIADNE_EXPECT_EVENTUALLY_CTX
+ *  @brief Check a condition-variable predicate with a caller-owned lock.
+ *  @note The condition variable and unique_lock must outlive the check.
+ */
+#define ARIADNE_EXPECT_EVENTUALLY_CTX(context, condition, lock, predicate, timeout) \
+    (context).expect_eventually((condition), (lock), \
+        [&]() -> decltype(auto) { return std::invoke((predicate)); }, \
+        (timeout), #predicate " eventually holds")
+
+/** @} */
+
 /** @name Relational checks
  *  @brief Evaluate left/right once after the live CHECK event.
  *  @{ */
@@ -436,6 +518,48 @@
  */
 #define ARIADNE_EXPECT_INDETERMINATE(expression) \
     ARIADNE_EXPECT_INDETERMINATE_CTX(this->ctx(), expression)
+
+/** @name Fixture shorthands for domain and concurrency checks
+ *  @brief Forward to the corresponding explicit-context macros using ctx().
+ *  @note Available within ContextFixture methods; all names have _CTX peers.
+ *  @{ */
+/** @def ARIADNE_EXPECT_STATUS
+ *  @brief Fixture shorthand for allowed status with conditional postcondition.
+ */
+#define ARIADNE_EXPECT_STATUS(operation, selector, permitted, verifier) \
+    ARIADNE_EXPECT_STATUS_CTX(this->ctx(), operation, selector, permitted, verifier)
+
+/** @def ARIADNE_EXPECT_STATUS_ONLY
+ *  @brief Fixture shorthand for status-only checks.
+ */
+#define ARIADNE_EXPECT_STATUS_ONLY(operation, selector, permitted) \
+    ARIADNE_EXPECT_STATUS_ONLY_CTX(this->ctx(), operation, selector, permitted)
+
+/** @def ARIADNE_EXPECT_ALTERNATIVE
+ *  @brief Fixture shorthand for a result or exception alternative.
+ */
+#define ARIADNE_EXPECT_ALTERNATIVE(operation, verify_result, verify_exception) \
+    ARIADNE_EXPECT_ALTERNATIVE_CTX(this->ctx(), operation, verify_result, verify_exception)
+
+/** @def ARIADNE_EXPECT_ATOMIC
+ *  @brief Fixture shorthand for bounded atomic progress.
+ */
+#define ARIADNE_EXPECT_ATOMIC(state, predicate, timeout) \
+    ARIADNE_EXPECT_ATOMIC_CTX(this->ctx(), state, predicate, timeout)
+
+/** @def ARIADNE_EXPECT_READY
+ *  @brief Fixture shorthand for future readiness.
+ */
+#define ARIADNE_EXPECT_READY(future, timeout) \
+    ARIADNE_EXPECT_READY_CTX(this->ctx(), future, timeout)
+
+/** @def ARIADNE_EXPECT_EVENTUALLY
+ *  @brief Fixture shorthand for condition-variable bounded progress.
+ */
+#define ARIADNE_EXPECT_EVENTUALLY(condition, lock, predicate, timeout) \
+    ARIADNE_EXPECT_EVENTUALLY_CTX(this->ctx(), condition, lock, predicate, timeout)
+
+/** @} */
 
 /** @} */
 
