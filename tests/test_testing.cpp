@@ -710,5 +710,114 @@ int main() {
         }
     }
 
+
+    // Verify the console reporter's complete outcome vocabulary, including
+    // inconclusive proofs and explicitly skipped cases.
+    Suite all_outcomes("all outcome classifications");
+    all_outcomes.add("proved", [](Context& c) { c.prove(true, "established"); });
+    all_outcomes.add("refuted", [](Context& c) { c.prove(false, "not established"); });
+    all_outcomes.add("uncertain", [](Context& c) {
+        c.prove(TestLogic::Truth::Indeterminate, "undecidable proposition");
+    });
+    all_outcomes.add("not applicable", [](Context& c) {
+        c.skip("precondition unavailable");
+    });
+    all_outcomes.add("unexpected exception", [](Context&) {
+        throw std::runtime_error("unhandled operation");
+    });
+    std::ostringstream outcome_output;
+    ConsoleReporter outcome_reporter(outcome_output, ConsoleDetail::All);
+    auto const all_summary = all_outcomes.run(outcome_reporter);
+    if (all_summary.passed != 1 || all_summary.failed != 1 ||
+        all_summary.inconclusive != 1 || all_summary.skipped != 1 ||
+        all_summary.errors != 1)
+        return 95;
+    auto const outcome_log = outcome_output.str();
+    if (outcome_log.find("[PASS] proved") == std::string::npos ||
+        outcome_log.find("[FAIL] refuted") == std::string::npos ||
+        outcome_log.find("[INCONCLUSIVE] uncertain") == std::string::npos ||
+        outcome_log.find("[SKIP] not applicable") == std::string::npos ||
+        outcome_log.find("[ERROR] unexpected exception") == std::string::npos ||
+        outcome_log.find("detail: unhandled operation") == std::string::npos)
+        return 96;
+
+    // Diagnostics must be streamed in full in All mode. In Concise mode
+    // successful notes stay hidden, warnings remain visible, and a failed
+    // case retains its diagnostic context and measured values.
+    Suite diagnostic_modes("reporter detail modes");
+    diagnostic_modes.add("successful diagnostics", [](Context& c) {
+        c.note("preparation");
+        c.inspect("input", 42);
+        c.elapsed("initialization", std::chrono::nanoseconds(123));
+        {
+            auto scope = c.scope("stage");
+            c.warning("approximate oracle");
+            c.note("inside stage");
+        }
+        c.prove(true, "successful operation");
+    });
+    diagnostic_modes.add("failed diagnostics", [](Context& c) {
+        c.note("failure trace");
+        c.inspect("observed", 7);
+        c.elapsed("failed stage", std::chrono::nanoseconds(5));
+        c.prove(false, "expected failed check");
+    });
+    std::ostringstream all_details;
+    ConsoleReporter all_detail_reporter(all_details, ConsoleDetail::All);
+    auto const all_details_summary = diagnostic_modes.run(all_detail_reporter);
+    if (all_details_summary.passed != 1 || all_details_summary.failed != 1 ||
+        all_details_summary.errors != 0)
+        return 97;
+    auto const full_detail_log = all_details.str();
+    if (full_detail_log.find("[NOTE] preparation") == std::string::npos ||
+        full_detail_log.find("[VALUE] input = 42") == std::string::npos ||
+        full_detail_log.find("[TIME] initialization = 123 ns") == std::string::npos ||
+        full_detail_log.find("[SCOPE 1] stage") == std::string::npos ||
+        full_detail_log.find("[WARN] stage / approximate oracle") == std::string::npos ||
+        full_detail_log.find("[NOTE] stage / inside stage") == std::string::npos ||
+        full_detail_log.find("[NOTE] failure trace") == std::string::npos ||
+        full_detail_log.find("[VALUE] observed = 7") == std::string::npos ||
+        full_detail_log.find("[TIME] failed stage = 5 ns") == std::string::npos)
+        return 98;
+
+    std::ostringstream concise_details;
+    ConsoleReporter concise_detail_reporter(concise_details, ConsoleDetail::Concise);
+    auto const concise_summary = diagnostic_modes.run(concise_detail_reporter);
+    if (concise_summary.passed != 1 || concise_summary.failed != 1 ||
+        concise_summary.errors != 0)
+        return 99;
+    auto const concise_log = concise_details.str();
+    if (concise_log.find("[NOTE] preparation") != std::string::npos ||
+        concise_log.find("[VALUE] input") != std::string::npos ||
+        concise_log.find("[TIME] initialization") != std::string::npos ||
+        concise_log.find("[WARN] stage / approximate oracle") == std::string::npos ||
+        concise_log.find("diagnostic: failure trace") == std::string::npos ||
+        concise_log.find("diagnostic: observed = 7") == std::string::npos ||
+        concise_log.find("diagnostic: failed stage = 5 ns") == std::string::npos ||
+        concise_log.find("diagnostic: preparation") != std::string::npos)
+        return 100;
+
+    // Context is also usable without a Reporter. Event and assertion
+    // recording must not depend on callback notifications.
+    CaseResult manual_result;
+    Context manual_context(manual_result);
+    manual_context.note("manual context");
+    bool rejected_blank_scope = false;
+    try {
+        auto invalid = manual_context.scope("");
+        (void)invalid;
+    } catch (std::invalid_argument const&) {
+        rejected_blank_scope = true;
+    }
+    manual_context.prove(true, "manual assertion");
+    if (!rejected_blank_scope || manual_result.diagnostics.size() != 1 ||
+        manual_result.diagnostics[0].kind != DiagnosticKind::Note ||
+        manual_result.diagnostics[0].description != "manual context" ||
+        manual_result.assertions.size() != 1 ||
+        manual_result.assertions[0].check_index != 1 ||
+        manual_result.assertions[0].outcome != Outcome::Passed ||
+        manual_result.outcome != Outcome::Passed)
+        return 101;
+
     return 0;
 }
