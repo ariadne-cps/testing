@@ -30,6 +30,12 @@
 #include <iostream>
 #include <sstream>
 
+#if defined(_WIN32)
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
+
 
 namespace Ariadne::Testing {
 namespace {
@@ -163,10 +169,16 @@ std::filesystem::path const& Context::work_directory() {
         // A stack address is reused for successive test cases. Use a new
         // candidate ID for each allocation, with create_directory as the
         // atomic uniqueness check across concurrent processes.
+        // Distinct names across concurrent CTest executables.
+#if defined(_WIN32)
+        auto const process_id = std::to_string(_getpid());
+#else
+        auto const process_id = std::to_string(getpid());
+#endif
         static std::atomic<std::uint64_t> next_id{0};
         for (unsigned i=0; i<1000; ++i) {
             auto const id = next_id.fetch_add(1, std::memory_order_relaxed);
-            auto candidate = base / ("ariadne-case-" + std::to_string(id));
+            auto candidate = base / ("ariadne-case-" + process_id + "-" + std::to_string(id));
             std::error_code error;
             if (std::filesystem::create_directory(candidate, error)) {
                 _work_directory = std::move(candidate);
