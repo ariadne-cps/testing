@@ -1038,3 +1038,30 @@ tolerance versus exact equality. It checks domain relation naming, rendered
 operands and CHECK-before-operand/single-evaluation behavior. No domain
 relation is silently translated into a different one. The self-test is
 registered without platform guards. CI verification remains the release gate.
+
+## 2026-10-31 — D10: fixture lifecycle and explicit shared resources
+
+Optional `void set_up()` and `void tear_down()` hooks are now used by
+both ordinary fixture registration and variant registration. The helper
+constructs a fresh fixture for every case, runs setup before the body,
+and ensures teardown runs after completion, body exception, NoThrow
+failure or a failed fatal prerequisite. A setup exception prevents body
+and teardown while the fixture still gets destroyed. A teardown failure
+is Error. If both body and teardown fail, the resulting Error retains
+both descriptions, and any preceding assertion still contributes its
+original Failed/Inconclusive classification. NoThrow applies to the
+method body alone, not setup or teardown. Hook methods must return void.
+
+The fixture is never reused across cases because it holds Context&.
+Explicitly shared data such as solver warm-start state belongs in a
+separately owned resource passed by a variant factory into fresh
+fixtures. Testing does not decide the resource reset/synchronization
+policy; such a policy remains domain-specific. No Logging dependency
+was introduced.
+
+`test_lifecycle.cpp` covers lifecycle order and counts, fresh local
+state across cases, exception and fatal-abort teardown, setup failure
+short-circuiting, teardown failures, simultaneous body/teardown
+errors, NoThrow body classification, variant lifecycle and explicitly
+shared resources. All cases run on every supported OS/compiler. CI
+verification of the current main commit remains required.

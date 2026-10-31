@@ -275,10 +275,15 @@ checks witness validity conditionally.
       settings, singleton configuration, drawing backend, stream state).
       Preserve the original state even when the case throws.
       Generic value and getter/restorer guards implemented; domain adapters remain local.
-- [ ] Define setup/teardown and share-or-recreate fixture semantics,
+- [x] Define setup/teardown and share-or-recreate fixture semantics,
       without cross-case leakage, especially for solver warm starts.
-- [ ] Avoid mandatory Logging dependency even when Logging-dependent
-      consumers use verbosity variants.
+      Optional per-case set_up()/tear_down() hooks surround both ordinary
+      and parameterized fixture methods. Shared resources are explicit
+      factory captures; the Context-bound fixture is never shared.
+- [x] Avoid mandatory Logging dependency even when Logging-dependent
+      consumers use verbosity variants. Lifecycle hooks remain generic
+      and do not include or link Logging; global verbosity remains
+      consumer-owned state governed by RAII guards.
 
 **Evidence:** [numeric/test_float.cpp](https://github.com/ariadne-cps/numeric/blob/main/tests/test_float.cpp)
 changes rounding modes; [integration/test_bounder.cpp](https://github.com/ariadne-cps/integration/blob/main/tests/test_bounder.cpp)

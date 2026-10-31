@@ -161,6 +161,25 @@ regular C++ arguments and are not deferred. These macros remain thin
 wrappers for the corresponding `Context` methods; the C++ APIs are
 equally supported and preferred when explicit descriptions are needed.
 
+## Fixture lifecycle and shared resources
+
+Every `ARIADNE_ADD_TEST_TO` and `ARIADNE_ADD_VARIANT_TEST` case constructs
+a new fixture with its own `Context&`. Optional `void set_up()` and
+`void tear_down()` hooks run around the test body. Teardown runs after
+normal completion, an exception or a failed fatal requirement; setup
+failure prevents the test body and teardown, but the destructor still runs.
+Teardown failures are Errors; when both body and teardown fail, both
+error descriptions are retained. `FixtureCheck::NoThrow` applies only
+to the body, not the hooks. Hook return values must be void.
+
+**Never share a fixture across cases:** its Context reference is case-local.
+To preserve solver warm-start or similar reusable data, capture an
+explicitly owned `std::shared_ptr` resource in the `fixture_variant`
+factory and construct new fixtures that refer to the resource. The
+consumer owns resource synchronization, reset and state restoration.
+The lifecycle is a C++ extension of existing fixture registration, not
+a new assertion: existing registration macros already activate the hooks.
+
 ## Parameterized suites and fixture factories
 
 The umbrella header also provides implementation/precision variants.
