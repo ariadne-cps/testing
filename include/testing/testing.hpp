@@ -231,6 +231,8 @@ struct AbortCase {};
 /** @endcond */
 
 /** @brief Per-case context for assertions, diagnostics, files and fatal prerequisites. */
+class WorkerBatch;
+
 class Context {
   public:
     // Move-only guard: a nested diagnostic scope always restores its parent.
@@ -576,6 +578,7 @@ template<class Callable>
               std::source_location location = std::source_location::current());
 
   private:
+    friend class WorkerBatch;
     friend /** @brief Ordered collection of cases executed with a reporter. */
 class Suite;
     static Outcome outcome(Evidence value);

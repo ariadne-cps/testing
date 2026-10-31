@@ -174,6 +174,22 @@ a separate D05 task. Atomic waits use a bounded poll instead of the
 non-timed C++20 `atomic::wait`. This facility does not stop hung workers;
 the repository's CTest self-tests have a separate 90-second watchdog.
 
+## Cross-thread checks and deterministic reporting
+
+`WorkerBatch batch(n)` allocates fixed numbered worker slots. Run
+`batch.run(i, [](WorkerBatch::Worker& worker) { ... })` on a caller-owned
+worker thread and use `ARIADNE_WORKER_CHECK(worker, expression)` to buffer
+one evidence-preserving check without touching `Context` or `Reporter`.
+After joining **all** threads, invoke `batch.flush(context)` on the owning
+case thread. Assertions are emitted in slot order, then check order.
+Source locations and Failed/Inconclusive/Error classifications are retained.
+
+Uncaught worker exceptions and empty worker slots are Error; duplicate or
+incomplete batches cannot silently pass. Worker references must not escape
+the run callback. These checks only emit CHECK events at flush time, so
+worker hangs remain subject to the CTest watchdog; this API does not create,
+cancel, join or force-stop threads. See `testing/worker.hpp` for details.
+
 ## Structured diagnostic scopes
 
 Use `auto file = ctx().scope("oracle", "floatmp_rounding.tsv");` and

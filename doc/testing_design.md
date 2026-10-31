@@ -933,3 +933,25 @@ diagnostic descriptions. Added a maintenance rule to the development
 backlog requiring macro parity or an explicit rationale for C++-only APIs.
 The change does not special-case any OS or compiler. CI results on the
 published commit are required before the new wrappers are called verified.
+
+## 2026-10-31 — D05: synchronized worker assertions
+
+`WorkerBatch` stages worker-local checks under a mutex without exposing
+`Context` or `Reporter` to worker threads. Fixed numbered slots are run
+once each, and `batch.flush(context)` is called by the case thread after
+all worker threads have joined. This emits CHECK and assertions in slot
+index and within-slot order, independently of scheduler interleaving.
+The original worker source location, evidence outcome and error diagnostic
+are preserved. Uncaught worker exceptions become Error; zero-check workers
+also become Error rather than vacuous success. Missing, duplicate and
+prematurely flushed slots are rejected. The documented
+`ARIADNE_WORKER_CHECK` macro is the thin deferred-expression convenience
+wrapper; `Worker::check` is also available directly.
+
+`test_worker.cpp` exercises synchronized cross-thread interleaving,
+ordered replay, contradictory outcomes, error details, slot lifecycle,
+exactly-once evaluation and a following unaffected case. All worker
+CHECK events are deliberately deferred to the owner-thread flush;
+therefore this is not streaming progress from worker threads. CTest
+retains responsibility for hung/deadlocked workers. No platform-specific
+test omission has been introduced; CI verification is required.

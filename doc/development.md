@@ -167,7 +167,7 @@ manually measures durations; numeric test files annotate frozen TSV cases.
       atomic progress with an observable value and steady-clock deadline.
       Safe cross-thread check aggregation and shared absolute-deadline
       coordination remain open.
-- [ ] Define ownership, synchronization and aggregation for checks issued
+- [x] Define ownership, synchronization and aggregation for checks issued
       from worker threads; never allow concurrent writes to unprotected
       \`Context\`/Reporter state. Define reporting order and worker exception
       capture.

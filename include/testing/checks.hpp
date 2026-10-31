@@ -359,6 +359,14 @@
 
 /** @} */
 
+/** @def ARIADNE_WORKER_CHECK
+ *  @brief Evaluate one worker-local expression and stage its evidence once.
+ *  @note Does not touch Context/Reporter. CHECK is emitted by WorkerBatch::flush
+ *  after all workers have completed and been joined by the caller.
+ */
+#define ARIADNE_WORKER_CHECK(worker, expression) \
+    (worker).check([&]() -> decltype(auto) { return (expression); }, #expression)
+
 /** @name Fixture shorthand macros
  *  @brief Forward to the equivalent explicit-context macro using this->ctx().
  *  @note These require a ContextFixture-derived object.
