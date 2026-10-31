@@ -153,6 +153,9 @@ struct CaseResult {
     std::size_t case_total = 0;
     std::vector<DiagnosticEvent> diagnostics;
     std::vector<ArtifactRecord> artifacts;
+    // Labels are per-case metadata; they are not generated from case names.
+    std::vector<std::string> tags;
+    std::string implementation;
 };
 
 // Exit-gate policy only: assertion outcomes and summary counts never change.
@@ -184,11 +187,53 @@ struct Summary {
     bool successful() const { return acceptable({}); }
 };
 
+/** @brief Registration metadata used for domain-specific grouping. */
+struct CaseMetadata {
+    std::vector<std::string> tags;
+    // A variant's implementation name is its exact selection identity.
+    std::string implementation;
+};
+
+/** @brief Opt-in selection. Blank fields mean no constraint.
+ *  @details Multiple fields intersect; any_tags matches at least one tag.
+ *  This type never modifies the set of registered cases.
+ */
+struct CaseFilter {
+    std::string name_contains;
+    std::vector<std::string> any_tags;
+    std::string implementation;
+
+    bool active() const noexcept {
+        return !name_contains.empty() || !any_tags.empty() || !implementation.empty();
+    }
+};
+
+/** @brief Exact numbers and predicate applied when running a filtered suite. */
+struct SelectionInfo {
+    std::size_t registered = 0;
+    std::size_t selected = 0;
+    CaseFilter filter;
+
+    bool complete() const noexcept { return registered == selected; }
+};
+
+/** @brief Filtered results, separating selection success from full coverage. */
+struct SelectionResult {
+    Summary summary;
+    SelectionInfo selection;
+    // This is the only API that can claim a complete successful regression.
+    bool successful() const { return selection.complete() && summary.successful(); }
+    // Explicit opt-in for callers that intentionally only test a subset.
+    bool selected_successful() const { return summary.successful(); }
+};
+
 /** @brief Callback interface for live case and diagnostic reporting. */
 class Reporter {
   public:
     virtual ~Reporter() = default;
     // Optional lifecycle notifications, compatible with existing reporters.
+    /** @brief Called before any selected case, only for active filters. */
+    virtual void selection_started(SelectionInfo const&) { }
     virtual void case_started(CaseResult const&) { }
     virtual void check_started(CaseResult const&, std::size_t, std::string_view) { }
     virtual void diagnostic_emitted(CaseResult const&, DiagnosticEvent const&) { }
@@ -200,6 +245,7 @@ class Reporter {
 class ConsoleReporter final : public Reporter {
   public:
     explicit ConsoleReporter(std::ostream& output, ConsoleDetail detail = ConsoleDetail::All);
+    void selection_started(SelectionInfo const& info) override;
     void diagnostic_emitted(CaseResult const& result, DiagnosticEvent const& event) override;
     void case_started(CaseResult const& result) override;
     void check_started(CaseResult const& result, std::size_t index,
@@ -706,12 +752,22 @@ class Suite;
 class Suite {
   public:
     explicit Suite(std::string name) : _name(std::move(name)) { }
-    void add(std::string name, std::function<void(Context&)> test);
+    void add(std::string name, std::function<void(Context&)> test,
+             CaseMetadata metadata = {});
+    /** @brief Run every registered case, retaining the historical result API. */
     Summary run(Reporter& reporter) const;
+    /** @brief Run a selected subset without misrepresenting suite coverage.
+     *  @details A partial selection leaves SelectionResult::successful()
+     *  false even when every selected case passes. No cases match is a
+     *  detectable empty run; selection is reported before the first case.
+     *  A filtered case retains its original registration index.
+     */
+    SelectionResult run_selected(Reporter& reporter, CaseFilter const& filter) const;
   private:
     struct TestCase {
         std::string name;
         std::function<void(Context&)> run;
+        CaseMetadata metadata;
     };
     std::string _name;
     std::vector<TestCase> _tests;

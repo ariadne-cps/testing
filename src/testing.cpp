@@ -101,6 +101,23 @@ void ConsoleReporter::diagnostic_emitted(CaseResult const& result, DiagnosticEve
     _output << '\n' << std::flush;
 }
 
+void ConsoleReporter::selection_started(SelectionInfo const& info) {
+    _output << "[SELECTION " << info.selected << '/' << info.registered << "] ";
+    if (!info.filter.name_contains.empty())
+        _output << "name_contains=" << info.filter.name_contains << ' ';
+    if (!info.filter.implementation.empty())
+        _output << "implementation=" << info.filter.implementation << ' ';
+    if (!info.filter.any_tags.empty()) {
+        _output << "any_tags=";
+        for (std::size_t i = 0; i < info.filter.any_tags.size(); ++i) {
+            if (i) _output << ',';
+            _output << info.filter.any_tags[i];
+        }
+        _output << ' ';
+    }
+    _output << (info.complete() ? "complete" : "partial") << '\n' << std::flush;
+}
+
 void ConsoleReporter::case_started(CaseResult const& result) {
     _output << "[RUN " << result.case_index << '/' << result.case_total << "] "
             << result.suite_name << " / " << result.name << '\n' << std::flush;
@@ -582,20 +599,60 @@ void Context::skip(std::string_view reason, std::source_location location) {
     record(Outcome::Skipped, reason, {}, {}, {}, location, index);
 }
 
-void Suite::add(std::string name, std::function<void(Context&)> test) {
-    if (name.empty() || !test) throw std::invalid_argument("Test name and body must be nonempty");
-    _tests.push_back({std::move(name),std::move(test)});
+void Suite::add(std::string name, std::function<void(Context&)> test,
+                CaseMetadata metadata) {
+    if (name.empty() || !test)
+        throw std::invalid_argument("Test name and body must be nonempty");
+    for (std::size_t i = 0; i < metadata.tags.size(); ++i) {
+        if (metadata.tags[i].empty())
+            throw std::invalid_argument("Case tag must be nonempty");
+        for (std::size_t j = 0; j < i; ++j)
+            if (metadata.tags[j] == metadata.tags[i])
+                throw std::invalid_argument("Case tags must be unique");
+    }
+    _tests.push_back({std::move(name), std::move(test), std::move(metadata)});
 }
 
 Summary Suite::run(Reporter& reporter) const {
-    Summary summary;
+    return run_selected(reporter, {}).summary;
+}
+
+SelectionResult Suite::run_selected(Reporter& reporter, CaseFilter const& filter) const {
+    for (auto const& tag : filter.any_tags)
+        if (tag.empty()) throw std::invalid_argument("Filter tags must be nonempty");
+    SelectionResult output;
+    output.selection.registered = _tests.size();
+    output.selection.filter = filter;
+
+    auto matches = [&](TestCase const& test) {
+        if (!filter.name_contains.empty() &&
+            test.name.find(filter.name_contains) == std::string::npos) return false;
+        if (!filter.implementation.empty() &&
+            test.metadata.implementation != filter.implementation) return false;
+        if (!filter.any_tags.empty()) {
+            bool matched = false;
+            for (auto const& tag : filter.any_tags)
+                if (std::find(test.metadata.tags.begin(), test.metadata.tags.end(), tag)
+                    != test.metadata.tags.end()) matched = true;
+            if (!matched) return false;
+        }
+        return true;
+    };
+    for (auto const& test : _tests)
+        if (matches(test)) ++output.selection.selected;
+
+    // Filter notices are streamed before any selected body, never after.
+    if (filter.active()) reporter.selection_started(output.selection);
     for (std::size_t i = 0; i < _tests.size(); ++i) {
         auto const& test = _tests[i];
+        if (!matches(test)) continue;
         CaseResult result;
         result.name = test.name;
         result.suite_name = _name;
         result.case_index = i + 1;
         result.case_total = _tests.size();
+        result.tags = test.metadata.tags;
+        result.implementation = test.metadata.implementation;
         Context context(result, &reporter);
         reporter.case_started(result);
         auto const started = std::chrono::steady_clock::now();
@@ -616,20 +673,20 @@ Summary Suite::run(Reporter& reporter) const {
                            std::source_location::current(), 0);
         }
         switch (result.outcome) {
-            case Outcome::Passed: ++summary.passed; break;
-            case Outcome::Failed: ++summary.failed; break;
-            case Outcome::Inconclusive: ++summary.inconclusive; break;
-            case Outcome::Skipped: ++summary.skipped; break;
-            case Outcome::Error: ++summary.errors; break;
+            case Outcome::Passed: ++output.summary.passed; break;
+            case Outcome::Failed: ++output.summary.failed; break;
+            case Outcome::Inconclusive: ++output.summary.inconclusive; break;
+            case Outcome::Skipped: ++output.summary.skipped; break;
+            case Outcome::Error: ++output.summary.errors; break;
             default:
-                ++summary.errors;
+                ++output.summary.errors;
                 result.outcome = Outcome::Error;
                 break;
         }
         reporter.case_finished(result);
     }
-    reporter.suite_finished(_name, summary);
-    return summary;
+    reporter.suite_finished(_name, output.summary);
+    return output;
 }
 
 } // namespace Ariadne::Testing

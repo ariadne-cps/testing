@@ -37,6 +37,7 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace Ariadne::Testing {
 
@@ -51,11 +52,13 @@ class SuiteVariant {
     }
 
     template<class Callable>
-    void add(std::string name, Callable&& body) const;
+    void add(std::string name, Callable&& body,
+             std::vector<std::string> tags = {}) const;
 
     // One generic callable can be registered for multiple compile-time tags.
     template<class Tag, class Callable>
-    void add_typed(std::string name, Callable&& body) const;
+    void add_typed(std::string name, Callable&& body,
+                   std::vector<std::string> tags = {}) const;
 
   private:
     Suite* _suite;
@@ -78,7 +81,8 @@ class FixtureVariant {
 
     template<class Method>
     void add(std::string method_name, Method&& method,
-             FixtureCheck check = FixtureCheck::Direct) const;
+             FixtureCheck check = FixtureCheck::Direct,
+             std::vector<std::string> tags = {}) const;
 
   private:
     SuiteVariant _variant;

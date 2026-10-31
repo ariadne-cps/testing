@@ -33,25 +33,27 @@
 namespace Ariadne::Testing {
 
     template<class Callable>
-    void SuiteVariant::add(std::string name, Callable&& body) const {
+    void SuiteVariant::add(std::string name, Callable&& body,
+                           std::vector<std::string> tags) const {
         if (name.empty()) throw std::invalid_argument("Variant case name must be nonempty");
         static_assert(std::is_invocable_r_v<void, std::decay_t<Callable>&, Context&>,
                       "Variant case must be callable with Context&");
         auto action = std::make_shared<std::decay_t<Callable>>(std::forward<Callable>(body));
         _suite->add(_name + " / " + name, [action](Context& context) {
             std::invoke(*action, context);
-        });
+        }, CaseMetadata{std::move(tags), _name});
     }
 
     template<class Tag, class Callable>
-    void SuiteVariant::add_typed(std::string name, Callable&& body) const {
+    void SuiteVariant::add_typed(std::string name, Callable&& body,
+                                 std::vector<std::string> tags) const {
         static_assert(std::is_invocable_r_v<void, std::decay_t<Callable>&,
                                             Context&, std::type_identity<Tag>>,
                       "Typed case must accept Context& and std::type_identity<Tag>");
         auto action = std::make_shared<std::decay_t<Callable>>(std::forward<Callable>(body));
         add(std::move(name), [action](Context& context) {
             std::invoke(*action, context, std::type_identity<Tag>{});
-        });
+        }, std::move(tags));
     }
 
 template<class Fixture, class Factory>
@@ -67,7 +69,7 @@ FixtureVariant<Fixture, Factory>::FixtureVariant(Suite& suite, std::string name,
 template<class Fixture, class Factory>
 template<class Method>
     void FixtureVariant<Fixture, Factory>::add(std::string method_name, Method&& method,
-             FixtureCheck check) const {
+             FixtureCheck check, std::vector<std::string> tags) const {
         static_assert(std::is_invocable_v<std::decay_t<Method>&, Fixture&>,
                       "Test method must accept Fixture&");
         static_assert(std::is_void_v<std::invoke_result_t<std::decay_t<Method>&, Fixture&>>,
@@ -87,7 +89,7 @@ template<class Method>
                     std::invoke(*operation, instance);
                 }
             });
-        });
+        }, std::move(tags));
     }
 
 template<class Fixture, class Factory>
