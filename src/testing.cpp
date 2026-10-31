@@ -324,6 +324,7 @@ std::string OracleReplayPlan::description() const {
     auto summary = "replay_selected=" + std::to_string(indices.size()) +
                    "; manifest_total=" + std::to_string(total_rows);
     if (!valid) return summary + "; invalid selection: " + reason;
+    if (!structurally_valid()) return summary + "; invalid replay plan";
     if (!complete) return summary + "; partial replay, full coverage not established";
     return summary + "; full replay";
 }
@@ -332,7 +333,14 @@ void Context::expect_oracle_replay(OracleReplayPlan const& plan,
                                    std::string_view description,
                                    std::source_location location) {
     auto const index = begin_check(description);
-    auto const result = !plan.valid ? Outcome::Error :
+    record_oracle_replay(plan, description, location, index);
+}
+
+void Context::record_oracle_replay(OracleReplayPlan const& plan,
+                                   std::string_view description,
+                                   std::source_location location,
+                                   std::size_t index) {
+    auto const result = !plan.structurally_valid() ? Outcome::Error :
                         plan.complete ? Outcome::Passed : Outcome::Inconclusive;
     record(result, description, std::to_string(plan.indices.size()),
            std::to_string(plan.total_rows), plan.description(), location, index);
@@ -365,6 +373,14 @@ void Context::expect_oracle_rows(std::span<OracleRow const> manifest,
                                  std::string_view description,
                                  std::source_location location) {
     auto const index = begin_check(description);
+    record_oracle_rows(manifest, observed, description, location, index);
+}
+
+void Context::record_oracle_rows(std::span<OracleRow const> manifest,
+                                 std::span<OracleRow const> observed,
+                                 std::string_view description,
+                                 std::source_location location,
+                                 std::size_t index) {
     auto const report = validate_oracle_rows(manifest, observed);
     record(report.valid() ? Outcome::Passed :
            report.invalid_manifest() ? Outcome::Error : Outcome::Failed,

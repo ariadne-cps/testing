@@ -316,6 +316,14 @@ class Context {
                             std::string_view description,
                             std::source_location location = std::source_location::current());
 
+    /** @brief Evaluate both oracle row containers once, left-to-right, AFTER CHECK.
+     *  @note Prefer this deferred API for expression-style public macros.
+     */
+    template<class ManifestFn, class ObservedFn>
+    void check_oracle_rows(ManifestFn&& manifest_fn, ObservedFn&& observed_fn,
+                           std::string_view description,
+                           std::source_location location = std::source_location::current());
+
     /** @brief Assert full-replay coverage or identify an explicit subset.
      *  @details A valid partial plan produces Inconclusive (default blocking),
      *  not Passed. Malformed selections produce Error. The selector is pure
@@ -324,6 +332,13 @@ class Context {
     void expect_oracle_replay(OracleReplayPlan const& plan,
                               std::string_view description,
                               std::source_location location = std::source_location::current());
+
+    /** @brief Defer a replay plan expression until after the CHECK notification.
+     *  @note A partial replay is Inconclusive and malformed plans are Error.
+     */
+    template<class PlanFn>
+    void check_oracle_replay(PlanFn&& plan_fn, std::string_view description,
+                             std::source_location location = std::source_location::current());
 
     // File expectations issue CHECK before inspecting the filesystem.
     /** @brief Check whether a path is an accessible regular file. */
@@ -669,6 +684,13 @@ class Suite;
     void emit(DiagnosticKind kind, std::string description, std::string value,
               std::chrono::nanoseconds duration, std::source_location location);
     std::size_t begin_check(std::string_view description);
+    void record_oracle_rows(std::span<OracleRow const> manifest,
+                            std::span<OracleRow const> observed,
+                            std::string_view description,
+                            std::source_location location, std::size_t index);
+    void record_oracle_replay(OracleReplayPlan const& plan,
+                              std::string_view description,
+                              std::source_location location, std::size_t index);
     void record(Outcome outcome, std::string_view description, std::string actual,
                 std::string expected, std::string detail, std::source_location location,
                 std::size_t index,

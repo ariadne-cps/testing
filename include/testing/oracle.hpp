@@ -110,6 +110,27 @@ struct OracleReplayPlan {
     bool complete = false;
     std::string reason;
 
+    /** @brief Reject fabricated, empty, repeated, unordered or incomplete plans. */
+    bool structurally_valid() const noexcept {
+        if (!valid || total_rows == 0 || indices.empty() ||
+            indices.size() > total_rows) return false;
+        for (std::size_t i = 0; i < indices.size(); ++i)
+            if (indices[i] >= total_rows ||
+                (i != 0 && indices[i - 1] >= indices[i])) return false;
+        return complete == (indices.size() == total_rows);
+    }
+
+    /** @brief Check membership without reading or advancing a random stream.
+     *  @note If the consumer uses one shared RNG, generate all rows in the
+     *  original order BEFORE deciding whether to assert a selected row.
+     */
+    bool includes(std::size_t index) const noexcept {
+        if (!structurally_valid()) return false;
+        for (auto const selected : indices)
+            if (selected == index) return true;
+        return false;
+    }
+
     std::string description() const;
 };
 

@@ -927,6 +927,26 @@ void Context::expect_atomic_until(std::atomic<T> const& state, Predicate&& predi
                Detail::budget_at(started, deadline), true));
 }
 
+template<class ManifestFn, class ObservedFn>
+void Context::check_oracle_rows(ManifestFn&& manifest_fn, ObservedFn&& observed_fn,
+                                std::string_view description,
+                                std::source_location location) {
+    auto const index = begin_check(description);
+    auto const& manifest = std::invoke(std::forward<ManifestFn>(manifest_fn));
+    auto const& observed = std::invoke(std::forward<ObservedFn>(observed_fn));
+    record_oracle_rows(std::span<OracleRow const>{manifest},
+                       std::span<OracleRow const>{observed},
+                       description, location, index);
+}
+
+template<class PlanFn>
+void Context::check_oracle_replay(PlanFn&& plan_fn, std::string_view description,
+                                  std::source_location location) {
+    auto const index = begin_check(description);
+    auto const& plan = std::invoke(std::forward<PlanFn>(plan_fn));
+    record_oracle_replay(plan, description, location, index);
+}
+
 template<class Callable>
     void Context::check(Callable&& predicate, std::string_view description,
                std::source_location location){

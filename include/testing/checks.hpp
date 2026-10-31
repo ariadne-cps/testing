@@ -264,14 +264,19 @@
  *  This is a complete integrity check, not an expected-value generator.
  */
 #define ARIADNE_TESTING_EXPECT_ORACLE_ROWS_CTX(context, manifest, observed) \
-    (context).expect_oracle_rows((manifest), (observed), #observed " matches " #manifest)
+    (context).check_oracle_rows( \
+        [&]() -> decltype(auto) { return (manifest); }, \
+        [&]() -> decltype(auto) { return (observed); }, \
+        #observed " matches " #manifest)
 
 /** @def ARIADNE_TESTING_EXPECT_ORACLE_REPLAY_CTX
  *  @brief Report complete vs explicitly selected frozen-oracle replay.
  *  @details A partial selection remains Inconclusive, not a vacuous pass.
  */
 #define ARIADNE_TESTING_EXPECT_ORACLE_REPLAY_CTX(context, plan) \
-    (context).expect_oracle_replay((plan), #plan " covers the complete oracle")
+    (context).check_oracle_replay( \
+        [&]() -> decltype(auto) { return (plan); }, \
+        #plan " covers the complete oracle")
 
 /** @name Relational checks
  *  @brief Evaluate left/right once after the live CHECK event.
