@@ -469,3 +469,15 @@ does not filter datasets or apply hidden replay thresholds.
 ## Restoring mutable test state
 
 Use `auto guard = Ariadne::Testing::preserve_value(setting);` for copyable state with non-throwing assignment. For global or domain-specific state, use `preserve_state(getter, restorer)`: the getter snapshots the original value once, and the `noexcept` restorer runs at scope exit, including exception unwinding or a failed fatal prerequisite. Guards are non-copyable and non-movable, and nested guards restore in reverse order. No global state is modified automatically.
+
+## Reporting explicit case selection
+
+JSON and JUnit also record opt-in case selection. JSON serializes the
+registered and selected counts, filter criteria, exact case tags and
+implementation, and separately reports whether only the selected cases
+passed or the **entire** registered suite was covered. JUnit emits suite
+properties for the same selection metadata and, for an incomplete
+selection, a synthetic `__incomplete_selection__` failure with
+`type="incomplete_coverage"`. This synthetic row is a reporting gate,
+not an executed C++ case and does not change `Suite::run_selected()`
+outcomes. A completed full run never receives this synthetic row.

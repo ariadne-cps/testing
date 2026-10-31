@@ -344,9 +344,11 @@ and [README-sampling.md](https://github.com/ariadne-cps/numeric/blob/main/tests/
       and streaming RUN/CHECK flushes authoritative for hang diagnosis.
       Dependency-free JsonReporter, JUnitReporter and ReporterFanout
       preserve classifications and live reporter events.
-- [ ] Add case filters/tags, per-implementation selection and optional
-      per-case CTest listing. Avoid requiring Logging or third-party
-      testing frameworks.
+- [x] Add case filters/tags and per-implementation selection without
+      requiring Logging or third-party testing frameworks. Selection
+      counts and partial coverage are preserved in JSON/JUnit output.
+      Optional per-case CTest listing is deferred (the default CTest
+      targets continue to execute their entire suites).
 - [ ] Include a benchmark/elapsed-time note facility without inventing
       timing thresholds or claiming performance guarantees.
 

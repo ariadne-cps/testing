@@ -1324,3 +1324,18 @@ summary-size limits, independent of the internal Suite cases.
 `fail-on-error: false` and `fail-on-empty: true` are unchanged;
 CTest remains the execution gate. This is a presentation-only change,
 subject to CI verification.
+
+## 2026-10-31 — Structured reports preserve selection coverage
+
+Suite filtering was already correctly represented by
+`SelectionResult`, but previously ReporterFanout did not forward
+`selection_started` and the structured reporters had no selection
+metadata. Consequently, a partial run could serialize only successful
+selected cases and appear fully green. The fan-out now forwards this
+event, JSON serializes registered/selected counts and filters, and
+JUnit attaches suite properties plus a synthetic
+`__incomplete_selection__` failure for an incomplete run. The
+synthetic failure does not alter the actual Suite summary or any
+CaseResult. Reused reporters clear selection state at suite finish.
+`test_reporters.cpp` checks complete, partial and empty selections.
+This behavior must be validated by CI before acceptance.

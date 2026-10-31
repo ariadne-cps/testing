@@ -80,5 +80,44 @@ int main() {
           json.str().find("\"cases\":[]")!=std::string::npos &&
           junit.str().find("<testsuite name=\"empty suite\" tests=\"0\"")!=std::string::npos,
           "reporter reuse leaked cases");
+    // A filtered execution must not be misreported as full regression.
+    std::ostringstream selected_json,selected_xml;
+    JsonReporter sj(selected_json);
+    JUnitReporter sx(selected_xml);
+    ReporterFanout selected_reporting{std::ref(sj),std::ref(sx)};
+    Suite filtered("filtered report");
+    filtered.add("first",[](Context& c){c.prove(true,"passed");},
+                 CaseMetadata{{"fast"},"A"});
+    filtered.add("second",[](Context& c){c.prove(true,"passed");},
+                 CaseMetadata{{"slow"},"B"});
+    auto const selection=filtered.run_selected(selected_reporting,CaseFilter{"",{"fast"},"A"});
+    check(selection.selected_successful() && !selection.successful(),
+          "partial selection must not be complete success");
+    check(selected_json.str().find("\"selected\":1")!=std::string::npos &&
+          selected_json.str().find("\"registered\":2")!=std::string::npos &&
+          selected_json.str().find("\"complete\":false")!=std::string::npos &&
+          selected_json.str().find("\"full_suite_successful\":false")!=std::string::npos &&
+          selected_json.str().find("\"implementation\":\"A\"")!=std::string::npos &&
+          selected_json.str().find("\"tags\":[\"fast\"]")!=std::string::npos,
+          "JSON silently loses selection coverage or case metadata");
+    check(selected_xml.str().find("tests=\"2\" failures=\"1\"")!=std::string::npos &&
+          selected_xml.str().find("type=\"incomplete_coverage\"")!=std::string::npos &&
+          selected_xml.str().find("selection.selected")!=std::string::npos &&
+          selected_xml.str().find("selection.registered")!=std::string::npos &&
+          selected_xml.str().find("tag.0")!=std::string::npos,
+          "JUnit must report partial coverage as a synthetic failure");
+    Suite everything("full report");
+    everything.add("only",[](Context& c){c.prove(true,"passed");});
+    auto const full=everything.run(selected_reporting);
+    check(full.successful() &&
+          selected_json.str().find("\"complete\":true")!=std::string::npos &&
+          selected_xml.str().find("<testsuite name=\"full report\" tests=\"1\" failures=\"0\"")!=std::string::npos,
+          "reused reporters must clear selection and synthetic failure");
+    Suite no_match("empty selection");
+    no_match.add("only",[](Context& c){c.prove(true,"not run");});
+    auto const empty=no_match.run_selected(selected_reporting,CaseFilter{"missing",{},""});
+    check(!empty.successful() &&
+          selected_xml.str().find("<testsuite name=\"empty selection\" tests=\"1\" failures=\"1\"")!=std::string::npos,
+          "empty partial selection must not produce a green JUnit report");
     return ok?0:1;
 }
