@@ -401,10 +401,9 @@ migration or edit to those repos.
 
 Every new public testing macro is named `ARIADNE_TESTING_*`. This applies
 to expression checks, `_CTX` counterparts, fixture and suite registration,
-worker staging, and compile-time assertions. Deprecated nonconflicting
-pre-namespace spellings may remain as temporary compatibility aliases;
-do not introduce legacy `ARIADNE_TEST_*` aliases, since those are owned by
-the older Ariadne Macro testing API and can have different semantics.
+worker staging, and compile-time assertions. No compatibility aliases
+are exported. The legacy `ARIADNE_TEST_*` namespace belongs to the
+older Ariadne Macro testing API and may have different semantics.
 For compile-time assertions use `ARIADNE_TESTING_COMPILE_CONCEPT`,
 `ARIADNE_TESTING_COMPILE_TRAIT` and
 `ARIADNE_TESTING_COMPILE_SAME_TYPE`. New regressions and examples use

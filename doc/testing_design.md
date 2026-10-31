@@ -1103,3 +1103,19 @@ The canonical compile-time macros have explicit `COMPILE_` in their names.
 Downstream users should migrate source sites rather than relying indefinitely
 on compatibility aliases. All test sources were migrated to canonical
 spellings; CI is required to verify this release.
+
+## 2026-10-31 — Remove all compatibility aliases
+
+Removed the 79 transitional macro aliases from `checks.hpp`, `fixture.hpp`
+and `parameterized.hpp`. Every public macro definition now begins with
+`ARIADNE_TESTING_`; the D11 compile-time checks already had no aliases.
+The old spellings are deliberately no longer exported because no stable
+external consumers require compatibility. The `utility` consumer will be
+migrated separately rather than introducing ambiguity into the new API.
+The compile-only positive test now rejects each of the former names with
+preprocessor guards, preventing reintroduction. No changes to assertion
+or test lifecycle semantics, or any platform/compiler exclusion.
+CI verification of the new commit is required.
+
+The immediately preceding journal entry describes the earlier transitional
+state. The alias removal in this entry supersedes that temporary policy.

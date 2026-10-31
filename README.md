@@ -71,14 +71,14 @@ int main() {
 
 Every public macro of the new framework begins with `ARIADNE_TESTING_`,
 including assertions, fixture registration, worker checks and compile-time
-requirements. Existing nonconflicting `ARIADNE_EXPECT_*`, `ARIADNE_PROVE`,
-`ARIADNE_REQUIRE` and registration names are temporarily accepted as
-deprecated compatibility aliases; migrate consumers to the canonical spelling.
+requirements. **No compatibility aliases are exported:** only the canonical
+`ARIADNE_TESTING_*` macros are defined. Existing consumers (including
+`utility`) must update their uses when migrating to this framework.
 
 Compile-time checks are named `ARIADNE_TESTING_COMPILE_CONCEPT`,
 `ARIADNE_TESTING_COMPILE_TRAIT` and
 `ARIADNE_TESTING_COMPILE_SAME_TYPE`. The previous D11 spellings
-`ARIADNE_TEST_CONCEPT` and `ARIADNE_TEST_SAME_TYPE` are **not** aliased:
+`ARIADNE_TEST_CONCEPT` and `ARIADNE_TEST_SAME_TYPE` are **not** exported:
 they already exist in the legacy `macro/testing.hpp` and have different,
 runtime semantics. Do not include both testing frameworks in one
 translation unit unless the legacy macros have been deliberately isolated.
