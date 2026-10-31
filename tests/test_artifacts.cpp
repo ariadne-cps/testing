@@ -7,6 +7,9 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#if defined(_WIN32)
+#include <cstdlib>
+#endif
 using namespace Ariadne::Testing;
 struct Capture : Reporter {
     std::vector<CaseResult> cases;
@@ -272,19 +275,36 @@ int main() {
     }
     std::filesystem::remove_all(retained,error);
     std::filesystem::remove(reference,error);
-#if !defined(_WIN32)
-    // Managed artifacts must not escape through an in-tree symbolic link.
+    // Managed artifacts must not escape through an in-tree link.
     // The canonical target, not the lexical prefix, determines ownership.
     std::filesystem::path external_directory;
     Suite managed_symlinks("managed artifact canonical containment");
-    managed_symlinks.add("reject symlink escape, accept nested path", [&](Context& c) {
+    managed_symlinks.add("reject link escape, accept nested path", [&](Context& c) {
         auto const root = c.work_directory();
         external_directory = std::filesystem::temp_directory_path() /
                              ("ariadne-external-" + root.filename().string());
         if (!std::filesystem::create_directory(external_directory))
             throw std::runtime_error("cannot reserve an external fixture directory");
-        std::filesystem::create_directory_symlink(
-            external_directory, root / "external-link");
+        auto const link = root / "external-link";
+        // A Windows directory junction exercises reparse-point traversal
+        // without requiring the symlink privilege on CI runners.
+        struct LinkCleanup {
+            std::filesystem::path path;
+            ~LinkCleanup() {
+                std::error_code ignored;
+                (void)std::filesystem::remove(path, ignored);
+            }
+        } link_cleanup{link};
+#if defined(_WIN32)
+        auto const command = L"mklink /J \"" + link.wstring() +
+                             L"\" \"" + external_directory.wstring() + L"\" >NUL";
+        if (_wsystem(command.c_str()) != 0)
+            throw std::runtime_error("cannot create Windows junction fixture");
+#else
+        std::filesystem::create_directory_symlink(external_directory, link);
+#endif
+        if (!std::filesystem::equivalent(link, external_directory))
+            throw std::runtime_error("filesystem link fixture points to wrong target");
         bool rejected = false;
         try {
             c.artifact(root / "external-link" / "escaped.bin", "outside",
@@ -319,7 +339,6 @@ int main() {
     std::error_code symlink_cleanup_error;
     std::filesystem::remove_all(external_directory, symlink_cleanup_error);
     verify(!symlink_cleanup_error, "external fixture cleanup failed");
-#endif
 
     return ok ? 0 : 1;
 }

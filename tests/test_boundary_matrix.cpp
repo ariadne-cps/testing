@@ -346,25 +346,33 @@ int main() {
         }
     }
 
-#if !defined(_WIN32)
+    // The filesystem must distinguish invalid paths from ordinary missing files.
+    Suite fs_suite("filesystem error boundaries");
+#if defined(_WIN32)
+    // '*' is an invalid Win32 path component: status must report an OS error.
+    // Unlike a symlink loop, this fixture needs no extra Windows privilege.
+    fs_suite.add("invalid Win32 filename", [](Context& c) {
+        c.expect_file_exists(c.work_directory() / "invalid*name",
+                             "invalid Win32 path");
+    });
+#else
     // A circular symbolic link is a real filesystem error (ELOOP), not
     // an ordinary missing file. Keep it within a Context-owned directory.
-    Suite fs_suite("filesystem error boundaries");
     fs_suite.add("symlink loop", [](Context& c) {
         auto const loop = c.work_directory() / "self-loop";
         std::filesystem::create_symlink(loop.filename(), loop);
         c.expect_file_exists(loop, "cyclic symbolic link");
     });
+#endif
     Capture fs_report;
     auto const fs_summary = fs_suite.run(fs_report);
     ok &= verify(fs_summary.errors == 1 && fs_summary.failed == 0 &&
-                 fs_report.cases.size() == 1, "filesystem: ELOOP should be Error");
+                 fs_report.cases.size() == 1, "filesystem error must be Error");
     if (fs_report.cases.size() == 1)
         ok &= verify(fs_report.cases[0].assertions.size() == 1 &&
                      fs_report.cases[0].assertions[0].outcome == Outcome::Error &&
                      !fs_report.cases[0].assertions[0].detail.empty(),
                      "filesystem: missing underlying error detail");
-#endif
 
     return ok ? 0 : 1;
 }

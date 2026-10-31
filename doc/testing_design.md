@@ -806,3 +806,17 @@ applicable metrics. `testing.hpp` remains at 56/56 functions,
 work should focus on behaviorally meaningful remaining gaps in
 `testing.hpp` and `testing.cpp`; do not introduce artificial scenarios
 or weaken expectations merely to inflate the metrics.
+
+## 2026-10-31 — Windows filesystem boundary self-tests
+
+Previously, the managed-artifact escape and filesystem-error self-tests were
+entirely excluded on `_WIN32`, leaving Windows CI without either check.
+The artifact fixture now uses a directory junction on Windows (via `mklink /J`),
+which does not require the symbolic-link privilege, and a symbolic directory
+link on POSIX. Both must resolve to the external fixture, reject a managed
+artifact through the link, and accept an ordinary nested output. An exit guard
+removes the link before the case directory is cleaned, even on exceptions.
+The filesystem-error fixture continues testing an ELOOP link on POSIX and
+uses an invalid filename containing `*` on Windows. Both paths must produce
+an `Error` assertion with a nonempty diagnostic instead of being classified
+as an absent regular file. The Windows-specific cases require CI verification.
