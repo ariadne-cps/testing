@@ -566,6 +566,39 @@ template<class Lock, class Predicate, class Rep, class Period>
                        std::string_view description,
                        std::source_location location = std::source_location::current());
 
+    // Absolute deadlines can be reused across sequential waits without
+    // granting a fresh full timeout to every operation. An expired deadline
+    // still permits an immediate observation of an already-satisfied state.
+    /** @brief Check future readiness against a shared steady-clock deadline.
+     *  @note A deferred future fails; the future is never consumed.
+     */
+    template<class Future>
+    void expect_ready_until(Future& future,
+                            std::chrono::steady_clock::time_point deadline,
+                            std::string_view description,
+                            std::source_location location = std::source_location::current());
+
+    /** @brief Wait for a condition predicate until an absolute deadline.
+     *  @note The caller owns and locks the synchronization state.
+     */
+    template<class Lock, class Predicate>
+    void expect_eventually_until(std::condition_variable_any& condition, Lock& lock,
+                                 Predicate&& predicate,
+                                 std::chrono::steady_clock::time_point deadline,
+                                 std::string_view description,
+                                 std::source_location location = std::source_location::current());
+
+    /** @brief Observe atomic progress using one shared absolute deadline.
+     *  @note Loads use acquire ordering; predicate executes on the case thread.
+     *  A timeout means the required observation was not made before the
+     *  deadline; it cannot establish a deadlock or identify scheduler delays.
+     */
+    template<class T, class Predicate>
+    void expect_atomic_until(std::atomic<T> const& state, Predicate&& predicate,
+                             std::chrono::steady_clock::time_point deadline,
+                             std::string_view description,
+                             std::source_location location = std::source_location::current());
+
     // Deferred checker: emit progress before evaluating its potentially costly predicate.
     /** @brief Record the evidence of a deferred proposition.
  *  @note Arguments supplied as callables are evaluated at check time.

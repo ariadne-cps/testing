@@ -776,6 +776,105 @@ void Context::expect_atomic(std::atomic<T> const& state, Predicate&& predicate,
            location, index);
 }
 
+
+namespace Detail {
+
+// For absolute waits the original deadline is not restarted at each check.
+// The measured overrun is diagnostic, not proof of worker failure or a
+// benchmark of the operation's execution time.
+inline std::string absolute_wait_detail(std::chrono::steady_clock::time_point started,
+                                        std::chrono::steady_clock::time_point deadline,
+                                        std::chrono::steady_clock::time_point finished) {
+    using Clock = std::chrono::steady_clock;
+    auto const remaining = deadline > started ? deadline - started : Clock::duration::zero();
+    auto const overrun = finished > deadline ? finished - deadline : Clock::duration::zero();
+    auto const millis = [](Clock::duration duration) {
+        return std::to_string(
+            std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+    };
+    return "waited=" + millis(finished - started) +
+           "ms; remaining_at_start=" + millis(remaining) +
+           "ms; past_deadline_by=" + millis(overrun) + "ms";
+}
+
+} // namespace Detail
+
+template<class Future>
+void Context::expect_ready_until(Future& future,
+                                 std::chrono::steady_clock::time_point deadline,
+                                 std::string_view description,
+                                 std::source_location location) {
+    auto const index = begin_check(description);
+    auto const started = std::chrono::steady_clock::now();
+    auto const status = future.wait_until(deadline);
+    auto const finished = std::chrono::steady_clock::now();
+    Outcome result = Outcome::Error;
+    std::string observed;
+    switch (status) {
+        case std::future_status::ready:
+            observed = "ready";
+            result = Outcome::Passed;
+            break;
+        case std::future_status::timeout:
+            observed = "timeout";
+            result = Outcome::Failed;
+            break;
+        case std::future_status::deferred:
+            observed = "deferred";
+            result = Outcome::Failed;
+            break;
+        default:
+            observed = "unexpected future status";
+            result = Outcome::Error;
+            break;
+    }
+    record(result, description, std::move(observed), "ready",
+           Detail::absolute_wait_detail(started, deadline, finished), location, index);
+}
+
+template<class Lock, class Predicate>
+void Context::expect_eventually_until(std::condition_variable_any& condition, Lock& lock,
+                                      Predicate&& predicate,
+                                      std::chrono::steady_clock::time_point deadline,
+                                      std::string_view description,
+                                      std::source_location location) {
+    auto const index = begin_check(description);
+    auto const started = std::chrono::steady_clock::now();
+    bool const matched = condition.wait_until(
+        lock, deadline, std::forward<Predicate>(predicate));
+    auto const finished = std::chrono::steady_clock::now();
+    record(matched ? Outcome::Passed : Outcome::Failed, description,
+           matched ? "condition satisfied" : "timeout", "condition satisfied",
+           Detail::absolute_wait_detail(started, deadline, finished), location, index);
+}
+
+template<class T, class Predicate>
+void Context::expect_atomic_until(std::atomic<T> const& state, Predicate&& predicate,
+                                  std::chrono::steady_clock::time_point deadline,
+                                  std::string_view description,
+                                  std::source_location location) {
+    auto const index = begin_check(description);
+    auto const started = std::chrono::steady_clock::now();
+    auto observed = state.load(std::memory_order_acquire);
+    bool matched = static_cast<bool>(std::invoke(predicate, observed));
+    while (!matched) {
+        auto const now = std::chrono::steady_clock::now();
+        if (now >= deadline) break;
+        auto const remaining = deadline - now;
+        auto const max_pause = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+            std::chrono::milliseconds(1));
+        std::this_thread::sleep_for(std::min(remaining, max_pause));
+        observed = state.load(std::memory_order_acquire);
+        matched = static_cast<bool>(std::invoke(predicate, observed));
+    }
+    auto const finished = std::chrono::steady_clock::now();
+    record(matched ? Outcome::Passed : Outcome::Failed, description,
+           Detail::render(observed), "predicate satisfied",
+           (matched ? "" : "timeout; ") +
+               Detail::absolute_wait_detail(started, deadline, finished),
+           location, index);
+}
+
 template<class Callable>
     void Context::check(Callable&& predicate, std::string_view description,
                std::source_location location){

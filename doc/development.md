@@ -165,8 +165,10 @@ manually measures durations; numeric test files annotate frozen TSV cases.
       failure; make the waiting predicate deterministic when possible.
       **Partially implemented:** future and condition-variable waits, and
       atomic progress with an observable value and steady-clock deadline.
-      Safe cross-thread check aggregation and shared absolute-deadline
-      coordination remain open.
+      Shared absolute-deadline coordination is now provided by
+      `expect_ready_until`, `expect_eventually_until`, and
+      `expect_atomic_until`, with paired fixture/Context macros.
+      Verification on the new CI commit remains required.
 - [x] Define ownership, synchronization and aggregation for checks issued
       from worker threads; never allow concurrent writes to unprotected
       \`Context\`/Reporter state. Define reporting order and worker exception

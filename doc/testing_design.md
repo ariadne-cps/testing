@@ -955,3 +955,33 @@ CHECK events are deliberately deferred to the owner-thread flush;
 therefore this is not streaming progress from worker threads. CTest
 retains responsibility for hung/deadlocked workers. No platform-specific
 test omission has been introduced; CI verification is required.
+
+## 2026-10-31 — D05: shared monotonic deadlines
+
+Introduced three explicit `std::chrono::steady_clock::time_point` overloads
+`Context::expect_ready_until`, `expect_eventually_until`, and
+`expect_atomic_until`, without changing existing duration-based methods.
+One caller-created timestamp is reusable across consecutive checks; none of
+the checks restarts the original time budget. Each first observes the
+synchronization primitive, including when the deadline is already in the
+past. Already-satisfied futures, conditions and atomics therefore pass
+even with an expired deadline; unmet conditions fail immediately.
+
+The futures preserve `ready/timeout/deferred` results without consuming the
+future. Condition variables use the standard predicate-based
+`wait_until(lock, deadline, predicate)` to tolerate spurious wakeups. Atomic
+progress uses acquire loads, a bounded 1 ms backoff, and calls the predicate
+on the case thread. All checks report elapsed wait time, remaining budget
+at check start, and observed deadline overrun in milliseconds; these are
+timing observations, *not* proof of deadlock, scheduler culpability or an
+operation's benchmark duration. External process-level CTest watchdogs
+remain necessary for truly hung workers. The six public macros
+`ARIADNE_EXPECT_{READY,EVENTUALLY,ATOMIC}_UNTIL[_CTX]` mirror the new APIs,
+with Doxygen documentation and fixture shorthand. No OS/compiler-exclusive
+test path was introduced.
+
+`test_deadlines.cpp` checks expired-but-satisfied vs expired-unsatisfied
+states, a deferred future, synchronized cross-thread publishing under one
+reused deadline, a positive timeout, throwing predicates and both macro
+variants. A green result across the new GitHub Actions matrix is required
+before treating this increment as verified.

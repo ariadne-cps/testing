@@ -223,6 +223,40 @@
 
 /** @} */
 
+/** @name Shared absolute-deadline expectations
+ *  @brief Reuse one steady-clock deadline across multiple checks.
+ *  @details Pass a std::chrono::steady_clock::time_point, e.g.
+ *  `auto deadline = std::chrono::steady_clock::now() + 5s;`.
+ *  Only the condition/atomic predicate is evaluated by the check; objects
+ *  and deadline arguments are regular C++ function arguments.
+ *  @{ */
+/** @def ARIADNE_EXPECT_READY_UNTIL_CTX
+ *  @brief Check future readiness before a shared absolute deadline.
+ */
+#define ARIADNE_EXPECT_READY_UNTIL_CTX(context, future, deadline) \
+    (context).expect_ready_until((future), (deadline), #future " ready by " #deadline)
+
+/** @def ARIADNE_EXPECT_EVENTUALLY_UNTIL_CTX
+ *  @brief Check a condition variable with a shared deadline.
+ *  @note The predicate is deferred until after CHECK.
+ */
+#define ARIADNE_EXPECT_EVENTUALLY_UNTIL_CTX(context, condition, lock, predicate, deadline) \
+    (context).expect_eventually_until((condition), (lock), \
+        [&]() -> decltype(auto) { return std::invoke((predicate)); }, \
+        (deadline), #predicate " holds by " #deadline)
+
+/** @def ARIADNE_EXPECT_ATOMIC_UNTIL_CTX
+ *  @brief Check atomic progress against a reusable absolute deadline.
+ *  @note The predicate executes on the owning case thread after CHECK.
+ */
+#define ARIADNE_EXPECT_ATOMIC_UNTIL_CTX(context, state, predicate, deadline) \
+    (context).expect_atomic_until((state), \
+        [&](auto const& ariadne_observed) -> decltype(auto) { \
+            return std::invoke((predicate), ariadne_observed); \
+        }, (deadline), #state " satisfies " #predicate " by " #deadline)
+
+/** @} */
+
 /** @name Relational checks
  *  @brief Evaluate left/right once after the live CHECK event.
  *  @{ */
@@ -568,6 +602,24 @@
     ARIADNE_EXPECT_EVENTUALLY_CTX(this->ctx(), condition, lock, predicate, timeout)
 
 /** @} */
+
+/** @def ARIADNE_EXPECT_READY_UNTIL
+ *  @brief Fixture shorthand for a future and absolute deadline.
+ */
+#define ARIADNE_EXPECT_READY_UNTIL(future, deadline) \
+    ARIADNE_EXPECT_READY_UNTIL_CTX(this->ctx(), future, deadline)
+
+/** @def ARIADNE_EXPECT_EVENTUALLY_UNTIL
+ *  @brief Fixture shorthand for a condition-variable absolute wait.
+ */
+#define ARIADNE_EXPECT_EVENTUALLY_UNTIL(condition, lock, predicate, deadline) \
+    ARIADNE_EXPECT_EVENTUALLY_UNTIL_CTX(this->ctx(), condition, lock, predicate, deadline)
+
+/** @def ARIADNE_EXPECT_ATOMIC_UNTIL
+ *  @brief Fixture shorthand for atomic progress with an absolute deadline.
+ */
+#define ARIADNE_EXPECT_ATOMIC_UNTIL(state, predicate, deadline) \
+    ARIADNE_EXPECT_ATOMIC_UNTIL_CTX(this->ctx(), state, predicate, deadline)
 
 /** @} */
 

@@ -174,6 +174,29 @@ a separate D05 task. Atomic waits use a bounded poll instead of the
 non-timed C++20 `atomic::wait`. This facility does not stop hung workers;
 the repository's CTest self-tests have a separate 90-second watchdog.
 
+## Shared monotonic deadlines
+
+For multi-stage asynchronous tests, create one absolute deadline and reuse
+it rather than restarting the full duration for every check:
+
+```cpp
+auto const deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+ARIADNE_EXPECT_READY_UNTIL_CTX(c, future, deadline);
+ARIADNE_EXPECT_EVENTUALLY_UNTIL_CTX(c, cv, lock, [&] { return finished; }, deadline);
+ARIADNE_EXPECT_ATOMIC_UNTIL_CTX(c, progress,
+    [](int value) { return value >= 10; }, deadline);
+```
+
+The fixture forms omit `_CTX` and the context argument. Equivalent explicit
+methods are `expect_ready_until`, `expect_eventually_until`, and
+`expect_atomic_until`. An expired deadline still permits a single check of
+an already-satisfied condition; otherwise it produces a timeout. Recorded
+diagnostics include elapsed waiting, remaining budget at each check start,
+and observed overrun. A deadline failure establishes only that required
+progress was not observed in time; it cannot distinguish a bug from
+scheduler slowdown, and it is not a benchmark measurement. Worker ownership
+and CTest's separate process watchdog remain unchanged.
+
 ## Cross-thread checks and deterministic reporting
 
 `WorkerBatch batch(n)` allocates fixed numbered worker slots. Run
