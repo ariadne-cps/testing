@@ -675,13 +675,38 @@ template<class Callable>
         record(Outcome::Passed, description, {}, {}, {}, location, index);
     }
 
+namespace Detail {
+inline WaitObservation make_wait(WaitStatus status,
+        std::chrono::steady_clock::duration elapsed,
+        std::chrono::steady_clock::duration budget, bool absolute) {
+    return {status, std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed),
+            std::chrono::duration_cast<std::chrono::nanoseconds>(budget), absolute};
+}
+inline std::chrono::steady_clock::duration budget_at(
+        std::chrono::steady_clock::time_point start,
+        std::chrono::steady_clock::time_point deadline) {
+    return deadline > start ? deadline - start : std::chrono::steady_clock::duration::zero();
+}
+inline WaitStatus future_wait_status(std::future_status value) {
+    switch (value) {
+        case std::future_status::ready: return WaitStatus::Ready;
+        case std::future_status::timeout: return WaitStatus::Timeout;
+        case std::future_status::deferred: return WaitStatus::Deferred;
+        default: return WaitStatus::Unexpected;
+    }
+}
+} // namespace Detail
+
 template<class Future, class Rep, class Period>
     void Context::expect_ready(Future& future, std::chrono::duration<Rep, Period> timeout,
                       std::string_view description,
                       std::source_location location){
         auto const index = begin_check(description);
         if (timeout < timeout.zero()) {
-            record(Outcome::Error, description, {}, {}, "negative timeout", location, index);
+            record(Outcome::Error, description, {}, {}, "negative timeout", location, index,
+                   Detail::make_wait(WaitStatus::InvalidTimeout,
+                       std::chrono::steady_clock::duration::zero(),
+                       std::chrono::duration_cast<std::chrono::steady_clock::duration>(timeout), false));
             return;
         }
         auto const start = std::chrono::steady_clock::now();
@@ -712,7 +737,11 @@ template<class Future, class Rep, class Period>
                                 elapsed_time).count()) + "ms; limit=" +
                Detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
                                 timeout).count()) + "ms",
-               location, index);
+               location, index,
+
+               Detail::make_wait(Detail::future_wait_status(status), elapsed_time,
+
+                   std::chrono::duration_cast<std::chrono::steady_clock::duration>(timeout), false));
     }
 
 template<class Lock, class Predicate, class Rep, class Period>
@@ -722,7 +751,10 @@ template<class Lock, class Predicate, class Rep, class Period>
                            std::source_location location){
         auto const index = begin_check(description);
         if (timeout < timeout.zero()) {
-            record(Outcome::Error, description, {}, {}, "negative timeout", location, index);
+            record(Outcome::Error, description, {}, {}, "negative timeout", location, index,
+                   Detail::make_wait(WaitStatus::InvalidTimeout,
+                       std::chrono::steady_clock::duration::zero(),
+                       std::chrono::duration_cast<std::chrono::steady_clock::duration>(timeout), false));
             return;
         }
         auto const start = std::chrono::steady_clock::now();
@@ -735,7 +767,11 @@ template<class Lock, class Predicate, class Rep, class Period>
                                 elapsed_time).count()) + "ms; limit=" +
                Detail::render(std::chrono::duration_cast<std::chrono::milliseconds>(
                                 timeout).count()) + "ms",
-               location, index);
+               location, index,
+
+               Detail::make_wait(completed ? WaitStatus::Ready : WaitStatus::Timeout, elapsed_time,
+
+                   std::chrono::duration_cast<std::chrono::steady_clock::duration>(timeout), false));
     }
 
 
@@ -747,7 +783,10 @@ void Context::expect_atomic(std::atomic<T> const& state, Predicate&& predicate,
     auto const index = begin_check(description);
     if (timeout < timeout.zero()) {
         record(Outcome::Error, description, {}, "predicate satisfied",
-               "negative timeout", location, index);
+               "negative timeout", location, index,
+               Detail::make_wait(WaitStatus::InvalidTimeout,
+                   std::chrono::steady_clock::duration::zero(),
+                   std::chrono::duration_cast<std::chrono::steady_clock::duration>(timeout), false));
         return;
     }
     auto const start = std::chrono::steady_clock::now();
@@ -765,15 +804,20 @@ void Context::expect_atomic(std::atomic<T> const& state, Predicate&& predicate,
         observed = state.load(std::memory_order_acquire);
         matched = static_cast<bool>(std::invoke(predicate, observed));
     }
+    auto const finished = std::chrono::steady_clock::now();
     auto const waited = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start).count();
+        finished - start).count();
     auto const limit = std::chrono::duration_cast<std::chrono::milliseconds>(
         timeout).count();
     record(matched ? Outcome::Passed : Outcome::Failed, description,
            Detail::render(observed), "predicate satisfied",
            std::string(matched ? "waited=" : "timeout; waited=") +
                std::to_string(waited) + "ms; limit=" + std::to_string(limit) + "ms",
-           location, index);
+           location, index,
+
+           Detail::make_wait(matched ? WaitStatus::Ready : WaitStatus::Timeout, finished - start,
+
+               std::chrono::duration_cast<std::chrono::steady_clock::duration>(timeout), false));
 }
 
 
@@ -829,7 +873,9 @@ void Context::expect_ready_until(Future& future,
             break;
     }
     record(result, description, std::move(observed), "ready",
-           Detail::absolute_wait_detail(started, deadline, finished), location, index);
+           Detail::absolute_wait_detail(started, deadline, finished), location, index,
+ Detail::make_wait(Detail::future_wait_status(status), finished - started,
+     Detail::budget_at(started, deadline), true));
 }
 
 template<class Lock, class Predicate>
@@ -845,7 +891,9 @@ void Context::expect_eventually_until(std::condition_variable_any& condition, Lo
     auto const finished = std::chrono::steady_clock::now();
     record(matched ? Outcome::Passed : Outcome::Failed, description,
            matched ? "condition satisfied" : "timeout", "condition satisfied",
-           Detail::absolute_wait_detail(started, deadline, finished), location, index);
+           Detail::absolute_wait_detail(started, deadline, finished), location, index,
+ Detail::make_wait(matched ? WaitStatus::Ready : WaitStatus::Timeout, finished - started,
+     Detail::budget_at(started, deadline), true));
 }
 
 template<class T, class Predicate>
@@ -872,7 +920,11 @@ void Context::expect_atomic_until(std::atomic<T> const& state, Predicate&& predi
            Detail::render(observed), "predicate satisfied",
            (matched ? "" : "timeout; ") +
                Detail::absolute_wait_detail(started, deadline, finished),
-           location, index);
+           location, index,
+
+           Detail::make_wait(matched ? WaitStatus::Ready : WaitStatus::Timeout, finished - started,
+
+               Detail::budget_at(started, deadline), true));
 }
 
 template<class Callable>
