@@ -18,6 +18,23 @@ struct Capture final : Reporter {
     void case_finished(CaseResult const& result) override { cases.push_back(result); }
     void suite_finished(std::string_view, Summary const&) override {}
 };
+// Exercise the different mathematical and exceptional outcomes with one
+// concrete predicate type, so the same Worker::check specialization sees all
+// paths rather than compiling one lambda specialization per observation.
+struct EvidenceScenario {
+    int path;
+    Evidence operator()() const {
+        switch (path) {
+            case 0: return Evidence::True;
+            case 1: return Evidence::False;
+            case 2: return Evidence::Indeterminate;
+            case 3: return static_cast<Evidence>(99);
+            case 4: throw std::runtime_error("scenario standard exception");
+            default: throw 17;
+        }
+    }
+};
+
 int main() {
     Suite suite("worker result aggregation");
     Capture capture;
@@ -197,6 +214,41 @@ int main() {
                contracts_capture.cases[3].assertions[0].detail ==
                    "non-standard worker predicate exception",
                "worker error diagnostics lost their semantic causes");
+    }
+    Suite scenario_suite("worker predicate outcome matrix");
+    scenario_suite.add("same callable supports all outcomes", [](Context& c) {
+        WorkerBatch batch(1);
+        batch.run(0, [](WorkerBatch::Worker& worker) {
+            for (int scenario = 0; scenario != 6; ++scenario) {
+                worker.check(EvidenceScenario{scenario},
+                             "scenario " + std::to_string(scenario));
+            }
+        });
+        batch.flush(c);
+    });
+    Capture scenario_capture;
+    auto const scenario_summary = scenario_suite.run(scenario_capture);
+    verify(scenario_summary.errors == 1 && scenario_summary.passed == 0 &&
+           scenario_capture.cases.size() == 1 && scenario_capture.checks == 6,
+           "single predicate specialization must preserve all six observations");
+    if (scenario_capture.cases.size() == 1) {
+        auto const& records = scenario_capture.cases[0].assertions;
+        verify(records.size() == 6,
+               "outcome matrix must record each worker observation");
+        if (records.size() == 6) {
+            Outcome const expected[]{Outcome::Passed, Outcome::Failed,
+                Outcome::Inconclusive, Outcome::Error, Outcome::Error, Outcome::Error};
+            for (std::size_t i = 0; i < 6; ++i) {
+                verify(records[i].outcome == expected[i] &&
+                       records[i].description ==
+                           "worker[0]: scenario " + std::to_string(i),
+                       "worker predicate outcome or order changed at " + std::to_string(i));
+            }
+            verify(records[3].detail == "invalid evidence" &&
+                   records[4].detail == "scenario standard exception" &&
+                   records[5].detail == "non-standard worker predicate exception",
+                   "worker predicate exception diagnostics changed");
+        }
     }
     return ok ? 0 : 1;
 }
