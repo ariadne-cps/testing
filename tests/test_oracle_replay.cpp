@@ -54,6 +54,21 @@ int main() {
            "request ordering must not change complete manifest ordering");
     verify(!malformed.structurally_valid() && !malformed.includes(2),
            "fabricated unsorted plans must not be executable");
+    // Even externally constructed replay plans must reject every malformed
+    // structural shape before a consumer can use their indices.
+    auto zero_rows = full;
+    zero_rows.total_rows = 0;
+    auto no_indices = full;
+    no_indices.indices.clear();
+    auto excess_indices = full;
+    excess_indices.indices.push_back(0);
+    auto outside_manifest = full;
+    outside_manifest.indices.back() = full.total_rows;
+    verify(!zero_rows.structurally_valid() && !no_indices.structurally_valid() &&
+           !excess_indices.structurally_valid() &&
+           !outside_manifest.structurally_valid() &&
+           !outside_manifest.includes(0),
+           "fabricated replay plans must reject empty, excessive and out-of-range indices");
     auto const rng_seed = std::mt19937::default_seed;
     std::mt19937 original(rng_seed), observed(rng_seed);
     // An explicitly selected row still must consume all preceding RNG
