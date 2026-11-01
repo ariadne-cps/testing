@@ -89,7 +89,7 @@ inline int run_suite(Suite const& suite, int argc, char const* const* argv,
     for (int i = 1; i < argc; ++i) {
         std::string_view const arg = argv[i] ? std::string_view(argv[i]) : std::string_view();
         if (arg == "--help") {
-            output << "Usage: " << (argc > 0 && argv[0] ? argv[0] : "test")
+            output << "Usage: " << (argv[0] ? argv[0] : "test")
                    << " [--full | --concise]" << '\n';
             return 0;
         }
