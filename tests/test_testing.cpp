@@ -557,21 +557,26 @@ int main() {
     diagnostics.add("scope restored across cases", [](Context& c) {
         c.prove(true, "new case has no labels");
     });
-    ConsoleReporter diag_reporter(diag_output, ConsoleDetail::Concise);
-    auto const diag_summary = diagnostics.run(diag_reporter);
+    std::ostringstream concise_diag_output;
+    ConsoleReporter diag_reporter(diag_output, ConsoleDetail::All);
+    ConsoleReporter concise_diag_reporter(concise_diag_output, ConsoleDetail::Concise);
+    ReporterFanout diagnostic_fanout{std::ref(diag_reporter), std::ref(concise_diag_reporter)};
+    auto const diag_summary = diagnostics.run(diagnostic_fanout);
     if (diag_summary.failed != 1 || diag_summary.errors != 1 ||
         diag_summary.passed != 2) return 68;
     if (diag_output.str().find("[WARN] oracle=floatmp_rounding.tsv / row=21 / reference is approximate") ==
         std::string::npos) return 69;
     if (diag_output.str().find("context: oracle=floatmp_rounding.tsv / row=21") ==
         std::string::npos) return 70;
-    if (diag_output.str().find("diagnostic: input prepared") == std::string::npos ||
-        diag_output.str().find("diagnostic: calculation") == std::string::npos) return 71;
+    if (concise_diag_output.str().find("diagnostic: input prepared") == std::string::npos ||
+        concise_diag_output.str().find("diagnostic: calculation") == std::string::npos) return 71;
     if (diag_output.str().find("context: phase=outer / row=error") == std::string::npos) return 72;
     if (diag_output.str().find("[CHECK 3.1] scope still active after move") ==
         std::string::npos) return 82;
-    if (diag_output.str().find("[CHECK 3.2] moved scope closed at end of owner lifetime") !=
+    if (diag_output.str().find("[CHECK 3.2] moved scope closed at end of owner lifetime") ==
         std::string::npos) return 83;
+    if (concise_diag_output.str().find("[CHECK 3.2] moved scope closed at end of owner lifetime") !=
+        std::string::npos) return 114;
     if (diag_output.str().find("[CHECK 4.1] new case has no labels") == std::string::npos) return 73;
     Suite bounded_waits("bounded waits");
     CaptureReporter bounded_reporter;
