@@ -663,6 +663,25 @@ int main() {
         rejected_output.str().find("[FAIL] disproved") == std::string::npos)
         return report_self_test_failure(81, __LINE__);
 
+    // CLI arguments can come from embedding applications, not only the OS.
+    // A null option is rejected without dereferencing it; --help still works
+    // when the caller has no executable name to display.
+    char const* const unnamed_help[] = {nullptr, "--help"};
+    std::ostringstream unnamed_help_output;
+    if (run_suite(rejected, 2, unnamed_help, unnamed_help_output) != 0 ||
+        unnamed_help_output.str().find("Usage: test [--full | --concise]") == std::string::npos)
+        return report_self_test_failure(117, __LINE__);
+    char const* const null_option[] = {"embedded", nullptr};
+    std::ostringstream null_option_output;
+    if (run_suite(rejected, 2, null_option, null_option_output) != 2 ||
+        null_option_output.str().find("Unknown test option: ") == std::string::npos)
+        return report_self_test_failure(118, __LINE__);
+    char const* const no_option[] = {"embedded"};
+    std::ostringstream no_option_output;
+    if (run_suite(rejected, 1, no_option, no_option_output) != 1 ||
+        no_option_output.str().find("[FAIL] disproved") == std::string::npos)
+        return report_self_test_failure(119, __LINE__);
+
     // Suite registration rejects both independent invalid public inputs:
     // an empty name and an empty callable. Neither may append a case.
     Suite validation("registration contracts");
