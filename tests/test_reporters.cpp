@@ -248,6 +248,16 @@ int main() {
           concise_cli_output.str().find("[PASS]")==std::string::npos &&
           concise_cli_output.str().find("console option parsing: 1 passed")!=std::string::npos,
           "--concise must emit only the summary for successful suites");
+    // Repeating the same verbosity option is valid and must not conflict.
+    char const* const repeated_full[] = {"selftest", "--full", "--full"};
+    char const* const repeated_concise[] = {"selftest", "--concise", "--concise"};
+    std::ostringstream repeated_full_output, repeated_concise_output;
+    check(run_suite(cli_suite, 3, repeated_full, repeated_full_output) == 0 &&
+          repeated_full_output.str().find("[CHECK 1.2] second") != std::string::npos &&
+          run_suite(cli_suite, 3, repeated_concise, repeated_concise_output) == 0 &&
+          repeated_concise_output.str().find("[CHECK ") == std::string::npos &&
+          repeated_concise_output.str().find("console option parsing: 1 passed") != std::string::npos,
+          "repeated identical verbosity options must be accepted");
     const int executions_before_invalid = cli_executions;
     check(run_suite(cli_suite, 3, conflict_args, invalid_output)==2 &&
           run_suite(cli_suite, 2, wrong_args, invalid_output)==2 &&
