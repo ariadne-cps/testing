@@ -5,6 +5,15 @@
 #include <vector>
 using namespace Ariadne::Testing;
 
+struct InformativeFixture : ContextFixture {
+    using ContextFixture::ContextFixture;
+
+    void record() {
+        ARIADNE_TESTING_NOTE("fixture-note=" << 5);
+        ARIADNE_TESTING_INSPECT("fixture-value", 11);
+    }
+};
+
 int main() {
     std::ostringstream console, json, junit;
     ConsoleReporter live(console);
@@ -180,6 +189,32 @@ int main() {
     check(reuse_summary.successful() &&
           concise_output.str().substr(before_reuse).find("[FAILURE SUMMARY]")==std::string::npos,
           "console retained failures from preceding suite");
+    Suite informative("structured informational output");
+    informative.add("success", [](Context& ctx) {
+        ARIADNE_TESTING_NOTE_CTX(ctx, "value=" << 42 << " / " << 3);
+        ARIADNE_TESTING_INSPECT_CTX(ctx, "actual", 42);
+        ctx.prove(true, "accepted");
+    });
+    informative.add("failure", [](Context& ctx) {
+        ARIADNE_TESTING_NOTE_CTX(ctx, "value=" << 7 << " / " << 2);
+        ARIADNE_TESTING_INSPECT_CTX(ctx, "actual", 7);
+        InformativeFixture fixture(ctx);
+        fixture.record();
+        ctx.prove(false, "rejected");
+    });
+    std::ostringstream information_output;
+    ConsoleReporter information_reporter(information_output, ConsoleDetail::Concise);
+    auto const information_summary = informative.run(information_reporter);
+    check(information_summary.passed == 1 && information_summary.failed == 1 &&
+          information_output.str().find("value=42 / 3") == std::string::npos &&
+          information_output.str().find("diagnostic: value=7 / 2") != std::string::npos &&
+          information_output.str().find("diagnostic: actual = 7") != std::string::npos &&
+          information_output.str().find("diagnostic: fixture-note=5") != std::string::npos &&
+          information_output.str().find("diagnostic: fixture-value = 11") != std::string::npos &&
+          information_output.str().find("actual = 42") == std::string::npos &&
+          information_output.str().find("[CHECK ") == std::string::npos,
+          "informational stream macros must record and filter without checks");
+
     Suite cli_suite("console option parsing");
     int cli_executions = 0;
     cli_suite.add("check verbosity", [&](Context& c) {

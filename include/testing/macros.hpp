@@ -19,6 +19,7 @@
 #include "testing/fixture.hpp"
 #include "testing/parameterized.hpp"
 #include <type_traits>
+#include <sstream>
 
 // Compile-time constraints; these produce static_assert diagnostics.
 /** @def ARIADNE_TESTING_COMPILE_CONCEPT
@@ -40,6 +41,30 @@
     static_assert(std::is_same_v<first, second>, \
                   "ARIADNE compile-time type identity failed: " #first " vs " #second)
 
+
+
+/** @brief Capture an informative stream expression in the active test context.
+ *  @details Information is available to all reporters and does not count as a check.
+ *  Concise console output replays it only for problematic cases.
+ */
+#define ARIADNE_TESTING_NOTE_CTX(context, stream_expression) \
+    do { \
+        std::ostringstream ariadne_testing_note_stream; \
+        ariadne_testing_note_stream << stream_expression; \
+        (context).note(ariadne_testing_note_stream.str()); \
+    } while (false)
+
+/** @brief Fixture shorthand for an informative stream expression. */
+#define ARIADNE_TESTING_NOTE(stream_expression) \
+    ARIADNE_TESTING_NOTE_CTX(this->ctx(), stream_expression)
+
+/** @brief Capture a named typed diagnostic value without counting an assertion. */
+#define ARIADNE_TESTING_INSPECT_CTX(context, name, value) \
+    (context).inspect((name), (value))
+
+/** @brief Fixture shorthand for a named typed diagnostic value. */
+#define ARIADNE_TESTING_INSPECT(name, value) \
+    ARIADNE_TESTING_INSPECT_CTX(this->ctx(), name, value)
 
 
 // Runtime assertions; explicit Context forms and fixture shorthands.

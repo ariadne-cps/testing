@@ -1449,3 +1449,19 @@ live scope. The former 250-check progress sampling was arbitrary and
 contradicted the purpose of concise output. No execution, coverage, or
 structured report semantics change. Direct stdout/stderr written by tests
 are not intercepted by this reporter.
+
+## 2026-11-01 — Structured informational test output
+
+Added `ARIADNE_TESTING_NOTE_CTX(context, stream_expression)` and the
+`ContextFixture` shorthand `ARIADNE_TESTING_NOTE(stream_expression)`.
+They format into a local `std::ostringstream` and emit `Context::note`,
+without touching stdout/stderr or assertion counts. Concise replays the
+message for nonpassing cases; All reports it live. The reporter self-test
+verifies successful informational output is suppressed but failed-case
+output remains visible. Legacy tests without a Context must be migrated
+before their information can be routed through the framework.
+
+The same change provides `ARIADNE_TESTING_INSPECT_CTX` and
+`ARIADNE_TESTING_INSPECT`, which delegate to `Context::inspect` and record
+structured Value events without incrementing assertion counts. The
+self-test covers both explicit-context and ContextFixture shorthand forms.

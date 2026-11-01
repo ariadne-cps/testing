@@ -511,3 +511,23 @@ sanitizers, or CI failure criteria. The decision is made before CMake
 configuration: a daemon crash later during compilation is not automatically
 recovered, and must be investigated instead of hiding C++ failures.
 
+
+## Informational output from tests
+
+Test implementations should not print directly to `std::cout` or
+`std::cerr` for informational diagnostics. Use `ctx.note("phase")`,
+`ctx.inspect("value", x)`, or the streaming helpers
+`ARIADNE_TESTING_NOTE_CTX(ctx, "value=" << x)` in free functions and
+`ARIADNE_TESTING_NOTE("value=" << x)` in `ContextFixture` methods.
+The stream helper records a nonasserting diagnostic event. Full console and
+structured reporters retain it; the concise console replays it only when its
+case is problematic. Formatting uses an independent stream rather than
+mutating process-global stdout/stderr. Output deliberately *under test*,
+such as serialization into an `std::ostringstream`, is unaffected.
+Direct output from pre-migration legacy suites cannot be captured without
+migrating them to a Context-aware test runner.
+
+`ARIADNE_TESTING_INSPECT_CTX(ctx, "name", value)` records a typed Value
+ diagnostic, and `ARIADNE_TESTING_INSPECT("name", value)` provides the
+ ContextFixture shorthand. Both evaluate their value exactly once and
+ have no impact on assertion counts.
