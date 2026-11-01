@@ -89,6 +89,26 @@ struct NonstandardFailures : ContextFixture {
     void test_both_fail() { throw 17; }
 };
 
+// Exercise the four genuine combinations of a fixture body's and teardown's
+// outcomes in a single template specialization, including the NoThrow policy.
+struct LifecycleMatrix : ContextFixture {
+    using ContextFixture::ContextFixture;
+    bool fail_teardown = false;
+    void tear_down() {
+        if (fail_teardown) throw std::runtime_error("matrix teardown");
+    }
+    void test_success() { ctx().prove(true, "matrix body passed"); }
+    void test_body_error() { throw std::runtime_error("matrix body"); }
+    void test_teardown_error() {
+        fail_teardown = true;
+        ctx().prove(true, "matrix body passed before teardown error");
+    }
+    void test_both_errors() {
+        fail_teardown = true;
+        throw std::runtime_error("matrix body");
+    }
+};
+
 int main(){
     Trace trace; Fixture::trace=&trace;
     Suite suite("fixture lifecycle");
@@ -171,6 +191,42 @@ int main(){
                assertions[0].detail ==
                    "fixture body failed: non-standard exception; tear_down failed: non-standard exception",
                "both non-standard fixture failures must be preserved");
+    }
+    Suite matrix("fixture lifecycle combinations");
+    add_fixture_test<LifecycleMatrix>(matrix, "test_success",
+                                     &LifecycleMatrix::test_success);
+    add_fixture_test<LifecycleMatrix>(matrix, "test_body_error",
+                                     &LifecycleMatrix::test_body_error);
+    add_fixture_test<LifecycleMatrix>(matrix, "test_teardown_error",
+                                     &LifecycleMatrix::test_teardown_error);
+    add_fixture_test<LifecycleMatrix>(matrix, "test_both_errors",
+                                     &LifecycleMatrix::test_both_errors);
+    add_fixture_test<LifecycleMatrix>(matrix, "manual successful check",
+                                     &LifecycleMatrix::test_success,
+                                     FixtureCheck::NoThrow);
+    Capture matrix_capture;
+    auto const matrix_summary = matrix.run(matrix_capture);
+    verify(matrix_summary.passed == 2 && matrix_summary.errors == 3 &&
+           matrix_summary.failed == 0 && matrix_capture.cases.size() == 5,
+           "fixture lifecycle combinations changed classification");
+    if (matrix_capture.cases.size() == 5) {
+        verify(matrix_capture.cases[0].name == "success" &&
+               matrix_capture.cases[0].outcome == Outcome::Passed &&
+               matrix_capture.cases[1].name == "body_error" &&
+               matrix_capture.cases[1].outcome == Outcome::Error &&
+               matrix_capture.cases[2].outcome == Outcome::Error &&
+               matrix_capture.cases[3].outcome == Outcome::Error &&
+               matrix_capture.cases[4].name == "manual successful check" &&
+               matrix_capture.cases[4].outcome == Outcome::Passed,
+               "fixture lifecycle order and outcomes changed");
+        verify(!matrix_capture.cases[1].assertions.empty() &&
+               matrix_capture.cases[1].assertions.back().detail == "matrix body" &&
+               !matrix_capture.cases[2].assertions.empty() &&
+               matrix_capture.cases[2].assertions.back().detail == "matrix teardown" &&
+               !matrix_capture.cases[3].assertions.empty() &&
+               matrix_capture.cases[3].assertions.back().detail ==
+                 "fixture body failed: matrix body; tear_down failed: matrix teardown",
+               "fixture lifecycle single and combined failures lost their causes");
     }
     return ok?0:1;
 }
