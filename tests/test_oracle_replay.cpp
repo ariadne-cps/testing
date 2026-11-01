@@ -27,6 +27,7 @@ int main() {
     auto partial = plan_oracle_replay(manifest, requested);
     auto duplicate = plan_oracle_replay(manifest, std::vector<K>{manifest[0].id, manifest[0].id});
     auto unknown = plan_oracle_replay(manifest, std::vector<K>{K{"absent",1,0}});
+    auto empty_key = plan_oracle_replay(manifest, std::vector<K>{K{"",0,0}});
     auto bad_manifest = manifest; bad_manifest.push_back(manifest[0]);
     auto bad = plan_oracle_replay(bad_manifest);
     auto reordered = plan_oracle_replay(manifest,
@@ -46,6 +47,9 @@ int main() {
            partial.includes(1) && partial.includes(3) &&
            !partial.includes(0) && !partial.includes(4),
            "partial replay must preserve manifest order and exact identities");
+    verify(!empty_key.valid && !empty_key.structurally_valid() &&
+           empty_key.reason == "selected row has an empty key",
+           "selected row with empty key must be rejected before lookup");
     verify(!duplicate.valid && !unknown.valid && !bad.valid &&
            !duplicate.structurally_valid() && !unknown.structurally_valid(),
            "invalid selections must be rejected");
