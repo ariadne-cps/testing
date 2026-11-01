@@ -1,6 +1,7 @@
 #include "ariadne-testing.hpp"
 
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -93,6 +94,20 @@ int main() {
                       << " instead of " << static_cast<int>(outcomes[i]) << '\n';
             return 2;
         }
+    }
+    // The internal negation helper explicitly rejects a malformed Evidence
+    // representation instead of converting it to a boolean success.
+    int const invalid_representation = 99;
+    bool rejected_invalid_evidence = false;
+    try {
+        (void) Detail::negate(static_cast<Evidence>(invalid_representation));
+    } catch (std::logic_error const& error) {
+        rejected_invalid_evidence = std::string_view(error.what()) ==
+                                    "Invalid mathematical evidence";
+    }
+    if (!rejected_invalid_evidence) {
+        std::cerr << "Malformed Evidence was not rejected by negation\n";
+        return 3;
     }
     return 0;
 }
