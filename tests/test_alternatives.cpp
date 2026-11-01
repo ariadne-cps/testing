@@ -192,5 +192,71 @@ int main() {
             verify(capture.cases[13].assertions[0].actual == "void",
                    "void result must remain observable");
     }
+
+    // A fatal precondition is not an acceptable exception alternative and
+    // must not be swallowed by a verifier or converted into an Error.
+    Suite aborts("fatal prerequisites in alternatives");
+    int continued_after_fatal = 0;
+    int unexpected_verifiers = 0;
+    aborts.add("operation prerequisite aborts", [&](Context& c) {
+        c.expect_alternative([&]() -> SolverResult {
+                c.require([] { return false; }, "operation prerequisite");
+                ++continued_after_fatal;
+                return SolverResult{true, 9};
+            },
+            [&](SolverResult const&) { ++unexpected_verifiers; return true; },
+            [&](std::exception const&) { ++unexpected_verifiers; return true; },
+            "operation must stop on fatal prerequisite");
+        ++continued_after_fatal;
+    });
+    aborts.add("exception verifier prerequisite aborts", [&](Context& c) {
+        c.expect_alternative([]() -> SolverResult { throw Incomplete(7); },
+            [&](SolverResult const&) { ++unexpected_verifiers; return true; },
+            [&](std::exception const&) {
+                c.require([] { return false; }, "exception verifier prerequisite");
+                ++continued_after_fatal;
+                return true;
+            }, "exception verification must stop on fatal prerequisite");
+        ++continued_after_fatal;
+    });
+    aborts.add("result verifier prerequisite aborts", [&](Context& c) {
+        c.expect_alternative([] { return SolverResult{true, 9}; },
+            [&](SolverResult const&) {
+                c.require([] { return false; }, "result verifier prerequisite");
+                ++continued_after_fatal;
+                return true;
+            },
+            [&](std::exception const&) { ++unexpected_verifiers; return true; },
+            "result verification must stop on fatal prerequisite");
+        ++continued_after_fatal;
+    });
+    aborts.add("subsequent alternative case still runs", [](Context& c) {
+        c.prove(true, "suite resumes after fatal prerequisites");
+    });
+    Capture aborted_capture;
+    auto const aborted_summary = aborts.run(aborted_capture);
+    verify(aborted_summary.failed == 3 && aborted_summary.passed == 1 &&
+           aborted_summary.errors == 0 && aborted_summary.inconclusive == 0 &&
+           aborted_capture.cases.size() == 4 && aborted_capture.checks == 7 &&
+           continued_after_fatal == 0 && unexpected_verifiers == 0,
+           "fatal prerequisites must abort alternatives without suppressing later cases");
+    if (aborted_capture.cases.size() == 4) {
+        std::string const prerequisites[] = {
+            "operation prerequisite", "exception verifier prerequisite",
+            "result verifier prerequisite"
+        };
+        for (std::size_t i = 0; i < 3; ++i) {
+            auto const& fatal = aborted_capture.cases[i];
+            verify(fatal.outcome == Outcome::Failed && fatal.assertions.size() == 1 &&
+                   fatal.assertions[0].outcome == Outcome::Failed &&
+                   fatal.assertions[0].description == prerequisites[i] &&
+                   fatal.assertions[0].check_index == 2,
+                   "fatal alternative must retain only its failed prerequisite at " +
+                   std::to_string(i));
+        }
+        verify(aborted_capture.cases[3].outcome == Outcome::Passed &&
+               aborted_capture.cases[3].assertions.size() == 1,
+               "fatal alternative must not affect the following case");
+    }
     return ok ? 0 : 1;
 }
