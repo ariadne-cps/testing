@@ -135,5 +135,68 @@ int main() {
                capture.cases[5].outcome == Outcome::Passed,
                "worker lifecycle cases changed");
     }
+    // These cases exercise valid public error handling that cannot arise in
+    // an already-running worker batch's normal success path.
+    Suite contracts("worker boundary contracts");
+    contracts.add("zero workers rejected", [](Context& c) {
+        bool rejected = false;
+        try {
+            WorkerBatch empty(0);
+        } catch (std::invalid_argument const& error) {
+            rejected = std::string_view(error.what()) ==
+                       "WorkerBatch needs a nonzero slot count";
+        }
+        c.prove(rejected, "zero-slot worker batch must be rejected");
+    });
+    contracts.add("workers cannot start after flush", [](Context& c) {
+        WorkerBatch batch(1);
+        batch.run(0, [](WorkerBatch::Worker& worker) {
+            worker.check([] { return true; }, "first worker check");
+        });
+        batch.flush(c);
+        bool rejected = false;
+        try {
+            batch.run(0, [](WorkerBatch::Worker&) {});
+        } catch (std::logic_error const& error) {
+            rejected = std::string_view(error.what()) ==
+                       "invalid or repeated worker slot";
+        }
+        c.prove(rejected, "flushed batch must not accept new workers");
+    });
+    contracts.add("invalid evidence records Error", [](Context& c) {
+        WorkerBatch batch(1);
+        batch.run(0, [](WorkerBatch::Worker& worker) {
+            worker.check([] { return static_cast<Evidence>(99); },
+                         "malformed evidence");
+        });
+        batch.flush(c);
+    });
+    contracts.add("nonstandard predicate exception records Error", [](Context& c) {
+        WorkerBatch batch(1);
+        batch.run(0, [](WorkerBatch::Worker& worker) {
+            worker.check([]() -> bool { throw 17; },
+                         "nonstandard predicate");
+        });
+        batch.flush(c);
+    });
+    Capture contracts_capture;
+    auto const contracts_summary = contracts.run(contracts_capture);
+    verify(contracts_summary.passed == 2 && contracts_summary.errors == 2 &&
+           contracts_summary.failed == 0 && contracts_summary.inconclusive == 0 &&
+           contracts_capture.cases.size() == 4 && contracts_capture.checks == 5,
+           "worker boundary outcome or CHECK count changed");
+    if (contracts_capture.cases.size() == 4) {
+        verify(contracts_capture.cases[0].outcome == Outcome::Passed &&
+               contracts_capture.cases[1].outcome == Outcome::Passed &&
+               contracts_capture.cases[2].outcome == Outcome::Error &&
+               contracts_capture.cases[3].outcome == Outcome::Error,
+               "worker boundary classifications changed");
+        verify(contracts_capture.cases[2].assertions.size() == 1 &&
+               contracts_capture.cases[2].assertions[0].detail == "invalid evidence" &&
+               contracts_capture.cases[3].assertions.size() == 1 &&
+               contracts_capture.cases[3].assertions[0].detail ==
+                   "non-standard worker predicate exception",
+               "worker error diagnostics lost their semantic causes");
+    }
     return ok ? 0 : 1;
 }
