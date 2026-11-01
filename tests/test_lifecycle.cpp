@@ -81,6 +81,14 @@ struct VariantFail : ContextFixture {
     void test_exception(){throw std::runtime_error("variant error");}
 };
 
+// When both the fixture body and teardown throw non-standard exceptions,
+// both failures must survive in the aggregated diagnostic.
+struct NonstandardFailures : ContextFixture {
+    using ContextFixture::ContextFixture;
+    void tear_down() { throw 23; }
+    void test_both_fail() { throw 17; }
+};
+
 int main(){
     Trace trace; Fixture::trace=&trace;
     Suite suite("fixture lifecycle");
@@ -148,6 +156,21 @@ int main(){
         verify(no_throw.size()==1 && no_throw[0].outcome==Outcome::Failed &&
                no_throw[0].description=="operation completes",
                "NoThrow policy changed");
+    }
+    Suite nonstandard("nonstandard fixture failure diagnostics");
+    add_fixture_test<NonstandardFailures>(nonstandard, "test_both_fail",
+                                          &NonstandardFailures::test_both_fail);
+    Capture nonstandard_capture;
+    auto const nonstandard_summary = nonstandard.run(nonstandard_capture);
+    verify(nonstandard_summary.errors == 1 && nonstandard_summary.passed == 0 &&
+           nonstandard_capture.cases.size() == 1,
+           "non-standard body and teardown failures must report Error");
+    if (nonstandard_capture.cases.size() == 1) {
+        auto const& assertions = nonstandard_capture.cases[0].assertions;
+        verify(assertions.size() == 1 &&
+               assertions[0].detail ==
+                   "fixture body failed: non-standard exception; tear_down failed: non-standard exception",
+               "both non-standard fixture failures must be preserved");
     }
     return ok?0:1;
 }
