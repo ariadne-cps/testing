@@ -395,7 +395,7 @@ CrashDiagnostics::CrashDiagnostics() : _impl(new Impl) {
         if (i == 4 && _impl->signals[i] == SIGSEGV) continue;
         struct sigaction handler{};
         handler.sa_handler = crash_signal_handler;
-        ::sigemptyset(&handler.sa_mask);
+        sigemptyset(&handler.sa_mask);
         handler.sa_flags = SA_RESETHAND;
         _impl->installed[i] = ::sigaction(_impl->signals[i], &handler,
                                           &_impl->previous[i]) == 0;
