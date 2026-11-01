@@ -374,5 +374,71 @@ int main() {
     check(escaped_xml_output.str().find("quote&quot; backspace? formfeed?") !=
               std::string::npos,
           "JUnit XML must escape quotes and replace forbidden XML controls");
+
+    Suite crowded("bounded concise diagnostics");
+    crowded.add("failure with many notes", [](Context& c) {
+        for (int i = 0; i < 18; ++i)
+            c.note("event-" + std::to_string(i));
+        c.prove(false, "failure after diagnostics");
+    });
+    std::ostringstream crowded_output;
+    ConsoleReporter crowded_reporter(crowded_output, ConsoleDetail::Concise);
+    auto const crowded_summary = crowded.run(crowded_reporter);
+    check(crowded_summary.failed == 1 &&
+          crowded_output.str().find("diagnostic: event-15") != std::string::npos &&
+          crowded_output.str().find("diagnostic: additional events omitted") != std::string::npos &&
+          crowded_output.str().find("diagnostic: event-16") == std::string::npos,
+          "concise diagnostic limit changed");
+
+    bool rejected_empty_fanout = false;
+    try {
+        ReporterFanout empty_targets(std::initializer_list<std::reference_wrapper<Reporter>>{});
+    } catch (std::invalid_argument const& error) {
+        rejected_empty_fanout =
+            std::string_view(error.what()) == "ReporterFanout requires a reporter";
+    }
+    check(rejected_empty_fanout, "empty reporter fanout must be rejected");
+
+    CaseResult assertionless;
+    assertionless.suite_name = "external cases";
+    assertionless.name = "external failure";
+    assertionless.outcome = Outcome::Failed;
+    assertionless.case_index = 1;
+    assertionless.case_total = 1;
+    Summary assertionless_summary;
+    assertionless_summary.failed = 1;
+    std::ostringstream assertionless_xml;
+    JUnitReporter assertionless_junit(assertionless_xml);
+    assertionless_junit.case_finished(assertionless);
+    assertionless_junit.suite_finished("external cases", assertionless_summary);
+    check(assertionless_xml.str().find("failures=\"1\"") != std::string::npos &&
+          assertionless_xml.str().find("message=\"case has no assertion\"") != std::string::npos,
+          "JUnit must retain the classification of assertionless cases");
+
+    CaseResult retention_case;
+    retention_case.suite_name = "artifact retention";
+    retention_case.name = "retention policies";
+    retention_case.case_index = 1;
+    retention_case.case_total = 1;
+    std::array<ArtifactLifetime, 4> const lifetimes{
+        ArtifactLifetime::External, ArtifactLifetime::Temporary,
+        ArtifactLifetime::KeepOnFailure, ArtifactLifetime::KeepAlways};
+    for (std::size_t i = 0; i < lifetimes.size(); ++i) {
+        ArtifactRecord record;
+        record.path = "artifact-" + std::to_string(i) + ".dat";
+        record.label = "captured";
+        record.media_type = "application/octet-stream";
+        record.lifetime = lifetimes[i];
+        retention_case.artifacts.push_back(std::move(record));
+    }
+    std::ostringstream retention_json;
+    JsonReporter retention_reporter(retention_json);
+    retention_reporter.case_finished(retention_case);
+    Summary retention_summary;
+    retention_summary.passed = 1;
+    retention_reporter.suite_finished("artifact retention", retention_summary);
+    for (auto const* label : {"external", "temporary", "keep_on_failure", "keep_always"})
+        check(retention_json.str().find(std::string("\"lifetime\":\"") + label + "\"") != std::string::npos,
+              "JSON must preserve artifact lifetime: " + std::string(label));
     return ok?0:1;
 }
