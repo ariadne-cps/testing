@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 using namespace Ariadne::Testing;
@@ -127,5 +128,44 @@ int main(){
               direct_capture.cases[2].assertions[0].outcome==Outcome::Error,
               "direct oracle rows must record ordered assertion outcomes");
     }
+    // Reject invalid public metadata before any artifact is registered.
+    // Each independent invalid field must fail with invalid_argument.
+    Suite metadata_contracts("oracle metadata contracts");
+    OracleMetadata valid_metadata;
+    valid_metadata.reference = "independent-reference.tsv";
+    valid_metadata.label = "golden reference";
+    valid_metadata.row_key_column = "row-id";
+    auto rejected_metadata = [&](std::string name, OracleMetadata metadata) {
+        metadata_contracts.add(std::move(name), [metadata](Context& c) {
+            bool rejected_input = false;
+            try { c.register_oracle(metadata); }
+            catch (std::invalid_argument const&) { rejected_input = true; }
+            c.prove(rejected_input, "invalid metadata must be rejected");
+        });
+    };
+    auto empty_reference = valid_metadata;
+    empty_reference.reference.clear();
+    rejected_metadata("empty reference", empty_reference);
+    auto empty_label = valid_metadata;
+    empty_label.label.clear();
+    rejected_metadata("empty label", empty_label);
+    auto empty_row_key = valid_metadata;
+    empty_row_key.row_key_column.clear();
+    rejected_metadata("empty row key", empty_row_key);
+    auto empty_attribute_name = valid_metadata;
+    empty_attribute_name.input_attributes = {{"", "value"}};
+    rejected_metadata("empty attribute name", empty_attribute_name);
+    auto empty_attribute_value = valid_metadata;
+    empty_attribute_value.input_attributes = {{"name", ""}};
+    rejected_metadata("empty attribute value", empty_attribute_value);
+    Capture metadata_capture;
+    auto const metadata_summary = metadata_contracts.run(metadata_capture);
+    check(metadata_summary.passed == 5 && metadata_summary.failed == 0 &&
+          metadata_summary.errors == 0 && metadata_capture.cases.size() == 5 &&
+          metadata_capture.checks == 5,
+          "oracle metadata rejection contracts failed");
+    for (auto const& outcome : metadata_capture.cases)
+        check(outcome.outcome == Outcome::Passed && outcome.artifacts.empty(),
+              "rejected Oracle metadata must not register an artifact");
     return ok?0:1;
 }
