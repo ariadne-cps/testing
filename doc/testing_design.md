@@ -1400,3 +1400,14 @@ values, such as `(one+two).raw()`, without copying operands. The explicit
 `Context::check_equal` callable API remains available for callers that
 guarantee their returned references remain alive. The regression uses a
 non-copyable owner and checks the borrowed subobject while its owner is alive.
+
+## 2026-11-01 — Dependent-context member template calls
+
+Fixture shorthand macros expand through `this->ctx()`. In class templates
+this makes the member-call object expression dependent, so templated
+`Context` members need the C++ `template` disambiguator. All five
+`check_compare` relational macro forms and the three typed-exception
+macros now use `(context).template method<...>`; this syntax also accepts
+ordinary, non-dependent explicit `Context&` arguments. Regression cases
+exercise both forms, with eight checks each. Neither comparison
+semantics nor exception expectations change.

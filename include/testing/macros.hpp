@@ -120,21 +120,21 @@
  *  @brief Require the specified exception type from the statement.
  */
 #define ARIADNE_TESTING_EXPECT_THROWS_CTX(context, exception_type, statement) \
-    (context).expect_throws<exception_type>([&] { statement; }, \
+    (context).template expect_throws<exception_type>([&] { statement; }, \
         #statement " throws " #exception_type)
 
 /** @def ARIADNE_TESTING_EXPECT_THROWS_MESSAGE_CTX
  *  @brief Require the specified exception type and a message substring.
  */
 #define ARIADNE_TESTING_EXPECT_THROWS_MESSAGE_CTX(context, exception_type, statement, substring) \
-    (context).expect_throws_message<exception_type>([&] { statement; }, (substring), \
+    (context).template expect_throws_message<exception_type>([&] { statement; }, (substring), \
         #statement " throws " #exception_type " containing " #substring)
 
 /** @def ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX
  *  @brief Require an exception type and check a projected payload against an expected value.
  */
 #define ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX(context, exception_type, statement, projector, expected) \
-    (context).expect_throws_payload<exception_type>([&] { statement; }, \
+    (context).template expect_throws_payload<exception_type>([&] { statement; }, \
         [&]() -> decltype(auto) { return (projector); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         #statement " throws " #exception_type " with " #projector " == " #expected)
@@ -298,7 +298,7 @@
  *  @brief Check inequality, handling signed and unsigned integral operands correctly.
  */
 #define ARIADNE_TESTING_EXPECT_NOT_EQUAL_CTX(context, actual, expected) \
-    (context).check_compare<::Ariadne::Testing::Comparison::NotEqual>( \
+    (context).template check_compare<::Ariadne::Testing::Comparison::NotEqual>( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         #actual " != " #expected)
@@ -307,7 +307,7 @@
  *  @brief Check strict less-than ordering of two deferred operands.
  */
 #define ARIADNE_TESTING_EXPECT_LESS_CTX(context, actual, expected) \
-    (context).check_compare<::Ariadne::Testing::Comparison::Less>( \
+    (context).template check_compare<::Ariadne::Testing::Comparison::Less>( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         #actual " < " #expected)
@@ -316,7 +316,7 @@
  *  @brief Check less-than-or-equal ordering of two deferred operands.
  */
 #define ARIADNE_TESTING_EXPECT_LESS_EQUAL_CTX(context, actual, expected) \
-    (context).check_compare<::Ariadne::Testing::Comparison::LessEqual>( \
+    (context).template check_compare<::Ariadne::Testing::Comparison::LessEqual>( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         #actual " <= " #expected)
@@ -325,7 +325,7 @@
  *  @brief Check strict greater-than ordering of two deferred operands.
  */
 #define ARIADNE_TESTING_EXPECT_GREATER_CTX(context, actual, expected) \
-    (context).check_compare<::Ariadne::Testing::Comparison::Greater>( \
+    (context).template check_compare<::Ariadne::Testing::Comparison::Greater>( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         #actual " > " #expected)
@@ -334,7 +334,7 @@
  *  @brief Check greater-than-or-equal ordering of two deferred operands.
  */
 #define ARIADNE_TESTING_EXPECT_GREATER_EQUAL_CTX(context, actual, expected) \
-    (context).check_compare<::Ariadne::Testing::Comparison::GreaterEqual>( \
+    (context).template check_compare<::Ariadne::Testing::Comparison::GreaterEqual>( \
         [&]() -> decltype(auto) { return (actual); }, \
         [&]() -> decltype(auto) { return (expected); }, \
         #actual " >= " #expected)

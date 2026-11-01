@@ -77,6 +77,21 @@ std::ostream& operator<<(std::ostream& os, TemporaryBorrowOwner::View const& v) 
     return os << v.value;
 }
 
+template<class Tag>
+struct DependentContextFixture : ContextFixture {
+    using ContextFixture::ContextFixture;
+    void exercise() {
+        ARIADNE_TESTING_EXPECT_NOT_EQUAL(1, 2);
+        ARIADNE_TESTING_EXPECT_LESS(1, 2);
+        ARIADNE_TESTING_EXPECT_LESS_EQUAL(2, 2);
+        ARIADNE_TESTING_EXPECT_GREATER(2, 1);
+        ARIADNE_TESTING_EXPECT_GREATER_EQUAL(2, 2);
+        ARIADNE_TESTING_EXPECT_THROWS(std::runtime_error, throw std::runtime_error("expected"));
+        ARIADNE_TESTING_EXPECT_THROWS_MESSAGE(std::runtime_error, throw std::runtime_error("message match"), "match");
+        ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD(std::runtime_error, throw std::runtime_error("payload"),
+            [](std::runtime_error const& e) { return std::string(e.what()); }, std::string("payload"));
+    }
+};
 struct CaptureReporter final : Reporter {
     std::vector<CaseResult> results;
     Summary summary;
@@ -267,6 +282,28 @@ int main() {
         borrowed_reporter.results[0].assertions.size() != 1 ||
         borrowed_reporter.results[0].assertions[0].actual != "3" ||
         borrowed_reporter.results[0].assertions[0].expected != "3") return 112;
+    Suite dependent_context_macros("dependent fixture member template calls");
+    dependent_context_macros.add("fixture shorthand", [](Context& ctx) {
+        DependentContextFixture<int> fixture(ctx);
+        fixture.exercise();
+    });
+    dependent_context_macros.add("explicit context", [](Context& ctx) {
+        ARIADNE_TESTING_EXPECT_NOT_EQUAL_CTX(ctx, 1, 2);
+        ARIADNE_TESTING_EXPECT_LESS_CTX(ctx, 1, 2);
+        ARIADNE_TESTING_EXPECT_LESS_EQUAL_CTX(ctx, 2, 2);
+        ARIADNE_TESTING_EXPECT_GREATER_CTX(ctx, 2, 1);
+        ARIADNE_TESTING_EXPECT_GREATER_EQUAL_CTX(ctx, 2, 2);
+        ARIADNE_TESTING_EXPECT_THROWS_CTX(ctx, std::runtime_error, throw std::runtime_error("expected"));
+        ARIADNE_TESTING_EXPECT_THROWS_MESSAGE_CTX(ctx, std::runtime_error, throw std::runtime_error("message match"), "match");
+        ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX(ctx, std::runtime_error, throw std::runtime_error("payload"),
+            [](std::runtime_error const& e) { return std::string(e.what()); }, std::string("payload"));
+    });
+    CaptureReporter dependent_capture;
+    auto const dependent_summary = dependent_context_macros.run(dependent_capture);
+    if (dependent_summary.passed != 2 || dependent_summary.failed != 0 ||
+        dependent_summary.errors != 0 || dependent_capture.results.size() != 2 ||
+        dependent_capture.results[0].assertions.size() != 8 ||
+        dependent_capture.results[1].assertions.size() != 8) return 113;
     Suite ordering("deferred evaluation");
     std::ostringstream ordering_output;
     ordering.add("start precedes operands", [&](Context& t) {
