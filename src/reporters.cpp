@@ -351,7 +351,8 @@ void crash_emit_checkpoint() noexcept {
         (void)::WriteFile(error, crash_breadcrumb.text[current], count, &written, nullptr);
 #else
     // POSIX write is async-signal-safe. Do not allocate or use iostreams here.
-    (void)::write(STDERR_FILENO, crash_breadcrumb.text[current], count);
+    const ssize_t written = ::write(STDERR_FILENO, crash_breadcrumb.text[current], count);
+    if (written < 0) return; // Best effort in an async-signal-safe handler.
 #endif
 }
 #ifndef _WIN32
