@@ -65,6 +65,26 @@ int main() {
     try {suite.add("invalid",[](Context&){},CaseMetadata{{"dup","dup"},"A"});}
     catch(std::invalid_argument const&){rejected=true;}
     verify(rejected,"duplicate tags must be rejected");
+    // Empty tags are invalid both at registration and at selection time.
+    // Rejected input must not alter the registered set or invoke a reporter.
+    bool empty_case_tag_rejected = false;
+    try {
+        suite.add("empty tag", [](Context&) {}, CaseMetadata{{""}, "A"});
+    } catch (std::invalid_argument const&) {
+        empty_case_tag_rejected = true;
+    }
+    Capture invalid_filter_reporter;
+    bool empty_filter_tag_rejected = false;
+    try {
+        (void)suite.run_selected(invalid_filter_reporter, CaseFilter{"", {""}, ""});
+    } catch (std::invalid_argument const&) {
+        empty_filter_tag_rejected = true;
+    }
+    verify(empty_case_tag_rejected && empty_filter_tag_rejected &&
+           invalid_filter_reporter.selections.empty() &&
+           invalid_filter_reporter.cases.empty(),
+           "empty case and filter tags must be rejected before reporting");
+
     std::ostringstream console;
     ConsoleReporter live(console);
     auto const subset=suite.run_selected(live,CaseFilter{"fast",{},"B"});
