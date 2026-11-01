@@ -323,46 +323,61 @@
  *  @brief Check inequality, handling signed and unsigned integral operands correctly.
  */
 #define ARIADNE_TESTING_EXPECT_NOT_EQUAL_CTX(context, actual, expected) \
-    (context).template check_compare<::Ariadne::Testing::Comparison::NotEqual>( \
-        [&]() -> decltype(auto) { return (actual); }, \
-        [&]() -> decltype(auto) { return (expected); }, \
-        #actual " != " #expected)
+    (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::NotEqual>( \
+        [&]() { \
+            return ([&](auto const& observed_actual) { \
+                return ::Ariadne::Testing::Detail::observe_compare< \
+                    ::Ariadne::Testing::Comparison::NotEqual>(observed_actual, (expected)); \
+            }((actual))); \
+        }, #actual " != " #expected)
 
 /** @def ARIADNE_TESTING_EXPECT_LESS_CTX
  *  @brief Check strict less-than ordering of two deferred operands.
  */
 #define ARIADNE_TESTING_EXPECT_LESS_CTX(context, actual, expected) \
-    (context).template check_compare<::Ariadne::Testing::Comparison::Less>( \
-        [&]() -> decltype(auto) { return (actual); }, \
-        [&]() -> decltype(auto) { return (expected); }, \
-        #actual " < " #expected)
+    (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::Less>( \
+        [&]() { \
+            return ([&](auto const& observed_actual) { \
+                return ::Ariadne::Testing::Detail::observe_compare< \
+                    ::Ariadne::Testing::Comparison::Less>(observed_actual, (expected)); \
+            }((actual))); \
+        }, #actual " < " #expected)
 
 /** @def ARIADNE_TESTING_EXPECT_LESS_EQUAL_CTX
  *  @brief Check less-than-or-equal ordering of two deferred operands.
  */
 #define ARIADNE_TESTING_EXPECT_LESS_EQUAL_CTX(context, actual, expected) \
-    (context).template check_compare<::Ariadne::Testing::Comparison::LessEqual>( \
-        [&]() -> decltype(auto) { return (actual); }, \
-        [&]() -> decltype(auto) { return (expected); }, \
-        #actual " <= " #expected)
+    (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::LessEqual>( \
+        [&]() { \
+            return ([&](auto const& observed_actual) { \
+                return ::Ariadne::Testing::Detail::observe_compare< \
+                    ::Ariadne::Testing::Comparison::LessEqual>(observed_actual, (expected)); \
+            }((actual))); \
+        }, #actual " <= " #expected)
 
 /** @def ARIADNE_TESTING_EXPECT_GREATER_CTX
  *  @brief Check strict greater-than ordering of two deferred operands.
  */
 #define ARIADNE_TESTING_EXPECT_GREATER_CTX(context, actual, expected) \
-    (context).template check_compare<::Ariadne::Testing::Comparison::Greater>( \
-        [&]() -> decltype(auto) { return (actual); }, \
-        [&]() -> decltype(auto) { return (expected); }, \
-        #actual " > " #expected)
+    (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::Greater>( \
+        [&]() { \
+            return ([&](auto const& observed_actual) { \
+                return ::Ariadne::Testing::Detail::observe_compare< \
+                    ::Ariadne::Testing::Comparison::Greater>(observed_actual, (expected)); \
+            }((actual))); \
+        }, #actual " > " #expected)
 
 /** @def ARIADNE_TESTING_EXPECT_GREATER_EQUAL_CTX
  *  @brief Check greater-than-or-equal ordering of two deferred operands.
  */
 #define ARIADNE_TESTING_EXPECT_GREATER_EQUAL_CTX(context, actual, expected) \
-    (context).template check_compare<::Ariadne::Testing::Comparison::GreaterEqual>( \
-        [&]() -> decltype(auto) { return (actual); }, \
-        [&]() -> decltype(auto) { return (expected); }, \
-        #actual " >= " #expected)
+    (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::GreaterEqual>( \
+        [&]() { \
+            return ([&](auto const& observed_actual) { \
+                return ::Ariadne::Testing::Detail::observe_compare< \
+                    ::Ariadne::Testing::Comparison::GreaterEqual>(observed_actual, (expected)); \
+            }((actual))); \
+        }, #actual " >= " #expected)
 
 /** @} */
 

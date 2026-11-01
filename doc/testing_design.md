@@ -1530,3 +1530,20 @@ SA_RESETHAND implicitly fails compilation. Convert explicitly to the
 sa_flags field type, preserving the platform flag representation. The cast
 has been compile-checked with Linux Clang and GCC under -Wsign-conversion
 -Werror. Runtime crash-handler coverage remains gated by the CI matrix.
+
+## 2026-11-01 — Lifetime-safe comparison macros for temporary-backed views
+
+The five relational assertion macros (not-equal, less, less-equal, greater,
+greater-equal) now snapshot the comparison verdict and diagnostic renderings
+within the full expression evaluating the original operands, before their
+temporaries can be destroyed. Previously the detached `decltype(auto)`
+results of two deferred callables could become dangling references (notably
+`FloatBounds(...).upper().raw()`), corrupting Numeric comparisons and
+causing sporadic exceptions on Debug builds. The new snapshot path retains
+the CHECK-before-evaluation event, once-only left-to-right evaluation,
+mixed signed-integer and bool promotion semantics, domain ADL comparisons,
+three-valued evidence and actual/expected diagnostics. A deterministic
+regression poisons the referenced value in a temporary's destructor and
+requires all five relational macros to observe the original value. The
+existing lower-level `check_compare` API is unchanged; callers producing
+references into temporaries should prefer the macros or snapshot API.

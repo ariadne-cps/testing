@@ -1,6 +1,7 @@
 
 #include "ariadne-testing.hpp"
 #include <cstdlib>
+#include <memory>
 #include <iostream>
 #include <ostream>
 #include <stdexcept>
@@ -40,6 +41,12 @@ Evidence refines(Value const& a, Value const& b) {
 }
 bool consistent(Value const& v) { return v.radius >= 0; }
 } // namespace Demo
+
+struct TransientReference {
+    int* target;
+    ~TransientReference() { *target = -99; }
+    int const& raw() const { return *target; }
+};
 
 struct Capture : Reporter {
     std::vector<CaseResult> cases;
@@ -177,6 +184,59 @@ int main() {
                operands[0].actual.find("value(")!=std::string::npos &&
                operands[0].expected.find("value(")!=std::string::npos,
                "rendered operands or relation check missing");
+    }
+    // The .raw() method returns a reference to a member-style value owned
+    // by a temporary. Its destructor deliberately poisons that value.
+    // Each relation must compare AND render before the temporary dies.
+    Suite temporaries("relational temporary lifetime");
+    Capture observed;
+    int comparisons = 0;
+    int lhs_evaluations = 0;
+    int rhs_evaluations = 0;
+    temporaries.add("greater equal from temporary", [&](Context& c) {
+        int state = 7;
+        ARIADNE_TESTING_EXPECT_GREATER_EQUAL_CTX(c,
+            TransientReference{&state}.raw(), 7);
+        if (state == -99) ++comparisons;
+    });
+    temporaries.add("less equal from temporary", [&](Context& c) {
+        int state = 4;
+        ARIADNE_TESTING_EXPECT_LESS_EQUAL_CTX(c,
+            TransientReference{&state}.raw(), 4);
+        if (state == -99) ++comparisons;
+    });
+    temporaries.add("less with deferred operand order", [&](Context& c) {
+        int state = 3;
+        ARIADNE_TESTING_EXPECT_LESS_CTX(c,
+            ([&] { ++lhs_evaluations; return TransientReference{&state}; }()).raw(),
+            ([&] { ++rhs_evaluations; return 6; }()));
+        if (state == -99) ++comparisons;
+    });
+    temporaries.add("greater from temporary", [&](Context& c) {
+        int state = 9;
+        ARIADNE_TESTING_EXPECT_GREATER_CTX(c,
+            TransientReference{&state}.raw(), 8);
+        if (state == -99) ++comparisons;
+    });
+    temporaries.add("not equal from temporary", [&](Context& c) {
+        int state = 9;
+        ARIADNE_TESTING_EXPECT_NOT_EQUAL_CTX(c,
+            TransientReference{&state}.raw(), 8);
+        if (state == -99) ++comparisons;
+    });
+    const auto temporary_summary = temporaries.run(observed);
+    verify(temporary_summary.passed == 5 && temporary_summary.errors == 0 &&
+           temporary_summary.failed == 0 && observed.cases.size() == 5 &&
+           comparisons == 5 && lhs_evaluations == 1 && rhs_evaluations == 1,
+           "relational macro temporary lifetime or operand evaluation changed");
+    if (observed.cases.size() == 5) {
+        const std::string expected_actuals[] = {"7", "4", "3", "9", "9"};
+        for (std::size_t i=0; i<5; ++i)
+            verify(observed.cases[i].assertions.size() == 1 &&
+                   observed.cases[i].assertions[0].outcome == Outcome::Passed &&
+                   observed.cases[i].assertions[0].actual == expected_actuals[i],
+                   "relational temporary observation was poisoned at case " +
+                       std::to_string(i));
     }
     return ok?0:1;
 }

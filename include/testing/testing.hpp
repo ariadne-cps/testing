@@ -278,6 +278,17 @@ template<class ActualFn, class ExpectedFn>
                      std::string_view description,
                      std::source_location location = std::source_location::current());
 
+    // Macro-safe comparison: produce the verdict and rendered operands while
+    // both expressions' temporaries are still alive in the calling expression.
+    /** @brief Record an eagerly snapshot-captured relational comparison.
+     *  @note The callable is deferred until after the CHECK event. Its
+     *  result must contain a verdict and owned renderings of both operands.
+     */
+    template<Comparison Relation, class ComparisonFn>
+    void check_compare_snapshot(ComparisonFn&& comparison_fn,
+                                std::string_view description,
+                                std::source_location location = std::source_location::current());
+
     // Compare two input ranges without copying their elements. Both ranges
     // and the comparator/path selectors are evaluated once after CHECK.
     // A non-true predicate is retained as evidence, not coerced to bool.

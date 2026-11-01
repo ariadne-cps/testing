@@ -100,6 +100,52 @@ EqualityObservation observe_equal(A const& actual, B const& expected){
     return {verdict, render(actual), render(expected)};
 }
 
+template<Comparison Relation, class A, class B>
+EqualityObservation observe_compare(A const& actual, B const& expected) {
+    using Left = std::remove_cvref_t<A>;
+    using Right = std::remove_cvref_t<B>;
+    constexpr bool built_in_integers =
+        std::is_integral_v<Left> && std::is_integral_v<Right> &&
+        !std::is_same_v<Left, bool> && !std::is_same_v<Right, bool>;
+    constexpr bool boolean_arithmetic =
+        (std::is_same_v<Left, bool> || std::is_same_v<Right, bool>) &&
+        std::is_arithmetic_v<Left> && std::is_arithmetic_v<Right>;
+    decltype(auto) lhs = [&]() -> decltype(auto) {
+        if constexpr (boolean_arithmetic)
+            return static_cast<std::common_type_t<int, Left, Right>>(actual);
+        else return (actual);
+    }();
+    decltype(auto) rhs = [&]() -> decltype(auto) {
+        if constexpr (boolean_arithmetic)
+            return static_cast<std::common_type_t<int, Left, Right>>(expected);
+        else return (expected);
+    }();
+    Evidence verdict;
+    if constexpr (Relation == Comparison::NotEqual) {
+        if constexpr (built_in_integers)
+            verdict = evidence(!std::cmp_equal(lhs, rhs));
+        else verdict = evidence(lhs != rhs);
+    } else if constexpr (Relation == Comparison::Less) {
+        if constexpr (built_in_integers)
+            verdict = evidence(std::cmp_less(lhs, rhs));
+        else verdict = evidence(lhs < rhs);
+    } else if constexpr (Relation == Comparison::LessEqual) {
+        if constexpr (built_in_integers)
+            verdict = evidence(std::cmp_less_equal(lhs, rhs));
+        else verdict = evidence(lhs <= rhs);
+    } else if constexpr (Relation == Comparison::Greater) {
+        if constexpr (built_in_integers)
+            verdict = evidence(std::cmp_greater(lhs, rhs));
+        else verdict = evidence(lhs > rhs);
+    } else {
+        static_assert(Relation == Comparison::GreaterEqual);
+        if constexpr (built_in_integers)
+            verdict = evidence(std::cmp_greater_equal(lhs, rhs));
+        else verdict = evidence(lhs >= rhs);
+    }
+    return {verdict, render(actual), render(expected)};
+}
+
 template<class Callable>
 auto capture_callable(Callable&& callable){
     if constexpr (std::is_lvalue_reference_v<Callable>)
@@ -214,6 +260,17 @@ template<class ActualFn, class ExpectedFn>
 
 template<class ComparisonFn>
     void Context::check_equal_snapshot(ComparisonFn&& comparison_fn,
+                     std::string_view description,
+                     std::source_location location){
+        auto const index = begin_check(description);
+        auto observation = std::invoke(std::forward<ComparisonFn>(comparison_fn));
+        record(outcome(observation.verdict), description,
+               std::move(observation.actual), std::move(observation.expected),
+               {}, location, index);
+    }
+
+template<Comparison Relation, class ComparisonFn>
+    void Context::check_compare_snapshot(ComparisonFn&& comparison_fn,
                      std::string_view description,
                      std::source_location location){
         auto const index = begin_check(description);
