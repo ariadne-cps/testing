@@ -211,5 +211,50 @@ int main() {
             verify(broken[0].detail == "absolute predicate failure",
                    "predicate exception detail lost");
     }
+
+    // The state must change after an initial unsuccessful observation. A
+    // promise synchronizes the producer with the first predicate evaluation,
+    // so the test exercises real polling without assuming thread start order.
+    Suite atomic_transition("atomic transition during absolute wait");
+    atomic_transition.add("value published after waiting starts", [](Context& c) {
+        std::atomic<int> state{0};
+        std::promise<void> first_observed;
+        auto observed = first_observed.get_future();
+        bool notified = false;
+        std::jthread producer([&] {
+            if (observed.wait_for(2s) != std::future_status::ready) return;
+            std::this_thread::sleep_for(2ms);
+            state.store(1, std::memory_order_release);
+        });
+        int inspections = 0;
+        c.expect_atomic_until(state, [&](int value) {
+            ++inspections;
+            if (value == 0 && !notified) {
+                notified = true;
+                first_observed.set_value();
+            }
+            return value == 1;
+        }, std::chrono::steady_clock::now() + 3s,
+        "updated atomic state becomes ready");
+        producer.join();
+        c.prove(inspections >= 2,
+                "predicate observed an initial mismatch and the updated state");
+    });
+    Capture transition_capture;
+    auto const transition_summary = atomic_transition.run(transition_capture);
+    verify(transition_summary.passed == 1 && transition_summary.failed == 0 &&
+           transition_summary.errors == 0 && transition_capture.checks == 2 &&
+           transition_capture.results.size() == 1,
+           "atomic transition must complete successfully within its deadline");
+    if (transition_capture.results.size() == 1) {
+        auto const& assertions = transition_capture.results[0].assertions;
+        verify(assertions.size() == 2 &&
+               assertions[0].outcome == Outcome::Passed &&
+               assertions[0].actual == "1" &&
+               assertions[0].wait.has_value() &&
+               assertions[0].wait->status == WaitStatus::Ready &&
+               assertions[0].wait->absolute_deadline,
+               "atomic transition must preserve ready status and deadline");
+    }
     return ok ? 0 : 1;
 }
