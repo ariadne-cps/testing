@@ -1479,3 +1479,16 @@ reporter. `--full` and the default direct invocation retain streaming output.
 Raw stdout/stderr written outside the reporter remains outside this contract;
 legacy test executables that ignore `--concise` must be migrated separately.
 No result classifications, failure exit status or structured reporters change.
+
+## 2026-11-01 — Restore complete outcome reporting and self-test diagnostics
+
+The All reporter was dropping Passed and Skipped case-completion lines,
+although its existing self-test requires `[PASS] case` and `[SKIP] case`.
+Full mode now emits both outcomes immediately after the case finishes.
+Concise mode still suppresses them and prints only suite totals plus the
+trailing failure index. No result classification or exit-gate logic changed.
+
+The `test_testing` executable now prints the failing assertion's source line
+and exit code to stderr before returning nonzero. The regression checks for
+full outcome output also dump the captured console log if they fail, so CTest
+`--output-on-failure` exposes actionable diagnostics instead of a blank log.

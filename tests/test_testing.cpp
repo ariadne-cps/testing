@@ -99,6 +99,12 @@ struct CaptureReporter final : Reporter {
     void suite_finished(std::string_view, Summary const& s) override { summary = s; }
 };
 
+int report_self_test_failure(int code, int line) {
+    std::cerr << "[test_testing] assertion failed at " << __FILE__ << ':' << line
+              << " (exit code " << code << ")\n";
+    return code;
+}
+
 int main() {
     Suite suite("self-test");
     suite.add("bool pass", [](Context& t) { t.prove(true, "true"); });
@@ -117,24 +123,27 @@ int main() {
     if (s.passed != 4 || s.failed != 2 || s.inconclusive != 1 || s.skipped != 2 || s.errors != 2) {
         std::cerr << "Incorrect summary: " << s.passed << '/' << s.failed << '/' << s.inconclusive
                   << '/' << s.skipped << '/' << s.errors << '\n';
-        return 1;
+        return report_self_test_failure(1, __LINE__);
     }
-    if (s.successful() || reporter.results.size() != 11) return 2;
-    if (reporter.results[9].assertions[0].actual != "<unprintable>") return 3;
-    if (reporter.results[6].assertions[0].detail != "test error") return 4;
+    if (s.successful() || reporter.results.size() != 11) return report_self_test_failure(2, __LINE__);
+    if (reporter.results[9].assertions[0].actual != "<unprintable>") return report_self_test_failure(3, __LINE__);
+    if (reporter.results[6].assertions[0].detail != "test error") return report_self_test_failure(4, __LINE__);
     std::ostringstream output;
     ConsoleReporter console(output);
     Suite rendered("reporting");
     rendered.add("success", [](Context& t) { t.prove(true, "established"); });
     rendered.add("failure", [](Context& t) { t.expect_equal(2, 3, "numbers differ"); });
     Summary const rendered_summary = rendered.run(console);
-    if (rendered_summary.passed != 1 || rendered_summary.failed != 1) return 5;
+    if (rendered_summary.passed != 1 || rendered_summary.failed != 1) return report_self_test_failure(5, __LINE__);
     std::string const report = output.str();
-    if (report.find("[PASS] success") == std::string::npos) return 6;
-    if (report.find("[FAIL] failure") == std::string::npos) return 7;
-    if (report.find("actual: 2") == std::string::npos) return 8;
-    if (report.find("expected: 3") == std::string::npos) return 9;
-    if (report.find("reporting: 1 passed, 1 failed") == std::string::npos) return 10;
+    if (report.find("[PASS] success") == std::string::npos) {
+        std::cerr << "Expected [PASS] success; actual full console output:\n" << report;
+        return report_self_test_failure(6, __LINE__);
+    }
+    if (report.find("[FAIL] failure") == std::string::npos) return report_self_test_failure(7, __LINE__);
+    if (report.find("actual: 2") == std::string::npos) return report_self_test_failure(8, __LINE__);
+    if (report.find("expected: 3") == std::string::npos) return report_self_test_failure(9, __LINE__);
+    if (report.find("reporting: 1 passed, 1 failed") == std::string::npos) return report_self_test_failure(10, __LINE__);
     Suite exceptions("exceptions");
     exceptions.add("correct type", [](Context& t) { t.expect_throws<std::runtime_error>([] { throw std::runtime_error("yes"); }); });
     exceptions.add("wrong type", [](Context& t) { t.expect_throws<std::runtime_error>([] { throw std::logic_error("wrong"); }); });
@@ -144,7 +153,7 @@ int main() {
     exceptions.add("unexpected", [](Context& t) { t.expect_no_throw([] { throw 42; }); });
     CaptureReporter exceptions_reporter;
     Summary es = exceptions.run(exceptions_reporter);
-    if (es.passed != 3 || es.failed != 3 || es.errors != 0) return 11;
+    if (es.passed != 3 || es.failed != 3 || es.errors != 0) return report_self_test_failure(11, __LINE__);
     Suite mixed_signs("mixed signedness");
     mixed_signs.add("same positive", [](Context& t) {
         t.expect_equal(std::size_t{2}, 2, "size_t versus int");
@@ -155,9 +164,9 @@ int main() {
     });
     CaptureReporter sign_reporter;
     Summary const sign_summary = mixed_signs.run(sign_reporter);
-    if (sign_summary.passed != 1 || sign_summary.failed != 1) return 15;
+    if (sign_summary.passed != 1 || sign_summary.failed != 1) return report_self_test_failure(15, __LINE__);
     if (sign_reporter.results.size() != 2 ||
-        sign_reporter.results[1].outcome != Outcome::Failed) return 16;
+        sign_reporter.results[1].outcome != Outcome::Failed) return report_self_test_failure(16, __LINE__);
     Suite character_equality("character integral equality");
     character_equality.add("character types and integer interoperability", [](Context& t) {
         t.expect_equal('a', 'a');
@@ -178,7 +187,7 @@ int main() {
         character_summary.errors != 0 || character_reporter.results.size() != 2 ||
         character_reporter.results[0].assertions.size() != 7 ||
         character_reporter.results[1].assertions.size() != 2)
-        return 111;
+        return report_self_test_failure(111, __LINE__);
     Suite progress("progress");
     std::ostringstream live;
     ConsoleReporter live_reporter(live);
@@ -194,10 +203,10 @@ int main() {
     });
     progress.add("second", [](Context& t) { t.prove(true, "reset counter"); });
     auto const ps = progress.run(live_reporter);
-    if (ps.passed != 2 || ps.errors != 0) return 17;
-    if (live.str().find("[CHECK 1.2] second assertion") == std::string::npos) return 18;
-    if (live.str().find("[RUN 2/2] progress / second") == std::string::npos) return 19;
-    if (live.str().find("[CHECK 2.1] reset counter") == std::string::npos) return 20;
+    if (ps.passed != 2 || ps.errors != 0) return report_self_test_failure(17, __LINE__);
+    if (live.str().find("[CHECK 1.2] second assertion") == std::string::npos) return report_self_test_failure(18, __LINE__);
+    if (live.str().find("[RUN 2/2] progress / second") == std::string::npos) return report_self_test_failure(19, __LINE__);
+    if (live.str().find("[CHECK 2.1] reset counter") == std::string::npos) return report_self_test_failure(20, __LINE__);
     struct FixtureExample : ContextFixture {
         using ContextFixture::ContextFixture;
         void test_first() {
@@ -222,14 +231,14 @@ int main() {
     ConsoleReporter fixture_reporter(fixture_out);
     auto const fixture_summary = fixture_suite.run(fixture_reporter);
     if (fixture_summary.passed != 3 || fixture_summary.failed != 1 ||
-        fixture_summary.errors != 0) return 25;
+        fixture_summary.errors != 0) return report_self_test_failure(25, __LINE__);
     auto const fixture_log = fixture_out.str();
-    if (fixture_log.find("[RUN 1/4] fixtures / first") == std::string::npos) return 26;
-    if (fixture_log.find("[CHECK 1.2] second check") == std::string::npos) return 27;
-    if (fixture_log.find("[RUN 2/4] fixtures / second") == std::string::npos) return 28;
-    if (fixture_log.find("[CHECK 2.1] reset check count") == std::string::npos) return 29;
-    if (fixture_log.find("[CHECK 3.1] operation completes") == std::string::npos) return 30;
-    if (fixture_log.find("[FAIL] throws") == std::string::npos) return 31;
+    if (fixture_log.find("[RUN 1/4] fixtures / first") == std::string::npos) return report_self_test_failure(26, __LINE__);
+    if (fixture_log.find("[CHECK 1.2] second check") == std::string::npos) return report_self_test_failure(27, __LINE__);
+    if (fixture_log.find("[RUN 2/4] fixtures / second") == std::string::npos) return report_self_test_failure(28, __LINE__);
+    if (fixture_log.find("[CHECK 2.1] reset check count") == std::string::npos) return report_self_test_failure(29, __LINE__);
+    if (fixture_log.find("[CHECK 3.1] operation completes") == std::string::npos) return report_self_test_failure(30, __LINE__);
+    if (fixture_log.find("[FAIL] throws") == std::string::npos) return report_self_test_failure(31, __LINE__);
 
     // Exercise explicit fixture labels without the test_ prefix using the
     // same FixtureExample instantiation as the existing prefix cases.
@@ -244,7 +253,7 @@ int main() {
         named_fixture_reporter.results[0].name != "custom_label" ||
         named_fixture_reporter.results[0].assertions.size() != 2 ||
         named_fixture_reporter.results[0].assertions[0].outcome != Outcome::Passed)
-        return 79;
+        return report_self_test_failure(79, __LINE__);
 
     Suite expressions("macro expressions");
     std::ostringstream expression_output;
@@ -260,13 +269,13 @@ int main() {
     });
     ConsoleReporter expression_reporter(expression_output);
     auto const expression_summary = expressions.run(expression_reporter);
-    if (expression_summary.passed != 1 || evaluation_count != 1) return 32;
+    if (expression_summary.passed != 1 || evaluation_count != 1) return report_self_test_failure(32, __LINE__);
     auto const expression_log = expression_output.str();
-    if (expression_log.find("[CHECK 1.1] TestLogic::Truth::True") == std::string::npos) return 33;
-    if (expression_log.find("[CHECK 1.2] ++evaluation_count == 1") == std::string::npos) return 34;
-    if (expression_log.find("[CHECK 1.3] TestLogic::Value{2} same TestLogic::Value{2}") == std::string::npos) return 35;
-    if (expression_log.find("[CHECK 1.4] 11 within 1 of 10") == std::string::npos) return 36;
-    if (expression_log.find("[CHECK 1.7] (void)0 does not throw") == std::string::npos) return 37;
+    if (expression_log.find("[CHECK 1.1] TestLogic::Truth::True") == std::string::npos) return report_self_test_failure(33, __LINE__);
+    if (expression_log.find("[CHECK 1.2] ++evaluation_count == 1") == std::string::npos) return report_self_test_failure(34, __LINE__);
+    if (expression_log.find("[CHECK 1.3] TestLogic::Value{2} same TestLogic::Value{2}") == std::string::npos) return report_self_test_failure(35, __LINE__);
+    if (expression_log.find("[CHECK 1.4] 11 within 1 of 10") == std::string::npos) return report_self_test_failure(36, __LINE__);
+    if (expression_log.find("[CHECK 1.7] (void)0 does not throw") == std::string::npos) return report_self_test_failure(37, __LINE__);
     Suite borrowed_temporaries("borrowed temporary lifetime");
     bool owner_alive = false;
     int evaluations = 0;
@@ -281,7 +290,7 @@ int main() {
         borrowed_reporter.results.size() != 1 ||
         borrowed_reporter.results[0].assertions.size() != 1 ||
         borrowed_reporter.results[0].assertions[0].actual != "3" ||
-        borrowed_reporter.results[0].assertions[0].expected != "3") return 112;
+        borrowed_reporter.results[0].assertions[0].expected != "3") return report_self_test_failure(112, __LINE__);
     Suite dependent_context_macros("dependent fixture member template calls");
     dependent_context_macros.add("fixture shorthand", [](Context& ctx) {
         DependentContextFixture<int> fixture(ctx);
@@ -303,18 +312,18 @@ int main() {
     if (dependent_summary.passed != 2 || dependent_summary.failed != 0 ||
         dependent_summary.errors != 0 || dependent_capture.results.size() != 2 ||
         dependent_capture.results[0].assertions.size() != 8 ||
-        dependent_capture.results[1].assertions.size() != 8) return 113;
+        dependent_capture.results[1].assertions.size() != 8) return report_self_test_failure(113, __LINE__);
     Suite ordering("deferred evaluation");
     std::ostringstream ordering_output;
     ordering.add("start precedes operands", [&](Context& t) {
         ARIADNE_TESTING_EXPECT_EQUAL_CTX(t, ([&]() {
             if (ordering_output.str().find("[CHECK 1.1]") == std::string::npos)
                 throw std::runtime_error("CHECK event missing before operand evaluation");
-            return 2;
+            return report_self_test_failure(2, __LINE__);
         }()), 2);
     });
     ConsoleReporter ordering_reporter(ordering_output);
-    if (!ordering.run(ordering_reporter).successful()) return 38;
+    if (!ordering.run(ordering_reporter).successful()) return report_self_test_failure(38, __LINE__);
     // Rerun the SAME macro expansion without a console reporter.
     // The operand's CHECK-presence precondition now throws; the runner
     // must report that evaluation error instead of silently passing.
@@ -328,7 +337,7 @@ int main() {
         ordering_without_console.results[0].assertions[0].outcome != Outcome::Error ||
         ordering_without_console.results[0].assertions[0].detail !=
             "CHECK event missing before operand evaluation")
-        return 89;
+        return report_self_test_failure(89, __LINE__);
     // D01: relational comparisons preserve built-in signedness and ADL evidence.
     Suite relations("relations");
     CaptureReporter relation_capture;
@@ -361,17 +370,17 @@ int main() {
     });
     auto const relation_summary = relations.run(relation_capture);
     if (relation_summary.passed != 2 || relation_summary.inconclusive != 1 ||
-        relation_summary.failed != 1 || relation_summary.errors != 0) return 40;
-    if (relation_capture.results.size() != 4) return 41;
+        relation_summary.failed != 1 || relation_summary.errors != 0) return report_self_test_failure(40, __LINE__);
+    if (relation_capture.results.size() != 4) return report_self_test_failure(41, __LINE__);
     auto const& indeterminate = relation_capture.results[2];
-    if (indeterminate.assertions.size() != 5) return 42;
+    if (indeterminate.assertions.size() != 5) return report_self_test_failure(42, __LINE__);
     for (auto const& assertion : indeterminate.assertions)
-        if (assertion.outcome != Outcome::Inconclusive) return 43;
+        if (assertion.outcome != Outcome::Inconclusive) return report_self_test_failure(43, __LINE__);
     auto const& failures = relation_capture.results[3].assertions;
     if (failures.size() != 2 || failures[0].actual != "5" ||
-        failures[0].expected != "3" || failures[0].description != "5 < 3") return 44;
+        failures[0].expected != "3" || failures[0].description != "5 < 3") return report_self_test_failure(44, __LINE__);
     if (failures[1].description.find("not ordered(") != 0 ||
-        failures[1].outcome != Outcome::Failed) return 45;
+        failures[1].outcome != Outcome::Failed) return report_self_test_failure(45, __LINE__);
 
     Suite evaluation("single evaluation");
     std::ostringstream live_comparisons;
@@ -400,8 +409,8 @@ int main() {
         }, "ordered predicate");
     });
     ConsoleReporter live_relation_reporter(live_comparisons);
-    if (!evaluation.run(live_relation_reporter).successful() || order != 5) return 46;
-    if (live_comparisons.str().find("[CHECK 1.2] ordered predicate") == std::string::npos) return 47;
+    if (!evaluation.run(live_relation_reporter).successful() || order != 5) return report_self_test_failure(46, __LINE__);
+    if (live_comparisons.str().find("[CHECK 1.2] ordered predicate") == std::string::npos) return report_self_test_failure(47, __LINE__);
 
     // The existing single-evaluation macro expansion is exercised with
     // three genuine operand failures, not copied into new template
@@ -415,7 +424,7 @@ int main() {
         wrong_initial_order.results[0].assertions.size() != 1 ||
         wrong_initial_order.results[0].assertions[0].detail !=
             "left operand evaluated before CHECK")
-        return 90;
+        return report_self_test_failure(90, __LINE__);
 
     // Second: the left operand's progress precondition fails when no
     // console CHECK output is available, even with a correct order.
@@ -429,7 +438,7 @@ int main() {
         missing_check_output.results[0].assertions.size() != 1 ||
         missing_check_output.results[0].assertions[0].detail !=
             "left operand evaluated before CHECK")
-        return 91;
+        return report_self_test_failure(91, __LINE__);
 
     // Third: the right operand sees a bad order. The adjustable offset
     // emulates an intervening evaluation while the lexical macro site
@@ -441,7 +450,7 @@ int main() {
     auto const right_order_summary = evaluation.run(live_relation_reporter);
     if (right_order_summary.errors != 1 ||
         live_comparisons.str().find("wrong operand order") == std::string::npos)
-        return 92;
+        return report_self_test_failure(92, __LINE__);
     // D02: an expected indeterminate value must not become an inconclusive test.
     Suite expectations("evidence expectations");
     CaptureReporter expected_capture;
@@ -466,24 +475,24 @@ int main() {
     });
     auto const expected_sum = expectations.run(expected_capture);
     if (expected_sum.passed != 1 || expected_sum.failed != 2 ||
-        expected_sum.inconclusive != 1 || expected_sum.errors != 0) return 48;
-    if (expected_capture.results.size() != 4) return 49;
+        expected_sum.inconclusive != 1 || expected_sum.errors != 0) return report_self_test_failure(48, __LINE__);
+    if (expected_capture.results.size() != 4) return report_self_test_failure(49, __LINE__);
     auto const& evidence_pass = expected_capture.results[0].assertions;
-    if (evidence_pass.size() != 5) return 50;
+    if (evidence_pass.size() != 5) return report_self_test_failure(50, __LINE__);
     for (auto const& assertion : evidence_pass)
-        if (assertion.outcome != Outcome::Passed) return 51;
+        if (assertion.outcome != Outcome::Passed) return report_self_test_failure(51, __LINE__);
     if (evidence_pass[2].actual != "indeterminate" ||
-        evidence_pass[2].expected != "possibly true") return 52;
+        evidence_pass[2].expected != "possibly true") return report_self_test_failure(52, __LINE__);
     if (expected_capture.results[1].assertions[1].outcome != Outcome::Inconclusive)
-        return 53;
+        return report_self_test_failure(53, __LINE__);
     if (expected_capture.results[2].assertions[0].outcome != Outcome::Inconclusive)
-        return 54;
-    if (expected_capture.results[3].assertions[0].actual != "false") return 55;
-    if (expected_capture.results[0].assertions[3].expected != "not possibly true") return 56;
-    if (expected_capture.results[2].assertions[0].expected != "not possibly true") return 57;
+        return report_self_test_failure(54, __LINE__);
+    if (expected_capture.results[3].assertions[0].actual != "false") return report_self_test_failure(55, __LINE__);
+    if (expected_capture.results[0].assertions[3].expected != "not possibly true") return report_self_test_failure(56, __LINE__);
+    if (expected_capture.results[2].assertions[0].expected != "not possibly true") return report_self_test_failure(57, __LINE__);
     if (expected_capture.results[3].assertions.size() != 3 ||
         expected_capture.results[3].assertions[1].actual != "true" ||
-        expected_capture.results[3].assertions[1].outcome != Outcome::Failed) return 58;
+        expected_capture.results[3].assertions[1].outcome != Outcome::Failed) return report_self_test_failure(58, __LINE__);
     Suite gate_cases("exit policy");
     CaptureReporter gate_reporter;
     gate_cases.add("valid proof", [](Context& c) { c.prove(true, "certain"); });
@@ -493,24 +502,24 @@ int main() {
     gate_cases.add("not executed", [](Context& c) { c.skip("environment unavailable"); });
     auto const gate_summary = gate_cases.run(gate_reporter);
     if (gate_summary.passed != 1 || gate_summary.inconclusive != 1 ||
-        gate_summary.skipped != 1 || gate_summary.successful()) return 59;
-    if (gate_summary.acceptable({})) return 60;
+        gate_summary.skipped != 1 || gate_summary.successful()) return report_self_test_failure(59, __LINE__);
+    if (gate_summary.acceptable({})) return report_self_test_failure(60, __LINE__);
     AcceptancePolicy permit_inconclusive;
     permit_inconclusive.inconclusive = InconclusivePolicy::NonBlocking;
-    if (!gate_summary.acceptable(permit_inconclusive)) return 61;
+    if (!gate_summary.acceptable(permit_inconclusive)) return report_self_test_failure(61, __LINE__);
     permit_inconclusive.skipped = SkippedPolicy::Blocking;
-    if (gate_summary.acceptable(permit_inconclusive)) return 62;
+    if (gate_summary.acceptable(permit_inconclusive)) return report_self_test_failure(62, __LINE__);
     if (gate_reporter.results[1].outcome != Outcome::Inconclusive ||
-        gate_reporter.results[2].outcome != Outcome::Skipped) return 63;
+        gate_reporter.results[2].outcome != Outcome::Skipped) return report_self_test_failure(63, __LINE__);
     Summary only_inconclusive;
     only_inconclusive.inconclusive = 1;
-    if (only_inconclusive.acceptable(permit_inconclusive)) return 64;
+    if (only_inconclusive.acceptable(permit_inconclusive)) return report_self_test_failure(64, __LINE__);
     Summary with_failure = gate_summary;
     with_failure.failed = 1;
-    if (with_failure.acceptable({InconclusivePolicy::NonBlocking, SkippedPolicy::NonBlocking})) return 65;
+    if (with_failure.acceptable({InconclusivePolicy::NonBlocking, SkippedPolicy::NonBlocking})) return report_self_test_failure(65, __LINE__);
     Summary with_error = gate_summary;
     with_error.errors = 1;
-    if (with_error.acceptable({InconclusivePolicy::NonBlocking, SkippedPolicy::NonBlocking})) return 66;
+    if (with_error.acceptable({InconclusivePolicy::NonBlocking, SkippedPolicy::NonBlocking})) return report_self_test_failure(66, __LINE__);
     // A successfully checked solver status UNKNOWN is not test Inconclusive.
     enum class SolverState { Sat, Unsat, Unknown };
     enum class UnknownReason { None, ResourceExhausted };
@@ -525,7 +534,7 @@ int main() {
     auto const solver_summary = solver_states.run(solver_state_reporter);
     if (!solver_summary.successful() || solver_state_reporter.results.size() != 1 ||
         solver_state_reporter.results[0].assertions.size() != 2 ||
-        solver_state_reporter.results[0].assertions[0].outcome != Outcome::Passed) return 67;
+        solver_state_reporter.results[0].assertions[0].outcome != Outcome::Passed) return report_self_test_failure(67, __LINE__);
     Suite diagnostics("diagnostics");
     std::ostringstream diag_output;
     diagnostics.add("nested oracle", [&](Context& c) {
@@ -563,23 +572,23 @@ int main() {
     ReporterFanout diagnostic_fanout{std::ref(diag_reporter), std::ref(concise_diag_reporter)};
     auto const diag_summary = diagnostics.run(diagnostic_fanout);
     if (diag_summary.failed != 1 || diag_summary.errors != 1 ||
-        diag_summary.passed != 2) return 68;
+        diag_summary.passed != 2) return report_self_test_failure(68, __LINE__);
     if (diag_output.str().find("[WARN] oracle=floatmp_rounding.tsv / row=21 / reference is approximate") ==
-        std::string::npos) return 69;
+        std::string::npos) return report_self_test_failure(69, __LINE__);
     if (diag_output.str().find("context: oracle=floatmp_rounding.tsv / row=21") ==
-        std::string::npos) return 70;
+        std::string::npos) return report_self_test_failure(70, __LINE__);
     if (concise_diag_output.str().find("diagnostic: input prepared") == std::string::npos ||
-        concise_diag_output.str().find("diagnostic: calculation") == std::string::npos) return 71;
-    if (diag_output.str().find("context: phase=outer / row=error") == std::string::npos) return 72;
+        concise_diag_output.str().find("diagnostic: calculation") == std::string::npos) return report_self_test_failure(71, __LINE__);
+    if (diag_output.str().find("context: phase=outer / row=error") == std::string::npos) return report_self_test_failure(72, __LINE__);
     if (diag_output.str().find("[CHECK 3.1] scope still active after move") ==
-        std::string::npos) return 82;
+        std::string::npos) return report_self_test_failure(82, __LINE__);
     if (diag_output.str().find("[CHECK 3.2] moved scope closed at end of owner lifetime") ==
-        std::string::npos) return 83;
+        std::string::npos) return report_self_test_failure(83, __LINE__);
     if (concise_diag_output.str().find("[CHECK ") != std::string::npos ||
         concise_diag_output.str().find("[RUN ") != std::string::npos ||
         concise_diag_output.str().find("[SCOPE ") != std::string::npos ||
-        concise_diag_output.str().find("[PASS]") != std::string::npos) return 114;
-    if (diag_output.str().find("[CHECK 4.1] new case has no labels") == std::string::npos) return 73;
+        concise_diag_output.str().find("[PASS]") != std::string::npos) return report_self_test_failure(114, __LINE__);
+    if (diag_output.str().find("[CHECK 4.1] new case has no labels") == std::string::npos) return report_self_test_failure(73, __LINE__);
     Suite bounded_waits("bounded waits");
     CaptureReporter bounded_reporter;
     bounded_waits.add("ready future and immediate condition", [](Context& c) {
@@ -609,10 +618,10 @@ int main() {
     });
     auto const bounded_summary = bounded_waits.run(bounded_reporter);
     if (bounded_summary.passed != 1 || bounded_summary.failed != 2 ||
-        bounded_summary.errors != 0 || bounded_reporter.results.size() != 3) return 74;
+        bounded_summary.errors != 0 || bounded_reporter.results.size() != 3) return report_self_test_failure(74, __LINE__);
     if (bounded_reporter.results[1].assertions[0].actual != "timeout" ||
-        bounded_reporter.results[1].assertions[1].actual != "deferred") return 75;
-    if (bounded_reporter.results[2].assertions[0].actual != "timeout") return 76;
+        bounded_reporter.results[1].assertions[1].actual != "deferred") return report_self_test_failure(75, __LINE__);
+    if (bounded_reporter.results[2].assertions[0].actual != "timeout") return report_self_test_failure(76, __LINE__);
     // Exercise the compact one-suite entry point and explicit fixture macros.
     struct CompactFixture : ContextFixture {
         using ContextFixture::ContextFixture;
@@ -629,8 +638,8 @@ int main() {
         ARIADNE_TESTING_ADD_TEST(CompactFixture, test_compact);
         ARIADNE_TESTING_ADD_TEST_NO_THROW(CompactFixture, test_no_throw);
         std::ostringstream compact_output;
-        if (::Ariadne::Testing::run_suite(ariadne_test_suite, compact_output) != 0) return 77;
-        if (compact_output.str().find("[PASS] compact") == std::string::npos) return 78;
+        if (::Ariadne::Testing::run_suite(ariadne_test_suite, compact_output) != 0) return report_self_test_failure(77, __LINE__);
+        if (compact_output.str().find("[PASS] compact") == std::string::npos) return report_self_test_failure(78, __LINE__);
 
         // Preserve the conventional registration above, and separately verify
         // the API's handling of an explicitly supplied, unprefixed label.
@@ -643,7 +652,7 @@ int main() {
             alias_capture.results.size() != 1 ||
             alias_capture.results[0].name != "manual_label" ||
             alias_capture.results[0].assertions.size() != 3)
-            return 80;
+            return report_self_test_failure(80, __LINE__);
     }
     // A failed proof must make run_suite return a nonzero exit status while
     // retaining the original FAIL diagnostics.
@@ -652,7 +661,7 @@ int main() {
     std::ostringstream rejected_output;
     if (run_suite(rejected, rejected_output) != 1 ||
         rejected_output.str().find("[FAIL] disproved") == std::string::npos)
-        return 81;
+        return report_self_test_failure(81, __LINE__);
 
     // Suite registration rejects both independent invalid public inputs:
     // an empty name and an empty callable. Neither may append a case.
@@ -669,7 +678,7 @@ int main() {
     } catch (std::invalid_argument const&) {
         rejected_empty_body = true;
     }
-    if (!rejected_empty_name || !rejected_empty_body) return 84;
+    if (!rejected_empty_name || !rejected_empty_body) return report_self_test_failure(84, __LINE__);
 
     // An unhandled non-std C++ exception is a case Error, not a program
     // termination. A following valid test must still run normally.
@@ -682,7 +691,7 @@ int main() {
     if (contract_summary.passed != 1 || contract_summary.failed != 0 ||
         contract_summary.inconclusive != 0 || contract_summary.skipped != 0 ||
         contract_summary.errors != 1 || contract_reporter.results.size() != 2)
-        return 85;
+        return report_self_test_failure(85, __LINE__);
     if (contract_reporter.results[0].name != "nonstandard exception" ||
         contract_reporter.results[0].outcome != Outcome::Error ||
         contract_reporter.results[0].assertions.size() != 1 ||
@@ -694,7 +703,7 @@ int main() {
         contract_reporter.results[1].outcome != Outcome::Passed ||
         contract_reporter.results[1].assertions.size() != 1 ||
         contract_reporter.results[1].assertions[0].description != "runner continued")
-        return 86;
+        return report_self_test_failure(86, __LINE__);
 
     // Negative wait durations are invalid arguments and must be reported
     // without invoking a condition predicate or blocking on the future.
@@ -721,7 +730,7 @@ int main() {
     if (invalid_waits_summary.passed != 1 || invalid_waits_summary.errors != 1 ||
         invalid_waits_summary.failed != 0 || invalid_waits_capture.results.size() != 2 ||
         evaluated_condition)
-        return 87;
+        return report_self_test_failure(87, __LINE__);
     auto const& invalid_wait_assertions = invalid_waits_capture.results[0].assertions;
     if (invalid_wait_assertions.size() != 2 ||
         invalid_wait_assertions[0].outcome != Outcome::Error ||
@@ -729,7 +738,7 @@ int main() {
         invalid_wait_assertions[0].detail != "negative timeout" ||
         invalid_wait_assertions[1].detail != "negative timeout" ||
         invalid_waits_capture.results[1].outcome != Outcome::Passed)
-        return 88;
+        return report_self_test_failure(88, __LINE__);
 
     // One predicate type, twelve logically distinct evidence-expectation
     // combinations. The table verifies the public three-valued contract,
@@ -791,7 +800,7 @@ int main() {
         evidence_summary.errors != 0 || evidence_summary.skipped != 0 ||
         evidence_report.results.size() != evidence_scenarios.size()) {
         std::cerr << "evidence expectation matrix: wrong outcome counts\n";
-        return 93;
+        return report_self_test_failure(93, __LINE__);
     }
     for (std::size_t i = 0; i != evidence_scenarios.size(); ++i) {
         auto const& scenario = evidence_scenarios[i];
@@ -804,7 +813,7 @@ int main() {
             result.assertions[0].description != "three-valued evidence expectation") {
             std::cerr << "evidence expectation matrix: incorrect result for "
                       << scenario.name << '\n';
-            return 94;
+            return report_self_test_failure(94, __LINE__);
         }
     }
 
@@ -829,15 +838,17 @@ int main() {
     if (all_summary.passed != 1 || all_summary.failed != 1 ||
         all_summary.inconclusive != 1 || all_summary.skipped != 1 ||
         all_summary.errors != 1)
-        return 95;
+        return report_self_test_failure(95, __LINE__);
     auto const outcome_log = outcome_output.str();
     if (outcome_log.find("[PASS] proved") == std::string::npos ||
         outcome_log.find("[FAIL] refuted") == std::string::npos ||
         outcome_log.find("[INCONCLUSIVE] uncertain") == std::string::npos ||
         outcome_log.find("[SKIP] not applicable") == std::string::npos ||
         outcome_log.find("[ERROR] unexpected exception") == std::string::npos ||
-        outcome_log.find("detail: unhandled operation") == std::string::npos)
-        return 96;
+        outcome_log.find("detail: unhandled operation") == std::string::npos) {
+        std::cerr << "Unexpected full console outcome log:\n" << outcome_log;
+        return report_self_test_failure(96, __LINE__);
+    }
 
     // All streams diagnostics; Concise reports them only for problematic cases.
     Suite diagnostic_modes("reporter detail modes");
@@ -863,7 +874,7 @@ int main() {
     auto const all_details_summary = diagnostic_modes.run(all_detail_reporter);
     if (all_details_summary.passed != 1 || all_details_summary.failed != 1 ||
         all_details_summary.errors != 0)
-        return 97;
+        return report_self_test_failure(97, __LINE__);
     auto const full_detail_log = all_details.str();
     if (full_detail_log.find("[NOTE] preparation") == std::string::npos ||
         full_detail_log.find("[VALUE] input = 42") == std::string::npos ||
@@ -874,14 +885,14 @@ int main() {
         full_detail_log.find("[NOTE] failure trace") == std::string::npos ||
         full_detail_log.find("[VALUE] observed = 7") == std::string::npos ||
         full_detail_log.find("[TIME] failed stage = 5 ns") == std::string::npos)
-        return 98;
+        return report_self_test_failure(98, __LINE__);
 
     std::ostringstream concise_details;
     ConsoleReporter concise_detail_reporter(concise_details, ConsoleDetail::Concise);
     auto const concise_summary = diagnostic_modes.run(concise_detail_reporter);
     if (concise_summary.passed != 1 || concise_summary.failed != 1 ||
         concise_summary.errors != 0)
-        return 99;
+        return report_self_test_failure(99, __LINE__);
     auto const concise_log = concise_details.str();
     if (concise_log.find("[NOTE] preparation") != std::string::npos ||
         concise_log.find("[VALUE] input") != std::string::npos ||
@@ -891,7 +902,7 @@ int main() {
         concise_log.find("diagnostic: observed = 7") == std::string::npos ||
         concise_log.find("diagnostic: failed stage = 5 ns") == std::string::npos ||
         concise_log.find("diagnostic: preparation") != std::string::npos)
-        return 100;
+        return report_self_test_failure(100, __LINE__);
 
     // Context is also usable without a Reporter. Event and assertion
     // recording must not depend on callback notifications.
@@ -913,7 +924,7 @@ int main() {
         manual_result.assertions[0].check_index != 1 ||
         manual_result.assertions[0].outcome != Outcome::Passed ||
         manual_result.outcome != Outcome::Passed)
-        return 101;
+        return report_self_test_failure(101, __LINE__);
 
 
     // A measured operation must emit Elapsed diagnostics even when it
@@ -961,13 +972,13 @@ int main() {
         measured_summary.errors != 2 || measured_summary.inconclusive != 0 ||
         measured_summary.skipped != 0 || measured_capture.results.size() != 4 ||
         operation_calls != 4 || successful_continuations != 1)
-        return 102;
+        return report_self_test_failure(102, __LINE__);
     for (auto const& case_result : measured_capture.results) {
         if (case_result.diagnostics.size() != 1 ||
             case_result.diagnostics[0].kind != DiagnosticKind::Elapsed ||
             case_result.diagnostics[0].description != "measured operation" ||
             case_result.diagnostics[0].duration.count() < 0)
-            return 103;
+            return report_self_test_failure(103, __LINE__);
     }
     auto const& measured_ok = measured_capture.results[0];
     auto const& measured_std = measured_capture.results[1];
@@ -987,7 +998,7 @@ int main() {
         measured_abort.assertions.size() != 1 ||
         measured_abort.assertions[0].outcome != Outcome::Failed ||
         measured_abort.assertions[0].description != "false")
-        return 104;
+        return report_self_test_failure(104, __LINE__);
 
 
     // Imported assertion results may lack a source location. The public
@@ -1014,7 +1025,7 @@ int main() {
         imported_log.find("expected: 8") == std::string::npos ||
         imported_log.find("detail: reference mismatch") == std::string::npos ||
         imported_log.find("\n    at ") != std::string::npos)
-        return 105;
+        return report_self_test_failure(105, __LINE__);
 
     // The same record with known provenance must instead retain the
     // exact source location, ensuring both sides of the contract.
@@ -1024,7 +1035,7 @@ int main() {
     ConsoleReporter located_reporter(located_output);
     located_reporter.case_finished(imported_case);
     if (located_output.str().find("at imported-test.cpp:37") == std::string::npos)
-        return 106;
+        return report_self_test_failure(106, __LINE__);
 
     return 0;
 }

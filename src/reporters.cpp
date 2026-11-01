@@ -343,7 +343,12 @@ void ConsoleReporter::check_started(CaseResult const& result, std::size_t index,
 }
 
 void ConsoleReporter::case_finished(CaseResult const& result) {
-    if (result.outcome == Outcome::Passed || result.outcome == Outcome::Skipped) return;
+    if (result.outcome == Outcome::Passed || result.outcome == Outcome::Skipped) {
+        if (_detail == ConsoleDetail::All)
+            _output << '[' << outcome_name(result.outcome) << "] "
+                    << result.name << '\n' << std::flush;
+        return;
+    }
     if (_detail == ConsoleDetail::All)
         _output << '[' << outcome_name(result.outcome) << "] " << result.name << '\n';
 
