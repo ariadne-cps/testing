@@ -1521,3 +1521,12 @@ the runner thread, process termination without a supported fatal signal,
 and unsafe process corruption may prevent a breadcrumb; it is not a stack
 trace. A subprocess regression checks that a SIGABRT preserves both the
 signal exit status and the concise context without emitting check progress.
+
+## 2026-11-01 — SA_RESETHAND warning-clean on Linux
+
+On glibc, SA_RESETHAND is an unsigned high-bit mask while sigaction.sa_flags
+is a signed integral field. In -Wsign-conversion -Werror builds, assigning
+SA_RESETHAND implicitly fails compilation. Convert explicitly to the
+sa_flags field type, preserving the platform flag representation. The cast
+has been compile-checked with Linux Clang and GCC under -Wsign-conversion
+-Werror. Runtime crash-handler coverage remains gated by the CI matrix.

@@ -396,7 +396,7 @@ CrashDiagnostics::CrashDiagnostics() : _impl(new Impl) {
         struct sigaction handler{};
         handler.sa_handler = crash_signal_handler;
         sigemptyset(&handler.sa_mask);
-        handler.sa_flags = SA_RESETHAND;
+        handler.sa_flags = static_cast<decltype(handler.sa_flags)>(SA_RESETHAND);
         _impl->installed[i] = ::sigaction(_impl->signals[i], &handler,
                                           &_impl->previous[i]) == 0;
     }
