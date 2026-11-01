@@ -102,5 +102,30 @@ int main(){
     auto identity=validate_oracle_rows(frozen,valid);
     check(identity.valid() && identity.expected_rows==3 &&
           identity.observed_rows==3,"oracle identities not reusable");
+    // Direct Context API must provide the same observable outcomes as the
+    // deferred macro entry point, including an invalid frozen manifest.
+    Suite direct_rows("direct oracle rows");
+    direct_rows.add("matching rows", [&](Context& c) {
+        c.expect_oracle_rows(frozen, valid, "direct complete oracle match");
+    });
+    direct_rows.add("missing rows", [&](Context& c) {
+        c.expect_oracle_rows(frozen, missing, "direct missing oracle row");
+    });
+    direct_rows.add("invalid frozen reference", [&](Context& c) {
+        c.expect_oracle_rows(bad_manifest, valid, "direct invalid manifest");
+    });
+    Capture direct_capture;
+    auto const direct_summary = direct_rows.run(direct_capture);
+    check(direct_summary.passed==1 && direct_summary.failed==1 &&
+          direct_summary.errors==1 && direct_capture.checks==3 &&
+          direct_capture.cases.size()==3,
+          "direct oracle rows result classification");
+    if (direct_capture.cases.size()==3) {
+        check(direct_capture.cases[0].assertions.size()==1 &&
+              direct_capture.cases[0].assertions[0].outcome==Outcome::Passed &&
+              direct_capture.cases[1].assertions[0].outcome==Outcome::Failed &&
+              direct_capture.cases[2].assertions[0].outcome==Outcome::Error,
+              "direct oracle rows must record ordered assertion outcomes");
+    }
     return ok?0:1;
 }

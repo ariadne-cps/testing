@@ -138,5 +138,29 @@ int main() {
                capture.cases[1].assertions[0].detail.find("partial replay")!=std::string::npos,
                "partial coverage is not explicit");
     }
+    // Cover the public eager check as well as the deferred macro route.
+    Suite direct_replays("direct oracle replay");
+    direct_replays.add("complete", [&](Context& c) {
+        c.expect_oracle_replay(full, "direct full replay");
+    });
+    direct_replays.add("selected subset", [&](Context& c) {
+        c.expect_oracle_replay(partial, "direct partial replay");
+    });
+    direct_replays.add("invalid plan", [&](Context& c) {
+        c.expect_oracle_replay(malformed, "direct invalid replay");
+    });
+    Capture direct_capture;
+    auto const direct_summary=direct_replays.run(direct_capture);
+    verify(direct_summary.passed==1 && direct_summary.inconclusive==1 &&
+           direct_summary.errors==1 && direct_capture.announced==3 &&
+           direct_capture.cases.size()==3,
+           "direct replay outcome and CHECK lifecycle");
+    if (direct_capture.cases.size()==3) {
+        verify(direct_capture.cases[0].assertions.size()==1 &&
+               direct_capture.cases[0].assertions[0].outcome==Outcome::Passed &&
+               direct_capture.cases[1].assertions[0].outcome==Outcome::Inconclusive &&
+               direct_capture.cases[2].assertions[0].outcome==Outcome::Error,
+               "direct replay must retain exact assertion classification");
+    }
     return ok?0:1;
 }
