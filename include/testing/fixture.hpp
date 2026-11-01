@@ -72,7 +72,40 @@ void add_fixture_test(Suite& suite, std::string_view method_name,
                       FixtureCheck check = FixtureCheck::Direct);
 
 inline int run_suite(Suite const& suite, std::ostream& output = std::cout) {
-    ConsoleReporter reporter(output);
+    ConsoleReporter reporter(output, ConsoleDetail::All);
+    return suite.run(reporter).successful() ? 0 : 1;
+}
+
+/** @brief Select console verbosity with --full or --concise.
+ *  @details Direct invocation without flags remains fully verbose.
+ *  The caller (e.g. CTest) may pass --concise without altering results.
+ *  Invalid or conflicting flags return 2 before any test executes.
+ */
+inline int run_suite(Suite const& suite, int argc, char const* const* argv,
+                     std::ostream& output = std::cout) {
+    ConsoleDetail detail = ConsoleDetail::All;
+    bool selected = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string_view const arg = argv[i] ? std::string_view(argv[i]) : std::string_view();
+        if (arg == "--help") {
+            output << "Usage: " << (argc > 0 && argv[0] ? argv[0] : "test")
+                   << " [--full | --concise]" << '\n';
+            return 0;
+        }
+        if (arg != "--full" && arg != "--concise") {
+            output << "Unknown test option: " << arg
+                   << " (expected --full or --concise)" << '\n';
+            return 2;
+        }
+        auto const requested = arg == "--full" ? ConsoleDetail::All : ConsoleDetail::Concise;
+        if (selected && requested != detail) {
+            output << "Conflicting test options: --full and --concise" << '\n';
+            return 2;
+        }
+        selected = true;
+        detail = requested;
+    }
+    ConsoleReporter reporter(output, detail);
     return suite.run(reporter).successful() ? 0 : 1;
 }
 

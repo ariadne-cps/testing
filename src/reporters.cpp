@@ -17,6 +17,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace Ariadne::Testing {
 namespace {
@@ -280,9 +281,14 @@ ConsoleReporter::ConsoleReporter(std::ostream& output, ConsoleDetail detail)
     : _output(output), _detail(detail) { }
 
 void ConsoleReporter::diagnostic_emitted(CaseResult const& result, DiagnosticEvent const& event) {
-    // Scopes and warnings are always flushed for hang diagnosis and safety.
-    if (_detail == ConsoleDetail::Concise &&
-        event.kind != DiagnosticKind::Scope && event.kind != DiagnosticKind::Warning) return;
+    if (_detail == ConsoleDetail::Concise) {
+        if (event.kind == DiagnosticKind::Scope) {
+            ++_scopes_this_case;
+            if (_scopes_this_case != 1 && _scopes_this_case % 250 != 0) return;
+        } else if (event.kind != DiagnosticKind::Warning) {
+            return;
+        }
+    }
     switch (event.kind) {
         case DiagnosticKind::Scope:
             _output << "[SCOPE " << result.case_index << "] ";
@@ -324,29 +330,69 @@ void ConsoleReporter::selection_started(SelectionInfo const& info) {
 }
 
 void ConsoleReporter::case_started(CaseResult const& result) {
+    _last_check_index = 0;
+    _last_check.clear();
+    _scopes_this_case = 0;
     _output << "[RUN " << result.case_index << '/' << result.case_total << "] "
             << result.suite_name << " / " << result.name << '\n' << std::flush;
 }
 
 void ConsoleReporter::check_started(CaseResult const& result, std::size_t index,
                                     std::string_view description) {
+    if (_detail == ConsoleDetail::Concise) {
+        _last_check_index = index;
+        _last_check = description;
+        if (index != 1 && index % 250 != 0) return;
+    }
     _output << "[CHECK " << result.case_index << '.' << index << "] "
             << description << '\n' << std::flush;
 }
 
 void ConsoleReporter::case_finished(CaseResult const& result) {
     _output << '[' << outcome_name(result.outcome) << "] " << result.name << '\n';
-    if (result.outcome == Outcome::Passed) return;
-    // In concise mode successful notes are hidden, but restored for a failing case.
+    if (result.outcome == Outcome::Passed || result.outcome == Outcome::Skipped) return;
+
+    ProblemCase problem{result.outcome, result.name, result.case_index, result.case_total,
+                        _last_check_index, _last_check, {}, {}, {}, {}, {}, 0, {}};
+    for (auto const& assertion : result.assertions) {
+        if (assertion.outcome != result.outcome) continue;
+        problem.description = assertion.description;
+        problem.actual = assertion.actual;
+        problem.expected = assertion.expected;
+        problem.detail = assertion.detail;
+        if (assertion.check_index != 0) {
+            problem.file = assertion.file;
+            problem.line = assertion.line;
+        }
+        problem.context = assertion.context;
+        break;
+    }
+    _problems.push_back(std::move(problem));
+
+    // Keep the full per-assertion diagnostics available in the explicit All mode.
     if (_detail == ConsoleDetail::Concise) {
+        std::size_t printed = 0;
         for (auto const& event : result.diagnostics) {
-            if (event.kind == DiagnosticKind::Scope || event.kind == DiagnosticKind::Warning)
-                continue; // Already printed while executing.
+            if (event.kind == DiagnosticKind::Scope || event.kind == DiagnosticKind::Warning) continue;
+            if (printed++ == 16) {
+                _output << "  diagnostic: additional events omitted" << '\n';
+                break;
+            }
             _output << "  diagnostic: " << event.description;
             if (event.kind == DiagnosticKind::Value) _output << " = " << event.value;
-            if (event.kind == DiagnosticKind::Elapsed) _output << " = " << event.duration.count() << " ns";
+            if (event.kind == DiagnosticKind::Elapsed)
+                _output << " = " << event.duration.count() << " ns";
             _output << '\n';
         }
+        auto const& issue = _problems.back();
+        if (!issue.description.empty()) _output << "  " << outcome_name(issue.outcome)
+            << ": " << issue.description << '\n';
+        if (!issue.detail.empty()) _output << "    detail: " << issue.detail << '\n';
+        if (issue.last_check_index != 0)
+            _output << "    last check [" << issue.case_index << '.' << issue.last_check_index
+                    << "]: " << issue.last_check << '\n';
+        _output << std::flush;
+        return;
     }
     for (auto const& assertion : result.assertions) {
         if (assertion.outcome == Outcome::Passed) continue;
@@ -368,6 +414,38 @@ void ConsoleReporter::case_finished(CaseResult const& result) {
 
 void ConsoleReporter::suite_finished(std::string_view name, Summary const& summary) {
     _output << summary_text(name,summary) << '\n';
+    if (!_problems.empty()) {
+        _output << "[FAILURE SUMMARY] " << _problems.size()
+                << " problematic case(s) in " << name << '\n';
+        for (auto const& problem : _problems) {
+            _output << "  [" << outcome_name(problem.outcome) << ' '
+                    << problem.case_index << '/' << problem.case_total << "] "
+                    << problem.name << '\n';
+            if (problem.last_check_index != 0)
+                _output << "    last check [" << problem.case_index << '.'
+                        << problem.last_check_index << "]: " << problem.last_check << '\n';
+            if (!problem.description.empty())
+                _output << "    " << problem.description << '\n';
+            if (!problem.detail.empty()) _output << "    detail: " << problem.detail << '\n';
+            if (!problem.context.empty()) {
+                _output << "    context: ";
+                for (std::size_t i = 0; i < problem.context.size(); ++i) {
+                    if (i) _output << " / ";
+                    _output << problem.context[i];
+                }
+                _output << '\n';
+            }
+            if (!problem.actual.empty()) _output << "    actual: " << problem.actual << '\n';
+            if (!problem.expected.empty()) _output << "    expected: " << problem.expected << '\n';
+            if (!problem.file.empty())
+                _output << "    at " << problem.file << ':' << problem.line << '\n';
+        }
+    }
+    _problems.clear();
+    _last_check_index = 0;
+    _last_check.clear();
+    _scopes_this_case = 0;
+    _output << std::flush;
 }
 
 namespace {

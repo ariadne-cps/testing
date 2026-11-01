@@ -382,9 +382,23 @@ include their full active context. Scope destruction restores the parent.
 `ctx().elapsed("phase", duration)`, and
 `ctx().measure("phase", [&] { operation(); });` create diagnostic events
 that do not increment assertion counters or count as successful checks.
-`ConsoleReporter(output, ConsoleDetail::Concise)` hides successful
-notes and measurements, but preserves warnings/scopes and displays
-additional details if the case fails.
+`ConsoleReporter(output, ConsoleDetail::Concise)` suppresses per-check
+success noise: it flushes the first check and every 250th check in each case,
+and the first diagnostic scope and every 250th scope; warnings are immediate.
+Each case still reports its outcome. On completion, a `[FAILURE SUMMARY]`
+repeats the identity, last check, primary failure or exception, location and
+available context for every Failed, Error or Inconclusive case. This makes
+CTest output usable when GitHub Actions would truncate verbose test logs.
+The standard `run_suite(suite)` and fixture runner default to All, while
+`run_suite(suite, argc, argv)` selects All (default or `--full`) or
+Concise (`--concise`). CTest can pass `--concise` to migrated executables,
+without changing how a directly invoked test prints. Invalid or conflicting
+options fail before executing tests. The matching fixture macro is
+`ARIADNE_TESTING_RUN_TESTS_WITH_ARGS(argc, argv)`. Explicit `ConsoleReporter(output, ConsoleDetail::All)` retains every
+`[CHECK]`, scope, note and assertion diagnostic for detailed debugging.
+No verbosity setting affects test outcomes or JSON/JUnit reports. A process
+killed by the OS cannot produce its final summary; periodic CHECK messages
+still provide live progress.
 
 ## Fatal prerequisites and exception messages
 

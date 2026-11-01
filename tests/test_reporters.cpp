@@ -119,5 +119,94 @@ int main() {
     check(!empty.successful() &&
           selected_xml.str().find("<testsuite name=\"empty selection\" tests=\"1\" failures=\"1\"")!=std::string::npos,
           "empty partial selection must not produce a green JUnit report");
+
+    std::ostringstream concise_output;
+    ConsoleReporter concise(concise_output, ConsoleDetail::Concise);
+    Suite noisy("compact diagnostics");
+    noisy.add("late mismatch", [](Context& c) {
+        for (std::size_t i=0; i<501; ++i) {
+            auto row=c.scope("row", i);
+            c.prove(true, "accepted oracle row");
+        }
+        c.expect_equal(3, 4, "last comparison failed");
+    });
+    noisy.add("unhandled exception", [](Context& c) {
+        c.prove(true, "precondition satisfied");
+        throw std::runtime_error("sentinel exception");
+    });
+    noisy.add("undetermined result", [](Context& c) {
+        c.prove(Evidence::Indeterminate, "uncertain result");
+    });
+    noisy.add("passing result", [](Context& c) {
+        c.prove(true, "a good result");
+    });
+    const auto concise_summary = noisy.run(concise);
+    const std::string compact = concise_output.str();
+    check(concise_summary.passed==1 && concise_summary.failed==1 &&
+          concise_summary.errors==1 && concise_summary.inconclusive==1,
+          "compact console changed case outcomes");
+    check(compact.find("[CHECK 1.1]")!=std::string::npos &&
+          compact.find("[CHECK 1.250]")!=std::string::npos &&
+          compact.find("[CHECK 1.500]")!=std::string::npos &&
+          compact.find("[CHECK 1.249]")==std::string::npos &&
+          compact.find("[CHECK 1.501]")==std::string::npos &&
+          compact.find("[SCOPE 1] row=0")!=std::string::npos &&
+          compact.find("[SCOPE 1] row=1") == std::string::npos,
+          "compact reporter did not bound live progress");
+    const auto summary_at=compact.find("[FAILURE SUMMARY] 3 problematic case(s) in compact diagnostics");
+    check(summary_at!=std::string::npos &&
+          compact.find("compact diagnostics: 1 passed, 1 failed, 1 inconclusive, 0 skipped, 1 errors")
+             < summary_at,
+          "compact report has no trailing failure index");
+    if(summary_at!=std::string::npos) {
+        const auto tail=compact.substr(summary_at);
+        check(tail.find("[FAIL 1/4] late mismatch")!=std::string::npos &&
+              tail.find("last check [1.502]: last comparison failed")!=std::string::npos &&
+              tail.find("actual: 3")!=std::string::npos &&
+              tail.find("expected: 4")!=std::string::npos &&
+              tail.find("[ERROR 2/4] unhandled exception")!=std::string::npos &&
+              tail.find("sentinel exception")!=std::string::npos &&
+              tail.find("[INCONCLUSIVE 3/4] undetermined result")!=std::string::npos &&
+              tail.find("uncertain result")!=std::string::npos &&
+              tail.find("passing result")==std::string::npos,
+              "failure index lost identity, final CHECK, evidence, or exception");
+    }
+    Suite reuse_console("successful suite");
+    reuse_console.add("passing", [](Context& c) { c.prove(true, "ok"); });
+    const auto before_reuse=concise_output.str().size();
+    const auto reuse_summary=reuse_console.run(concise);
+    check(reuse_summary.successful() &&
+          concise_output.str().substr(before_reuse).find("[FAILURE SUMMARY]")==std::string::npos,
+          "console retained failures from preceding suite");
+    Suite cli_suite("console option parsing");
+    int cli_executions = 0;
+    cli_suite.add("check verbosity", [&](Context& c) {
+        ++cli_executions;
+        c.prove(true, "first");
+        c.prove(true, "second");
+    });
+    char const* const full_args[] = {"selftest", "--full"};
+    char const* const concise_args[] = {"selftest", "--concise"};
+    char const* const conflict_args[] = {"selftest", "--full", "--concise"};
+    char const* const wrong_args[] = {"selftest", "--bogus"};
+    char const* const help_args[] = {"selftest", "--help"};
+    std::ostringstream direct_output, full_output, concise_cli_output, invalid_output;
+    check(run_suite(cli_suite, direct_output)==0 &&
+          direct_output.str().find("[CHECK 1.2] second")!=std::string::npos,
+          "direct suite runner must remain full by default");
+    check(run_suite(cli_suite, 2, full_args, full_output)==0 &&
+          full_output.str().find("[CHECK 1.2] second")!=std::string::npos,
+          "explicit --full must preserve all checks");
+    check(run_suite(cli_suite, 2, concise_args, concise_cli_output)==0 &&
+          concise_cli_output.str().find("[CHECK 1.1] first")!=std::string::npos &&
+          concise_cli_output.str().find("[CHECK 1.2] second")==std::string::npos,
+          "--concise must suppress successful check lines");
+    const int executions_before_invalid = cli_executions;
+    check(run_suite(cli_suite, 3, conflict_args, invalid_output)==2 &&
+          run_suite(cli_suite, 2, wrong_args, invalid_output)==2 &&
+          run_suite(cli_suite, 2, help_args, invalid_output)==0 &&
+          cli_executions == executions_before_invalid &&
+          invalid_output.str().find("Usage:")!=std::string::npos,
+          "unknown/conflicting/help arguments must not run tests");
     return ok?0:1;
 }

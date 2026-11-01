@@ -691,6 +691,8 @@
     ARIADNE_TESTING_ADD_TEST_NO_THROW_TO(ariadne_test_suite, Fixture, method)
 
 #define ARIADNE_TESTING_RUN_TESTS() ::Ariadne::Testing::run_suite(ariadne_test_suite)
+#define ARIADNE_TESTING_RUN_TESTS_WITH_ARGS(argc, argv) \
+    ::Ariadne::Testing::run_suite(ariadne_test_suite, argc, argv)
 
 
 

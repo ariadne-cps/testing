@@ -1411,3 +1411,29 @@ macros now use `(context).template method<...>`; this syntax also accepts
 ordinary, non-dependent explicit `Context&` arguments. Regression cases
 exercise both forms, with eight checks each. Neither comparison
 semantics nor exception expectations change.
+
+## 2026-11-01 — Bounded CI console output and trailing failure index
+
+The standard suite runner now constructs `ConsoleReporter` with
+`ConsoleDetail::Concise`. This mode streams the first CHECK and every
+250th CHECK in each case, the first SCOPE and every 250th SCOPE, all case
+starts/outcomes and immediate warnings. `ConsoleDetail::All` remains
+available explicitly with the former full per-check tracing. Completed
+nonpassing cases are indexed and repeated at suite end after the count
+summary, including the case name and status, last check, primary assertion
+or exception, diagnostic values, location and context. The index only
+records Failed, Error and Inconclusive, not expected Skipped cases.
+All structured reporters and case semantics are untouched. Reusing the
+ConsoleReporter clears the index between suites. `test_reporters` exercises
+500+ checks, bounded output, final errors and state reuse. CI remains the
+cross-platform acceptance gate.
+
+### Command-line selection instead of ambient process state
+
+`run_suite(suite, argc, argv)` recognizes `--full` and `--concise` and
+uses All when neither is present; unknown and conflicting flags fail before
+running any checks. `ARIADNE_TESTING_RUN_TESTS_WITH_ARGS(argc, argv)` exposes
+this parser for standard fixture mains. CTest test registrations supply
+`--concise`, whereas direct invocations continue in All mode. No environment
+variable, global verbosity state or CTest-specific test-framework detection
+is used. The zero-argument runner and macro retain backwards compatibility.

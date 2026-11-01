@@ -570,7 +570,7 @@ int main() {
     if (diag_output.str().find("context: phase=outer / row=error") == std::string::npos) return 72;
     if (diag_output.str().find("[CHECK 3.1] scope still active after move") ==
         std::string::npos) return 82;
-    if (diag_output.str().find("[CHECK 3.2] moved scope closed at end of owner lifetime") ==
+    if (diag_output.str().find("[CHECK 3.2] moved scope closed at end of owner lifetime") !=
         std::string::npos) return 83;
     if (diag_output.str().find("[CHECK 4.1] new case has no labels") == std::string::npos) return 73;
     Suite bounded_waits("bounded waits");

@@ -22,7 +22,7 @@
 
 namespace Ariadne::Testing {
 
-/** @brief Verbose or concise console diagnostic rendering. */
+/** @brief All streams every check; Concise checkpoints progress and indexes errors. */
 enum class ConsoleDetail { All, Concise };
 
 /** @brief Callback interface for live case and diagnostic reporting. */
@@ -51,8 +51,28 @@ class ConsoleReporter final : public Reporter {
     void case_finished(CaseResult const& result) override;
     void suite_finished(std::string_view name, Summary const& summary) override;
   private:
+    struct ProblemCase {
+        Outcome outcome;
+        std::string name;
+        std::size_t case_index;
+        std::size_t case_total;
+        std::size_t last_check_index;
+        std::string last_check;
+        std::string description;
+        std::string actual;
+        std::string expected;
+        std::string detail;
+        std::string file;
+        std::uint_least32_t line;
+        std::vector<std::string> context;
+    };
+
     std::ostream& _output;
     ConsoleDetail _detail;
+    std::vector<ProblemCase> _problems;
+    std::size_t _last_check_index = 0;
+    std::string _last_check;
+    std::size_t _scopes_this_case = 0;
 };
 
 
