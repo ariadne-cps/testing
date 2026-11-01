@@ -12,6 +12,13 @@ struct Capture : Reporter {
     void case_finished(CaseResult const& result) override { cases.push_back(result); }
     void suite_finished(std::string_view, Summary const&) override {}
 };
+struct LegacyReporter final : Reporter {
+    int finished = 0;
+    int suites = 0;
+    // Deliberately do not override optional selection_started().
+    void case_finished(CaseResult const&) override { ++finished; }
+    void suite_finished(std::string_view, Summary const&) override { ++suites; }
+};
 int main() {
     Suite suite("selection");
     int fast=0,slow=0,other=0;
@@ -65,5 +72,13 @@ int main() {
            console.str().find("[SELECTION 1/4]")!=std::string::npos &&
            console.str().find("[RUN 4/4]")!=std::string::npos,
            "live selection message or original registration index missing");
+    // The optional selection lifecycle callback must remain compatible with
+    // reporters implemented before selection support was introduced.
+    LegacyReporter legacy;
+    auto const legacy_selection=suite.run_selected(legacy,CaseFilter{"fast",{},"B"});
+    verify(legacy_selection.selection.selected==1 &&
+           legacy_selection.selected_successful() &&
+           legacy.finished==1 && legacy.suites==1,
+           "selection must work with a reporter using the default lifecycle hook");
     return ok?0:1;
 }
