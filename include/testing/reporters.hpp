@@ -65,6 +65,7 @@ class ConsoleReporter final : public Reporter {
         std::string file;
         std::uint_least32_t line;
         std::vector<std::string> context;
+        std::vector<std::string> diagnostics;
     };
 
     std::ostream& _output;

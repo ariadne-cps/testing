@@ -344,10 +344,11 @@ void ConsoleReporter::check_started(CaseResult const& result, std::size_t index,
 
 void ConsoleReporter::case_finished(CaseResult const& result) {
     if (result.outcome == Outcome::Passed || result.outcome == Outcome::Skipped) return;
-    _output << '[' << outcome_name(result.outcome) << "] " << result.name << '\n';
+    if (_detail == ConsoleDetail::All)
+        _output << '[' << outcome_name(result.outcome) << "] " << result.name << '\n';
 
     ProblemCase problem{result.outcome, result.name, result.case_index, result.case_total,
-                        _last_check_index, _last_check, {}, {}, {}, {}, {}, 0, {}};
+                        _last_check_index, _last_check, {}, {}, {}, {}, {}, 0, {}, {}};
     for (auto const& assertion : result.assertions) {
         if (assertion.outcome != result.outcome) continue;
         problem.description = assertion.description;
@@ -363,29 +364,23 @@ void ConsoleReporter::case_finished(CaseResult const& result) {
     }
     _problems.push_back(std::move(problem));
 
-    // Keep the full per-assertion diagnostics available in the explicit All mode.
+    // Concise prints only the final suite totals and failure index.
+    // Keep at most 16 non-scope diagnostics per problematic case for that index.
     if (_detail == ConsoleDetail::Concise) {
-        std::size_t printed = 0;
+        auto& issue = _problems.back();
         for (auto const& event : result.diagnostics) {
             if (event.kind == DiagnosticKind::Scope) continue;
-            if (printed++ == 16) {
-                _output << "  diagnostic: additional events omitted" << '\n';
+            if (issue.diagnostics.size() == 16) {
+                issue.diagnostics.emplace_back("additional events omitted");
                 break;
             }
-            _output << "  diagnostic: " << event.description;
-            if (event.kind == DiagnosticKind::Value) _output << " = " << event.value;
+            std::ostringstream diagnostic;
+            diagnostic << event.description;
+            if (event.kind == DiagnosticKind::Value) diagnostic << " = " << event.value;
             if (event.kind == DiagnosticKind::Elapsed)
-                _output << " = " << event.duration.count() << " ns";
-            _output << '\n';
+                diagnostic << " = " << event.duration.count() << " ns";
+            issue.diagnostics.push_back(diagnostic.str());
         }
-        auto const& issue = _problems.back();
-        if (!issue.description.empty()) _output << "  " << outcome_name(issue.outcome)
-            << ": " << issue.description << '\n';
-        if (!issue.detail.empty()) _output << "    detail: " << issue.detail << '\n';
-        if (issue.last_check_index != 0)
-            _output << "    last check [" << issue.case_index << '.' << issue.last_check_index
-                    << "]: " << issue.last_check << '\n';
-        _output << std::flush;
         return;
     }
     for (auto const& assertion : result.assertions) {
@@ -415,6 +410,8 @@ void ConsoleReporter::suite_finished(std::string_view name, Summary const& summa
             _output << "  [" << outcome_name(problem.outcome) << ' '
                     << problem.case_index << '/' << problem.case_total << "] "
                     << problem.name << '\n';
+            for (auto const& diagnostic : problem.diagnostics)
+                _output << "    diagnostic: " << diagnostic << '\n';
             if (problem.last_check_index != 0)
                 _output << "    last check [" << problem.case_index << '.'
                         << problem.last_check_index << "]: " << problem.last_check << '\n';

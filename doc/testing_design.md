@@ -1465,3 +1465,17 @@ The same change provides `ARIADNE_TESTING_INSPECT_CTX` and
 `ARIADNE_TESTING_INSPECT`, which delegate to `Context::inspect` and record
 structured Value events without incrementing assertion counts. The
 self-test covers both explicit-context and ContextFixture shorthand forms.
+
+## 2026-11-01 — Final-summary-only concise output
+
+The optional `--concise` mode now buffers failure details rather than
+emitting each nonpassing case's diagnostics before the final suite summary.
+A successful suite prints only its count summary; a problematic suite prints
+that summary and a trailing `[FAILURE SUMMARY]` listing every Failed,
+Error or Inconclusive case with its identity, last check, failure details,
+location, context and up to 16 non-scope informational diagnostics.
+No live RUN/CHECK/FAIL/ERROR output is produced by the concise console
+reporter. `--full` and the default direct invocation retain streaming output.
+Raw stdout/stderr written outside the reporter remains outside this contract;
+legacy test executables that ignore `--concise` must be migrated separately.
+No result classifications, failure exit status or structured reporters change.

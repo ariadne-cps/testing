@@ -382,12 +382,12 @@ include their full active context. Scope destruction restores the parent.
 `ctx().elapsed("phase", duration)`, and
 `ctx().measure("phase", [&] { operation(); });` create diagnostic events
 that do not increment assertion counters or count as successful checks.
-`ConsoleReporter(output, ConsoleDetail::Concise)` suppresses per-check
-success noise: it suppresses live RUN, CHECK, PASS, SKIP, SCOPE and WARN
-messages, printing only problematic cases and a suite summary.
-On completion, a `[FAILURE SUMMARY]`
-repeats the identity, last check, primary failure or exception, location and
-available context for every Failed, Error or Inconclusive case. This makes
+`ConsoleReporter(output, ConsoleDetail::Concise)` suppresses all live
+reporter events, including failures, and emits only the suite totals and a
+trailing `[FAILURE SUMMARY]` when cases are Failed, Error or Inconclusive.
+The summary identifies each problematic case with its last check, primary
+failure or exception, actual/expected values, location, context and up to 16
+non-scope diagnostic messages. Passing cases produce no diagnostic log. This makes
 CTest output usable when GitHub Actions would truncate verbose test logs.
 The standard `run_suite(suite)` and fixture runner default to All, while
 `run_suite(suite, argc, argv)` selects All (default or `--full`) or

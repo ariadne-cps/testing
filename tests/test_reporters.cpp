@@ -160,9 +160,10 @@ int main() {
           compact.find("[SKIP]")==std::string::npos &&
           compact.find("[SCOPE ")==std::string::npos &&
           compact.find("[WARN]")==std::string::npos &&
-          compact.find("[INCONCLUSIVE] undetermined result")!=std::string::npos &&
-          compact.find("[ERROR] unhandled exception")!=std::string::npos &&
-          compact.find("[FAIL] late mismatch")!=std::string::npos,
+          compact.find("[INCONCLUSIVE]")==std::string::npos &&
+          compact.find("[ERROR]")==std::string::npos &&
+          compact.find("[FAIL]")==std::string::npos &&
+          compact.rfind("compact diagnostics: 1 passed, 1 failed, 1 inconclusive, 0 skipped, 1 errors",0)==0,
           "concise reporter must print only problematic cases");
     const auto summary_at=compact.find("[FAILURE SUMMARY] 3 problematic case(s) in compact diagnostics");
     check(summary_at!=std::string::npos &&
@@ -206,6 +207,7 @@ int main() {
     ConsoleReporter information_reporter(information_output, ConsoleDetail::Concise);
     auto const information_summary = informative.run(information_reporter);
     check(information_summary.passed == 1 && information_summary.failed == 1 &&
+          information_output.str().rfind("structured informational output: 1 passed, 1 failed, 0 inconclusive, 0 skipped, 0 errors", 0) == 0 &&
           information_output.str().find("value=42 / 3") == std::string::npos &&
           information_output.str().find("diagnostic: value=7 / 2") != std::string::npos &&
           information_output.str().find("diagnostic: actual = 7") != std::string::npos &&
@@ -227,10 +229,13 @@ int main() {
     char const* const conflict_args[] = {"selftest", "--full", "--concise"};
     char const* const wrong_args[] = {"selftest", "--bogus"};
     char const* const help_args[] = {"selftest", "--help"};
-    std::ostringstream direct_output, full_output, concise_cli_output, invalid_output;
+    std::ostringstream direct_output, default_cli_output, full_output, concise_cli_output, invalid_output;
     check(run_suite(cli_suite, direct_output)==0 &&
           direct_output.str().find("[CHECK 1.2] second")!=std::string::npos,
           "direct suite runner must remain full by default");
+    check(run_suite(cli_suite, 1, full_args, default_cli_output)==0 &&
+          default_cli_output.str().find("[CHECK 1.2] second")!=std::string::npos,
+          "argc/argv runner must remain full without flags");
     check(run_suite(cli_suite, 2, full_args, full_output)==0 &&
           full_output.str().find("[CHECK 1.2] second")!=std::string::npos,
           "explicit --full must preserve all checks");
