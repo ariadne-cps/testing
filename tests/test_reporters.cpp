@@ -1,4 +1,7 @@
 #include "ariadne-testing.hpp"
+#include <array>
+#include <utility>
+#include <string_view>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -252,5 +255,47 @@ int main() {
           cli_executions == executions_before_invalid &&
           invalid_output.str().find("Usage:")!=std::string::npos,
           "unknown/conflicting/help arguments must not run tests");
+    // Direct reporter input exercises all defined wait observations without
+    // depending on timing or scheduling a real asynchronous operation.
+    std::ostringstream wait_json_stream, wait_xml_stream;
+    JsonReporter wait_json(wait_json_stream);
+    JUnitReporter wait_xml(wait_xml_stream);
+    const std::array<std::pair<WaitStatus, std::string_view>, 5> waits{{
+        {WaitStatus::Ready, "ready"},
+        {WaitStatus::Timeout, "timeout"},
+        {WaitStatus::Deferred, "deferred"},
+        {WaitStatus::InvalidTimeout, "invalid_timeout"},
+        {WaitStatus::Unexpected, "unexpected"}
+    }};
+    for (std::size_t i = 0; i < waits.size(); ++i) {
+        CaseResult result;
+        result.suite_name = "wait serialization";
+        result.name = std::string(waits[i].second);
+        result.case_index = i + 1;
+        result.case_total = waits.size();
+        AssertionRecord assertion{};
+        assertion.outcome = Outcome::Passed;
+        assertion.description = "wait observation";
+        assertion.check_index = 1;
+        assertion.wait = WaitObservation{waits[i].first,
+            std::chrono::nanoseconds{17}, std::chrono::nanoseconds{23}, i % 2 == 0};
+        result.assertions.push_back(assertion);
+        wait_json.case_finished(result);
+        wait_xml.case_finished(result);
+    }
+    Summary wait_summary;
+    wait_summary.passed = waits.size();
+    wait_json.suite_finished("wait serialization", wait_summary);
+    wait_xml.suite_finished("wait serialization", wait_summary);
+    for (auto const& [status, name] : waits) {
+        (void)status;
+        std::string const label(name);
+        check(wait_json_stream.str().find("\"status\":\"" + label + "\"") != std::string::npos &&
+              wait_xml_stream.str().find("wait: " + label + " elapsed_ns=17 available_budget_ns=23") != std::string::npos,
+              "JSON/JUnit wait status missing: " + label);
+    }
+    check(wait_json_stream.str().find("\"absolute_deadline\":true") != std::string::npos &&
+          wait_json_stream.str().find("\"absolute_deadline\":false") != std::string::npos,
+          "JSON wait observation lost absolute deadline classification");
     return ok?0:1;
 }
