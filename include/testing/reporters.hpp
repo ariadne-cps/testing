@@ -22,7 +22,7 @@
 
 namespace Ariadne::Testing {
 
-/** @brief All streams full diagnostics; Concise prints only problematic cases and the suite summary. */
+/** @brief All streams full diagnostics; Concise emits final summaries and crash-only breadcrumbs. */
 enum class ConsoleDetail { All, Concise };
 
 /** @brief Callback interface for live case and diagnostic reporting. */
@@ -37,6 +37,23 @@ class Reporter {
     virtual void diagnostic_emitted(CaseResult const&, DiagnosticEvent const&) { }
     virtual void case_finished(CaseResult const& result) = 0;
     virtual void suite_finished(std::string_view name, Summary const& summary) = 0;
+};
+
+/** @brief Scope a crash-only stderr breadcrumb for an argc/argv --concise run.
+ *  @details Supports POSIX fatal signals and unhandled Windows exceptions.
+ *  An unexpected process crash prints the active case and most recently
+ *  started CHECK without streaming ordinary test progress. Does not suppress
+ *  the original crash or exit status. No effect on normal suite results.
+ */
+class CrashDiagnostics final {
+  public:
+    CrashDiagnostics();
+    ~CrashDiagnostics();
+    CrashDiagnostics(CrashDiagnostics const&) = delete;
+    CrashDiagnostics& operator=(CrashDiagnostics const&) = delete;
+  private:
+    struct Impl;
+    Impl* _impl;
 };
 
 /** @brief Human-readable reporter with configurable diagnostic verbosity. */

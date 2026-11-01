@@ -31,6 +31,7 @@
 #include "testing/testing.hpp"
 
 #include <iostream>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -105,6 +106,10 @@ inline int run_suite(Suite const& suite, int argc, char const* const* argv,
         selected = true;
         detail = requested;
     }
+    // A fatal signal bypasses suite_finished(): preserve the latest CHECK
+    // only in a crash handler, without printing normal concise progress.
+    std::unique_ptr<CrashDiagnostics> crash;
+    if (detail == ConsoleDetail::Concise) crash = std::make_unique<CrashDiagnostics>();
     ConsoleReporter reporter(output, detail);
     return suite.run(reporter).successful() ? 0 : 1;
 }

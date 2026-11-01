@@ -10,6 +10,20 @@
 #include "testing/reporters.hpp"
 
 #include <chrono>
+#include <algorithm>
+#include <atomic>
+#include <csignal>
+#include <cstdio>
+#include <climits>
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <unistd.h>
+#include <signal.h>
+#endif
 #include <iomanip>
 #include <locale>
 #include <ostream>
@@ -277,6 +291,132 @@ std::string case_description(CaseResult const& result) {
 }
 } // namespace
 
+
+namespace {
+// Each active suite runs its cases on the invoking thread. A handler that
+// interrupts that thread reads only the published (inactive-to-writer) buffer.
+// Check descriptions are rendered before the checked expression runs.
+struct CrashBreadcrumb {
+    char text[2][1024]{};
+    unsigned short length[2]{};
+    volatile std::sig_atomic_t published = 0;
+};
+thread_local CrashBreadcrumb crash_breadcrumb{};
+volatile std::sig_atomic_t crash_enabled = 0;
+
+void crash_checkpoint(CaseResult const& result, std::size_t check,
+                      std::string_view description) {
+    if (!crash_enabled) return;
+    auto const target = 1 - crash_breadcrumb.published;
+    auto& buffer = crash_breadcrumb.text[target];
+    auto const name_length = static_cast<int>(std::min(result.name.size(), std::size_t{260}));
+    auto const suite_length = static_cast<int>(std::min(result.suite_name.size(), std::size_t{160}));
+    auto const desc_length = static_cast<int>(std::min(description.size(), std::size_t{450}));
+    int size;
+    if (check == 0) {
+        size = std::snprintf(buffer, sizeof(buffer),
+            "[CRASH CONTEXT] suite=%.*s case=%.*s [%zu/%zu] (before first CHECK)\n",
+            suite_length, result.suite_name.data(),
+            name_length, result.name.data(), result.case_index, result.case_total);
+    } else {
+        size = std::snprintf(buffer, sizeof(buffer),
+            "[CRASH CONTEXT] suite=%.*s case=%.*s [%zu/%zu] last CHECK [%zu.%zu]: %.*s\n",
+            suite_length, result.suite_name.data(),
+            name_length, result.name.data(), result.case_index, result.case_total,
+            result.case_index, check, desc_length, description.data());
+    }
+    if (size < 0) return;
+    crash_breadcrumb.length[target] =
+        static_cast<unsigned short>(std::min(static_cast<std::size_t>(size), sizeof(buffer)-1));
+    std::atomic_signal_fence(std::memory_order_release);
+    crash_breadcrumb.published = target;
+}
+void crash_checkpoint_clear() {
+    if (!crash_enabled) return;
+    const auto target = 1 - crash_breadcrumb.published;
+    crash_breadcrumb.length[target] = 0;
+    std::atomic_signal_fence(std::memory_order_release);
+    crash_breadcrumb.published = target;
+}
+void crash_emit_checkpoint() noexcept {
+    if (!crash_enabled) return;
+    const auto current = crash_breadcrumb.published;
+    std::atomic_signal_fence(std::memory_order_acquire);
+    auto const count = crash_breadcrumb.length[current];
+    if (!count) return;
+#ifdef _WIN32
+    DWORD written = 0;
+    HANDLE const error = ::GetStdHandle(STD_ERROR_HANDLE);
+    if (error != INVALID_HANDLE_VALUE && error != nullptr)
+        (void)::WriteFile(error, crash_breadcrumb.text[current], count, &written, nullptr);
+#else
+    // POSIX write is async-signal-safe. Do not allocate or use iostreams here.
+    (void)::write(STDERR_FILENO, crash_breadcrumb.text[current], count);
+#endif
+}
+#ifndef _WIN32
+void crash_signal_handler(int signal_number) noexcept {
+    crash_emit_checkpoint();
+    // Installed with SA_RESETHAND: restore the normal signal termination.
+    // raise is async-signal-safe on POSIX; pending signal fires on return.
+    (void)::raise(signal_number);
+}
+#else
+LONG WINAPI crash_exception_handler(EXCEPTION_POINTERS*) {
+    crash_emit_checkpoint();
+    return EXCEPTION_CONTINUE_SEARCH; // Preserve original Windows failure status.
+}
+#endif
+} // namespace
+
+struct CrashDiagnostics::Impl {
+#ifdef _WIN32
+    LPTOP_LEVEL_EXCEPTION_FILTER previous = nullptr;
+#else
+    static constexpr int count = 5;
+    int signals[count] = {SIGSEGV, SIGABRT, SIGILL, SIGFPE,
+#ifdef SIGBUS
+                          SIGBUS
+#else
+                          SIGSEGV
+#endif
+    };
+    struct sigaction previous[count]{};
+    bool installed[count]{};
+#endif
+};
+
+CrashDiagnostics::CrashDiagnostics() : _impl(new Impl) {
+    crash_breadcrumb = CrashBreadcrumb{};
+#ifdef _WIN32
+    _impl->previous = ::SetUnhandledExceptionFilter(crash_exception_handler);
+#else
+    for (int i = 0; i < Impl::count; ++i) {
+        if (i == 4 && _impl->signals[i] == SIGSEGV) continue;
+        struct sigaction handler{};
+        handler.sa_handler = crash_signal_handler;
+        ::sigemptyset(&handler.sa_mask);
+        handler.sa_flags = SA_RESETHAND;
+        _impl->installed[i] = ::sigaction(_impl->signals[i], &handler,
+                                          &_impl->previous[i]) == 0;
+    }
+#endif
+    crash_enabled = 1;
+}
+
+CrashDiagnostics::~CrashDiagnostics() {
+    crash_enabled = 0;
+#ifdef _WIN32
+    ::SetUnhandledExceptionFilter(_impl->previous);
+#else
+    for (int i = 0; i < Impl::count; ++i)
+        if (_impl->installed[i])
+            (void)::sigaction(_impl->signals[i], &_impl->previous[i], nullptr);
+#endif
+    crash_breadcrumb = CrashBreadcrumb{};
+    delete _impl;
+}
+
 ConsoleReporter::ConsoleReporter(std::ostream& output, ConsoleDetail detail)
     : _output(output), _detail(detail) { }
 
@@ -326,7 +466,10 @@ void ConsoleReporter::selection_started(SelectionInfo const& info) {
 void ConsoleReporter::case_started(CaseResult const& result) {
     _last_check_index = 0;
     _last_check.clear();
-    if (_detail == ConsoleDetail::Concise) return;
+    if (_detail == ConsoleDetail::Concise) {
+        crash_checkpoint(result, 0, {});
+        return;
+    }
     _output << "[RUN " << result.case_index << '/' << result.case_total << "] "
             << result.suite_name << " / " << result.name << '\n' << std::flush;
 }
@@ -336,6 +479,7 @@ void ConsoleReporter::check_started(CaseResult const& result, std::size_t index,
     if (_detail == ConsoleDetail::Concise) {
         _last_check_index = index;
         _last_check = description;
+        crash_checkpoint(result, index, description);
         return;
     }
     _output << "[CHECK " << result.case_index << '.' << index << "] "
@@ -343,6 +487,7 @@ void ConsoleReporter::check_started(CaseResult const& result, std::size_t index,
 }
 
 void ConsoleReporter::case_finished(CaseResult const& result) {
+    if (_detail == ConsoleDetail::Concise) crash_checkpoint_clear();
     if (result.outcome == Outcome::Passed || result.outcome == Outcome::Skipped) {
         if (_detail == ConsoleDetail::All)
             _output << '[' << outcome_name(result.outcome) << "] "
@@ -407,6 +552,7 @@ void ConsoleReporter::case_finished(CaseResult const& result) {
 }
 
 void ConsoleReporter::suite_finished(std::string_view name, Summary const& summary) {
+    if (_detail == ConsoleDetail::Concise) crash_checkpoint_clear();
     _output << summary_text(name,summary) << '\n';
     if (!_problems.empty()) {
         _output << "[FAILURE SUMMARY] " << _problems.size()

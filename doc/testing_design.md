@@ -1504,3 +1504,20 @@ operand. This is a self-test instrumentation defect, not an RTL/framework
 comparison or reporter behavior change. CTest now sets
 `FAIL_REGULAR_EXPRESSION "assertion failed at"` on `test_testing` so that
 unexpected self-test diagnostics fail the CI even with process exit zero.
+
+## 2026-11-01 — Concise crash breadcrumbs
+
+When invoked with `--concise`, the standard command-line suite runner
+installs scoped fatal-process diagnostics. The console reporter publishes an
+up-to-date, bounded per-thread breadcrumb on case start and on every CHECK
+start, before evaluating the assertion. In a POSIX SIGSEGV/SIGABRT/SIGILL/
+SIGFPE/SIGBUS or unhandled Windows exception, the handler attempts to write
+the active case and last started CHECK to stderr, without formatting or
+allocating from the handler. POSIX handlers restore normal termination;
+Windows continues exception dispatch. No output is added to successful runs
+or normally completed failing cases; the final failure index is unchanged.
+Direct/default and --full runs are unaffected. Limitations: failures outside
+the runner thread, process termination without a supported fatal signal,
+and unsafe process corruption may prevent a breadcrumb; it is not a stack
+trace. A subprocess regression checks that a SIGABRT preserves both the
+signal exit status and the concise context without emitting check progress.
