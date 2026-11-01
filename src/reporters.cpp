@@ -315,12 +315,20 @@ void crash_checkpoint(CaseResult const& result, std::size_t check,
     int size;
     if (check == 0) {
         size = std::snprintf(buffer, sizeof(buffer),
-            "[CRASH CONTEXT] suite=%.*s case=%.*s [%zu/%zu] (before first CHECK)\n",
+            "[CRASH CONTEXT]\n"
+            "  suite: %.*s\n"
+            "  case: %.*s\n"
+            "  position: %zu/%zu\n"
+            "  last check: (not started)\n",
             suite_length, result.suite_name.data(),
             name_length, result.name.data(), result.case_index, result.case_total);
     } else {
         size = std::snprintf(buffer, sizeof(buffer),
-            "[CRASH CONTEXT] suite=%.*s case=%.*s [%zu/%zu] last CHECK [%zu.%zu]: %.*s\n",
+            "[CRASH CONTEXT]\n"
+            "  suite: %.*s\n"
+            "  case: %.*s\n"
+            "  position: %zu/%zu\n"
+            "  last check: [%zu.%zu] %.*s\n",
             suite_length, result.suite_name.data(),
             name_length, result.name.data(), result.case_index, result.case_total,
             result.case_index, check, desc_length, description.data());

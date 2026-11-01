@@ -52,8 +52,11 @@ int main() {
         std::cerr << "Child did not terminate by SIGABRT: status=" << status << '\n';
         return 6;
     }
-    if (output.find("[CRASH CONTEXT] suite=crash probe case=fatal case [2/2]") == std::string::npos ||
-        output.find("last CHECK [2.2]: fatal check") == std::string::npos ||
+    if (output != "[CRASH CONTEXT]\n"
+                  "  suite: crash probe\n"
+                  "  case: fatal case\n"
+                  "  position: 2/2\n"
+                  "  last check: [2.2] fatal check\n" ||
         output.find("before failure") != std::string::npos ||
         output.find("[CHECK ") != std::string::npos) {
         std::cerr << "Missing concise crash breadcrumb, or noisy progress: " << output << '\n';

@@ -1547,3 +1547,15 @@ regression poisons the referenced value in a temporary's destructor and
 requires all five relational macros to observe the original value. The
 existing lower-level `check_compare` API is unchanged; callers producing
 references into temporaries should prefer the macros or snapshot API.
+
+## 2026-11-01 — Structured multiline concise crash context
+
+A fatal crash in `--concise` mode prints one bounded, structured stderr
+breadcrumb, with fields on separate lines: `suite`, `case`,
+`position` and `last check`. The last-check field shows the case/check
+indices and the original expression, or `(not started)` when the crash
+precedes any check. The process-level regression compares the entire emitted
+message to the expected multiline text, so accidental extra diagnostics or
+formatting regressions are rejected. Crash handling remains async-signal-safe:
+the message is formatted before the fatal signal, and the handler only writes
+previously prepared bytes. No normal test output or acceptance rules change.
