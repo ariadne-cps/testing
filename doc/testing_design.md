@@ -1492,3 +1492,15 @@ The `test_testing` executable now prints the failing assertion's source line
 and exit code to stderr before returning nonzero. The regression checks for
 full outcome output also dump the captured console log if they fail, so CTest
 `--output-on-failure` exposes actionable diagnostics instead of a blank log.
+
+## 2026-11-01 — Prevent false self-test failures from diagnostic instrumentation
+
+The self-test diagnostic transformation inadvertently replaced the numeric
+operand return in the deferred-evaluation lambda with a call to
+`report_self_test_failure(2, __LINE__)`. The lambda still returned `2`, so
+the actual assertion passed and CI could remain green while stderr wrongly
+reported a failure at line 322. Restore the literal `return 2;` inside that
+operand. This is a self-test instrumentation defect, not an RTL/framework
+comparison or reporter behavior change. CTest now sets
+`FAIL_REGULAR_EXPRESSION "assertion failed at"` on `test_testing` so that
+unexpected self-test diagnostics fail the CI even with process exit zero.

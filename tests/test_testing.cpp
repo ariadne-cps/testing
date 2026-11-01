@@ -319,7 +319,7 @@ int main() {
         ARIADNE_TESTING_EXPECT_EQUAL_CTX(t, ([&]() {
             if (ordering_output.str().find("[CHECK 1.1]") == std::string::npos)
                 throw std::runtime_error("CHECK event missing before operand evaluation");
-            return report_self_test_failure(2, __LINE__);
+            return 2;
         }()), 2);
     });
     ConsoleReporter ordering_reporter(ordering_output);

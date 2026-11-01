@@ -2,6 +2,8 @@ include(CTest)
 add_executable(test_testing test_testing.cpp)
 target_link_libraries(test_testing PRIVATE ariadne-testing testing)
 add_test(NAME test_testing COMMAND $<TARGET_FILE:test_testing>)
+set_tests_properties(test_testing PROPERTIES
+    FAIL_REGULAR_EXPRESSION "assertion failed at")
 if(WIN32)
     set_tests_properties(test_testing PROPERTIES
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:ariadne-testing>")
