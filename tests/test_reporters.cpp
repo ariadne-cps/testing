@@ -440,5 +440,80 @@ int main() {
     for (auto const* label : {"external", "temporary", "keep_on_failure", "keep_always"})
         check(retention_json.str().find(std::string("\"lifetime\":\"") + label + "\"") != std::string::npos,
               "JSON must preserve artifact lifetime: " + std::string(label));
+    // An active filter that selects every registered case remains a complete
+    // selection. Exercise that contract in both console detail modes.
+    Suite filtered_complete("complete filtered reporting");
+    filtered_complete.add("selected passing", [](Context& ctx) {
+        ctx.prove(true, "selected case");
+    }, CaseMetadata{{"quick"}, "native"});
+    std::ostringstream complete_console;
+    ConsoleReporter complete_reporter(complete_console);
+    auto const complete_selected = filtered_complete.run_selected(
+        complete_reporter, CaseFilter{"selected", {}, ""});
+    check(complete_selected.selection.complete() &&
+          complete_selected.successful() &&
+          complete_console.str().find("[SELECTION 1/1] name_contains=selected complete")
+              != std::string::npos &&
+          complete_console.str().find("implementation=") == std::string::npos,
+          "full selection with an active name filter must report complete");
+    std::ostringstream tag_console;
+    ConsoleReporter tag_reporter(tag_console);
+    auto const tag_selected = filtered_complete.run_selected(
+        tag_reporter, CaseFilter{"", {"quick"}, ""});
+    check(tag_selected.successful() &&
+          tag_console.str().find("any_tags=quick complete") != std::string::npos &&
+          tag_console.str().find("name_contains=") == std::string::npos,
+          "tag-only selection must preserve its exact filter");
+    std::ostringstream filtered_concise_output;
+    ConsoleReporter filtered_concise(filtered_concise_output, ConsoleDetail::Concise);
+    auto const concise_selected = filtered_complete.run_selected(
+        filtered_concise, CaseFilter{"selected", {}, ""});
+    check(concise_selected.successful() &&
+          filtered_concise_output.str().find("[SELECTION ") == std::string::npos &&
+          filtered_concise_output.str().find("1 passed") != std::string::npos,
+          "concise console must suppress selection progress");
+
+    // A reporter may receive an externally classified failure without an
+    // assertion. Its failure index must still identify the case faithfully.
+    CaseResult assertionless_console_case;
+    assertionless_console_case.suite_name = "external diagnostics";
+    assertionless_console_case.name = "failure without assertions";
+    assertionless_console_case.case_index = 1;
+    assertionless_console_case.case_total = 1;
+    assertionless_console_case.outcome = Outcome::Failed;
+    Summary assertionless_console_summary;
+    assertionless_console_summary.failed = 1;
+    std::ostringstream assertionless_console_output;
+    ConsoleReporter assertionless_console(assertionless_console_output,
+                                           ConsoleDetail::Concise);
+    assertionless_console.case_finished(assertionless_console_case);
+    assertionless_console.suite_finished("external diagnostics",
+                                        assertionless_console_summary);
+    check(assertionless_console_output.str().find(
+              "[FAIL 1/1] failure without assertions") != std::string::npos &&
+          assertionless_console_output.str().find("[FAILURE SUMMARY] 1 problematic")
+              != std::string::npos &&
+          assertionless_console_output.str().find("last check") == std::string::npos,
+          "assertionless failures must remain visible without invented CHECKs");
+
+    // An implementation label, by itself, must produce a JUnit testcase
+    // property even when both tags and artifacts are absent.
+    CaseResult implementation_only;
+    implementation_only.suite_name = "external diagnostics";
+    implementation_only.name = "implementation only";
+    implementation_only.case_index = 1;
+    implementation_only.case_total = 1;
+    implementation_only.implementation = "native-only";
+    std::ostringstream implementation_xml;
+    JUnitReporter implementation_reporter(implementation_xml);
+    implementation_reporter.case_finished(implementation_only);
+    Summary implementation_summary;
+    implementation_summary.passed = 1;
+    implementation_reporter.suite_finished("external diagnostics",
+                                           implementation_summary);
+    check(implementation_xml.str().find(
+              "name=\"implementation\" value=\"native-only\"") != std::string::npos &&
+          implementation_xml.str().find("<properties>") != std::string::npos,
+          "JUnit must retain implementation-only case metadata");
     return ok?0:1;
 }
