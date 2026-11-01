@@ -80,5 +80,15 @@ int main() {
            legacy_selection.selected_successful() &&
            legacy.finished==1 && legacy.suites==1,
            "selection must work with a reporter using the default lifecycle hook");
+    // An unfiltered run with every case passing must be a complete success,
+    // not merely a successful selected subset.
+    Suite passing_suite("complete successful selection");
+    passing_suite.add("pass", [](Context& c) { c.prove(true,"passed"); });
+    Capture passing_capture;
+    auto const passing=passing_suite.run_selected(passing_capture,{});
+    verify(passing.selection.complete() && passing.successful() &&
+           passing.selected_successful() && passing_capture.cases.size()==1 &&
+           passing_capture.cases[0].outcome==Outcome::Passed,
+           "complete successful selection must pass the full-suite gate");
     return ok?0:1;
 }
