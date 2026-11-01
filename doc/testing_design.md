@@ -1391,3 +1391,12 @@ semantics for integral operands. The character types (`char`, `wchar_t`,
 expectations such as `expect_equal(delimiter, ',')` without implicit
 signedness surprises. The self-test covers matching, mixed-integer and
 mismatching values; no changes to evidence classification or failure policy.
+
+## 2026-11-01 — Temporary subobject equality
+
+Macro equality computes evidence and diagnostics in one deferred full-expression.
+This prevents dangling references returned by member access on temporary
+values, such as `(one+two).raw()`, without copying operands. The explicit
+`Context::check_equal` callable API remains available for callers that
+guarantee their returned references remain alive. The regression uses a
+non-copyable owner and checks the borrowed subobject while its owner is alive.

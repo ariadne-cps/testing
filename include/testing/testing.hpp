@@ -273,6 +273,11 @@ template<class ActualFn, class ExpectedFn>
                      std::string_view description,
                      std::source_location location = std::source_location::current());
 
+    template<class ComparisonFn>
+    void check_equal_snapshot(ComparisonFn&& comparison_fn,
+                     std::string_view description,
+                     std::source_location location = std::source_location::current());
+
     // Compare two input ranges without copying their elements. Both ranges
     // and the comparator/path selectors are evaluated once after CHECK.
     // A non-true predicate is retained as evidence, not coerced to bool.

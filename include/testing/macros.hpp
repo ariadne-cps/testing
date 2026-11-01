@@ -65,9 +65,12 @@
  *  @brief Compare two expressions once using evidence-preserving equality.
  */
 #define ARIADNE_TESTING_EXPECT_EQUAL_CTX(context, actual, expected) \
-    (context).check_equal( \
-        [&]() -> decltype(auto) { return (actual); }, \
-        [&]() -> decltype(auto) { return (expected); }, \
+    (context).check_equal_snapshot( \
+        [&]() { \
+            return ([&](auto const& observed_actual) { \
+                return ::Ariadne::Testing::Detail::observe_equal(observed_actual, (expected)); \
+            }((actual))); \
+        }, \
         #actual " == " #expected)
 
 /** @def ARIADNE_TESTING_EXPECT_RANGES_CTX

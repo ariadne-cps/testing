@@ -88,6 +88,18 @@ Evidence equal_evidence(Actual const& actual, Expected const& expected){
     }
 }
 
+struct EqualityObservation {
+    Evidence verdict;
+    std::string actual;
+    std::string expected;
+};
+
+template<class A, class B>
+EqualityObservation observe_equal(A const& actual, B const& expected){
+    auto const verdict = equal_evidence(actual, expected);
+    return {verdict, render(actual), render(expected)};
+}
+
 template<class Callable>
 auto capture_callable(Callable&& callable){
     if constexpr (std::is_lvalue_reference_v<Callable>)
@@ -198,6 +210,17 @@ template<class ActualFn, class ExpectedFn>
         auto const verdict = Detail::equal_evidence(actual, expected);
         record(outcome(verdict), description,
                Detail::render(actual), Detail::render(expected), {}, location, index);
+    }
+
+template<class ComparisonFn>
+    void Context::check_equal_snapshot(ComparisonFn&& comparison_fn,
+                     std::string_view description,
+                     std::source_location location){
+        auto const index = begin_check(description);
+        auto observation = std::invoke(std::forward<ComparisonFn>(comparison_fn));
+        record(outcome(observation.verdict), description,
+               std::move(observation.actual), std::move(observation.expected),
+               {}, location, index);
     }
 
 template<class ActualFn, class ExpectedFn, class ComparatorFn, class PathFn>

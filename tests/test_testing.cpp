@@ -59,6 +59,24 @@ Truth operator<(Value a, Value b) { return ordered(a,b); }
 
 } // namespace TestLogic
 
+struct TemporaryBorrowOwner {
+    struct View { int value; bool const* alive; };
+    bool* alive;
+    View view;
+    TemporaryBorrowOwner(bool& flag, int n) : alive(&flag), view{n,&flag} { flag = true; }
+    TemporaryBorrowOwner(TemporaryBorrowOwner const&) = delete;
+    ~TemporaryBorrowOwner() { *alive = false; }
+    View const& raw() const { return view; }
+};
+bool operator==(TemporaryBorrowOwner::View const& v, int expected) {
+    if (!*v.alive) throw std::logic_error("comparison of dangling borrow");
+    return v.value == expected;
+}
+std::ostream& operator<<(std::ostream& os, TemporaryBorrowOwner::View const& v) {
+    if (!*v.alive) throw std::logic_error("rendering of dangling borrow");
+    return os << v.value;
+}
+
 struct CaptureReporter final : Reporter {
     std::vector<CaseResult> results;
     Summary summary;
@@ -234,6 +252,21 @@ int main() {
     if (expression_log.find("[CHECK 1.3] TestLogic::Value{2} same TestLogic::Value{2}") == std::string::npos) return 35;
     if (expression_log.find("[CHECK 1.4] 11 within 1 of 10") == std::string::npos) return 36;
     if (expression_log.find("[CHECK 1.7] (void)0 does not throw") == std::string::npos) return 37;
+    Suite borrowed_temporaries("borrowed temporary lifetime");
+    bool owner_alive = false;
+    int evaluations = 0;
+    borrowed_temporaries.add("borrow and render", [&](Context& t) {
+        ARIADNE_TESTING_EXPECT_EQUAL_CTX(t,
+            ([&] { ++evaluations; return TemporaryBorrowOwner(owner_alive, 3); }()).raw(),
+            3);
+    });
+    CaptureReporter borrowed_reporter;
+    auto const borrowed_summary = borrowed_temporaries.run(borrowed_reporter);
+    if (!borrowed_summary.successful() || owner_alive || evaluations != 1 ||
+        borrowed_reporter.results.size() != 1 ||
+        borrowed_reporter.results[0].assertions.size() != 1 ||
+        borrowed_reporter.results[0].assertions[0].actual != "3" ||
+        borrowed_reporter.results[0].assertions[0].expected != "3") return 112;
     Suite ordering("deferred evaluation");
     std::ostringstream ordering_output;
     ordering.add("start precedes operands", [&](Context& t) {
