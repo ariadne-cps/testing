@@ -297,5 +297,49 @@ int main() {
     check(wait_json_stream.str().find("\"absolute_deadline\":true") != std::string::npos &&
           wait_json_stream.str().find("\"absolute_deadline\":false") != std::string::npos,
           "JSON wait observation lost absolute deadline classification");
+    // The full reporting stack must retain multiple observations and
+    // selection metadata, including controls escaped for each output format.
+    Suite rich("rich reporting");
+    rich.add("rich symbols", [](Context& c) {
+        auto outer = c.scope("outer\'s layer");
+        auto inner = c.scope("inner");
+        c.prove(true, "first observation");
+        c.prove(true, "second observation");
+        c.note(std::string("ctrl ") + char{1});
+        c.warning("secondary observation");
+        c.inspect("number", 42);
+        c.artifact("first.dat", "first", "application/octet-stream",
+                   ArtifactKind::Output, ArtifactLifetime::External,
+                   {{"key1", "value1"}, {"key2", "value2"}});
+        c.artifact("difference.dat", "second", "application/octet-stream",
+                   ArtifactKind::Difference, ArtifactLifetime::External);
+    }, CaseMetadata{{"io", "report"}, "native"});
+    rich.add("excluded", [](Context& c) { c.prove(false, "not selected"); },
+             CaseMetadata{{"slow"}, "native"});
+    std::ostringstream rich_console, rich_json, rich_xml;
+    ConsoleReporter rich_live(rich_console);
+    JsonReporter rich_structured(rich_json);
+    JUnitReporter rich_junit(rich_xml);
+    ReporterFanout rich_fanout{std::ref(rich_live),
+                                std::ref(rich_structured), std::ref(rich_junit)};
+    auto const rich_result = rich.run_selected(
+        rich_fanout, CaseFilter{"rich", {"io", "regression"}, "native"});
+    check(rich_result.selection.selected == 1 &&
+          rich_result.selected_successful() && !rich_result.successful(),
+          "rich selection must execute exactly one passing case");
+    check(rich_console.str().find("any_tags=io,regression partial") != std::string::npos &&
+          rich_console.str().find("name_contains=rich implementation=native") != std::string::npos,
+          "console did not preserve the complete selection filter");
+    check(rich_json.str().find("\"tags\":[\"io\",\"report\"]") != std::string::npos &&
+          rich_json.str().find("\"context\":[\"outer\'s layer\",\"inner\"]") != std::string::npos &&
+          rich_json.str().find("\"key2\"") != std::string::npos &&
+          rich_json.str().find("\"path\":\"difference.dat\"") != std::string::npos &&
+          rich_json.str().find("\\u0001") != std::string::npos,
+          "JSON lost repeated tags, scopes, artifacts, metadata or control escaping");
+    check(rich_xml.str().find("outer&apos;s layer") != std::string::npos &&
+          rich_xml.str().find("ctrl ?") != std::string::npos &&
+          rich_xml.str().find("artifact.1.path") != std::string::npos &&
+          rich_xml.str().find("selection.any_tag.1") != std::string::npos,
+          "JUnit lost XML escaping, repeated artifact properties or selection tags");
     return ok?0:1;
 }
