@@ -351,5 +351,28 @@ int main() {
           rich_xml.str().find("artifact.1.path") != std::string::npos &&
           rich_xml.str().find("selection.any_tag.1") != std::string::npos,
           "JUnit lost XML escaping, repeated artifact properties or selection tags");
+    // JSON string escaping must preserve each supported control character;
+    // this is a normal reporter input, independent of any failing test case.
+    CaseResult escaped_case;
+    escaped_case.suite_name = "string escaping";
+    escaped_case.name = "slash\\ quote\" backspace\b formfeed\f newline\n return\r tab\t";
+    escaped_case.case_index = 1;
+    escaped_case.case_total = 1;
+    std::ostringstream escaped_json_output, escaped_xml_output;
+    JsonReporter escaped_json(escaped_json_output);
+    JUnitReporter escaped_xml(escaped_xml_output);
+    escaped_json.case_finished(escaped_case);
+    escaped_xml.case_finished(escaped_case);
+    Summary escaped_summary;
+    escaped_summary.passed = 1;
+    escaped_json.suite_finished("string escaping", escaped_summary);
+    escaped_xml.suite_finished("string escaping", escaped_summary);
+    std::string const escaped_name =
+        R"escaped("name":"slash\\ quote\" backspace\b formfeed\f newline\n return\r tab\t")escaped";
+    check(escaped_json_output.str().find(escaped_name) != std::string::npos,
+          "JSON must escape quotes, backslashes and every named control character");
+    check(escaped_xml_output.str().find("quote&quot; backspace? formfeed?") !=
+              std::string::npos,
+          "JUnit XML must escape quotes and replace forbidden XML controls");
     return ok?0:1;
 }
