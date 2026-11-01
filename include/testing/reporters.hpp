@@ -22,7 +22,7 @@
 
 namespace Ariadne::Testing {
 
-/** @brief All streams every check; Concise checkpoints progress and indexes errors. */
+/** @brief All streams full diagnostics; Concise prints only problematic cases and the suite summary. */
 enum class ConsoleDetail { All, Concise };
 
 /** @brief Callback interface for live case and diagnostic reporting. */
@@ -72,7 +72,6 @@ class ConsoleReporter final : public Reporter {
     std::vector<ProblemCase> _problems;
     std::size_t _last_check_index = 0;
     std::string _last_check;
-    std::size_t _scopes_this_case = 0;
 };
 
 

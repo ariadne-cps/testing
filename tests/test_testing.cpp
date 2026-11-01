@@ -575,8 +575,10 @@ int main() {
         std::string::npos) return 82;
     if (diag_output.str().find("[CHECK 3.2] moved scope closed at end of owner lifetime") ==
         std::string::npos) return 83;
-    if (concise_diag_output.str().find("[CHECK 3.2] moved scope closed at end of owner lifetime") !=
-        std::string::npos) return 114;
+    if (concise_diag_output.str().find("[CHECK ") != std::string::npos ||
+        concise_diag_output.str().find("[RUN ") != std::string::npos ||
+        concise_diag_output.str().find("[SCOPE ") != std::string::npos ||
+        concise_diag_output.str().find("[PASS]") != std::string::npos) return 114;
     if (diag_output.str().find("[CHECK 4.1] new case has no labels") == std::string::npos) return 73;
     Suite bounded_waits("bounded waits");
     CaptureReporter bounded_reporter;
@@ -837,9 +839,7 @@ int main() {
         outcome_log.find("detail: unhandled operation") == std::string::npos)
         return 96;
 
-    // Diagnostics must be streamed in full in All mode. In Concise mode
-    // successful notes stay hidden, warnings remain visible, and a failed
-    // case retains its diagnostic context and measured values.
+    // All streams diagnostics; Concise reports them only for problematic cases.
     Suite diagnostic_modes("reporter detail modes");
     diagnostic_modes.add("successful diagnostics", [](Context& c) {
         c.note("preparation");
@@ -886,7 +886,7 @@ int main() {
     if (concise_log.find("[NOTE] preparation") != std::string::npos ||
         concise_log.find("[VALUE] input") != std::string::npos ||
         concise_log.find("[TIME] initialization") != std::string::npos ||
-        concise_log.find("[WARN] stage / approximate oracle") == std::string::npos ||
+        concise_log.find("[WARN] stage / approximate oracle") != std::string::npos ||
         concise_log.find("diagnostic: failure trace") == std::string::npos ||
         concise_log.find("diagnostic: observed = 7") == std::string::npos ||
         concise_log.find("diagnostic: failed stage = 5 ns") == std::string::npos ||

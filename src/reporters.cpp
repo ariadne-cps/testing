@@ -281,14 +281,7 @@ ConsoleReporter::ConsoleReporter(std::ostream& output, ConsoleDetail detail)
     : _output(output), _detail(detail) { }
 
 void ConsoleReporter::diagnostic_emitted(CaseResult const& result, DiagnosticEvent const& event) {
-    if (_detail == ConsoleDetail::Concise) {
-        if (event.kind == DiagnosticKind::Scope) {
-            ++_scopes_this_case;
-            if (_scopes_this_case != 1 && _scopes_this_case % 250 != 0) return;
-        } else if (event.kind != DiagnosticKind::Warning) {
-            return;
-        }
-    }
+    if (_detail == ConsoleDetail::Concise) return;
     switch (event.kind) {
         case DiagnosticKind::Scope:
             _output << "[SCOPE " << result.case_index << "] ";
@@ -313,6 +306,7 @@ void ConsoleReporter::diagnostic_emitted(CaseResult const& result, DiagnosticEve
 }
 
 void ConsoleReporter::selection_started(SelectionInfo const& info) {
+    if (_detail == ConsoleDetail::Concise) return;
     _output << "[SELECTION " << info.selected << '/' << info.registered << "] ";
     if (!info.filter.name_contains.empty())
         _output << "name_contains=" << info.filter.name_contains << ' ';
@@ -332,7 +326,7 @@ void ConsoleReporter::selection_started(SelectionInfo const& info) {
 void ConsoleReporter::case_started(CaseResult const& result) {
     _last_check_index = 0;
     _last_check.clear();
-    _scopes_this_case = 0;
+    if (_detail == ConsoleDetail::Concise) return;
     _output << "[RUN " << result.case_index << '/' << result.case_total << "] "
             << result.suite_name << " / " << result.name << '\n' << std::flush;
 }
@@ -342,15 +336,15 @@ void ConsoleReporter::check_started(CaseResult const& result, std::size_t index,
     if (_detail == ConsoleDetail::Concise) {
         _last_check_index = index;
         _last_check = description;
-        if (index != 1 && index % 250 != 0) return;
+        return;
     }
     _output << "[CHECK " << result.case_index << '.' << index << "] "
             << description << '\n' << std::flush;
 }
 
 void ConsoleReporter::case_finished(CaseResult const& result) {
-    _output << '[' << outcome_name(result.outcome) << "] " << result.name << '\n';
     if (result.outcome == Outcome::Passed || result.outcome == Outcome::Skipped) return;
+    _output << '[' << outcome_name(result.outcome) << "] " << result.name << '\n';
 
     ProblemCase problem{result.outcome, result.name, result.case_index, result.case_total,
                         _last_check_index, _last_check, {}, {}, {}, {}, {}, 0, {}};
@@ -373,7 +367,7 @@ void ConsoleReporter::case_finished(CaseResult const& result) {
     if (_detail == ConsoleDetail::Concise) {
         std::size_t printed = 0;
         for (auto const& event : result.diagnostics) {
-            if (event.kind == DiagnosticKind::Scope || event.kind == DiagnosticKind::Warning) continue;
+            if (event.kind == DiagnosticKind::Scope) continue;
             if (printed++ == 16) {
                 _output << "  diagnostic: additional events omitted" << '\n';
                 break;
@@ -444,7 +438,6 @@ void ConsoleReporter::suite_finished(std::string_view name, Summary const& summa
     _problems.clear();
     _last_check_index = 0;
     _last_check.clear();
-    _scopes_this_case = 0;
     _output << std::flush;
 }
 

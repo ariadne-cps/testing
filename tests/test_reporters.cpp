@@ -145,14 +145,16 @@ int main() {
     check(concise_summary.passed==1 && concise_summary.failed==1 &&
           concise_summary.errors==1 && concise_summary.inconclusive==1,
           "compact console changed case outcomes");
-    check(compact.find("[CHECK 1.1]")!=std::string::npos &&
-          compact.find("[CHECK 1.250]")!=std::string::npos &&
-          compact.find("[CHECK 1.500]")!=std::string::npos &&
-          compact.find("[CHECK 1.249]")==std::string::npos &&
-          compact.find("[CHECK 1.501]")==std::string::npos &&
-          compact.find("[SCOPE 1] row=0")!=std::string::npos &&
-          compact.find("[SCOPE 1] row=1") == std::string::npos,
-          "compact reporter did not bound live progress");
+    check(compact.find("[CHECK ")==std::string::npos &&
+          compact.find("[RUN ")==std::string::npos &&
+          compact.find("[PASS]")==std::string::npos &&
+          compact.find("[SKIP]")==std::string::npos &&
+          compact.find("[SCOPE ")==std::string::npos &&
+          compact.find("[WARN]")==std::string::npos &&
+          compact.find("[INCONCLUSIVE] undetermined result")!=std::string::npos &&
+          compact.find("[ERROR] unhandled exception")!=std::string::npos &&
+          compact.find("[FAIL] late mismatch")!=std::string::npos,
+          "concise reporter must print only problematic cases");
     const auto summary_at=compact.find("[FAILURE SUMMARY] 3 problematic case(s) in compact diagnostics");
     check(summary_at!=std::string::npos &&
           compact.find("compact diagnostics: 1 passed, 1 failed, 1 inconclusive, 0 skipped, 1 errors")
@@ -198,9 +200,11 @@ int main() {
           full_output.str().find("[CHECK 1.2] second")!=std::string::npos,
           "explicit --full must preserve all checks");
     check(run_suite(cli_suite, 2, concise_args, concise_cli_output)==0 &&
-          concise_cli_output.str().find("[CHECK 1.1] first")!=std::string::npos &&
-          concise_cli_output.str().find("[CHECK 1.2] second")==std::string::npos,
-          "--concise must suppress successful check lines");
+          concise_cli_output.str().find("[CHECK ")==std::string::npos &&
+          concise_cli_output.str().find("[RUN ")==std::string::npos &&
+          concise_cli_output.str().find("[PASS]")==std::string::npos &&
+          concise_cli_output.str().find("console option parsing: 1 passed")!=std::string::npos,
+          "--concise must emit only the summary for successful suites");
     const int executions_before_invalid = cli_executions;
     check(run_suite(cli_suite, 3, conflict_args, invalid_output)==2 &&
           run_suite(cli_suite, 2, wrong_args, invalid_output)==2 &&

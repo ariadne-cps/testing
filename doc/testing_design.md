@@ -1437,3 +1437,15 @@ this parser for standard fixture mains. CTest test registrations supply
 `--concise`, whereas direct invocations continue in All mode. No environment
 variable, global verbosity state or CTest-specific test-framework detection
 is used. The zero-argument runner and macro retain backwards compatibility.
+
+## 2026-11-01 — Strict concise output
+
+Concise now suppresses all live case starts, checks, passes, skips, scopes,
+warnings and selection announcements. It emits only nonpassing case details,
+the suite totals and a trailing index of Failed, Error and Inconclusive
+cases. Diagnostics and warnings for a failed case are replayed at that
+case's completion. Full output is unchanged, including every check and
+live scope. The former 250-check progress sampling was arbitrary and
+contradicted the purpose of concise output. No execution, coverage, or
+structured report semantics change. Direct stdout/stderr written by tests
+are not intercepted by this reporter.

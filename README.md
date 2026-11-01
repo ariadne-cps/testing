@@ -383,9 +383,9 @@ include their full active context. Scope destruction restores the parent.
 `ctx().measure("phase", [&] { operation(); });` create diagnostic events
 that do not increment assertion counters or count as successful checks.
 `ConsoleReporter(output, ConsoleDetail::Concise)` suppresses per-check
-success noise: it flushes the first check and every 250th check in each case,
-and the first diagnostic scope and every 250th scope; warnings are immediate.
-Each case still reports its outcome. On completion, a `[FAILURE SUMMARY]`
+success noise: it suppresses live RUN, CHECK, PASS, SKIP, SCOPE and WARN
+messages, printing only problematic cases and a suite summary.
+On completion, a `[FAILURE SUMMARY]`
 repeats the identity, last check, primary failure or exception, location and
 available context for every Failed, Error or Inconclusive case. This makes
 CTest output usable when GitHub Actions would truncate verbose test logs.
@@ -397,8 +397,8 @@ options fail before executing tests. The matching fixture macro is
 `ARIADNE_TESTING_RUN_TESTS_WITH_ARGS(argc, argv)`. Explicit `ConsoleReporter(output, ConsoleDetail::All)` retains every
 `[CHECK]`, scope, note and assertion diagnostic for detailed debugging.
 No verbosity setting affects test outcomes or JSON/JUnit reports. A process
-killed by the OS cannot produce its final summary; periodic CHECK messages
-still provide live progress.
+killed by the OS cannot produce its final summary. Use --full to obtain
+live diagnostic progress when investigating hangs or timeouts.
 
 ## Fatal prerequisites and exception messages
 
