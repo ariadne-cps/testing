@@ -1380,3 +1380,14 @@ Compilers, options, warnings-as-errors, test targets, coverage,
 sanitizers and report publishing are unchanged. Post-configuration
 cache failures are not silently retried. Complete CI matrix verification
 is required.
+
+## 2026-11-01 — Equality of integral character types
+
+`Context::check_equal` retains signed/unsigned-safe `std::cmp_equal`
+semantics for integral operands. The character types (`char`, `wchar_t`,
+`char8_t`, `char16_t`, `char32_t`) are normalized to signed or unsigned
+`intmax_t`/`uintmax_t` before that comparison because the standard
+`std::cmp_equal` excludes these character types. This permits test
+expectations such as `expect_equal(delimiter, ',')` without implicit
+signedness surprises. The self-test covers matching, mixed-integer and
+mismatching values; no changes to evidence classification or failure policy.

@@ -63,13 +63,26 @@ std::string render(T const& value){
     }
 }
 
+template<class T>
+constexpr auto comparable_integer(T value){
+    using V = std::remove_cvref_t<T>;
+    if constexpr (std::is_same_v<V, char> || std::is_same_v<V, wchar_t> ||
+                  std::is_same_v<V, char8_t> || std::is_same_v<V, char16_t> ||
+                  std::is_same_v<V, char32_t>) {
+        if constexpr (std::is_signed_v<V>) return static_cast<std::intmax_t>(value);
+        else return static_cast<std::uintmax_t>(value);
+    } else {
+        return value;
+    }
+}
+
 template<class Actual, class Expected>
 Evidence equal_evidence(Actual const& actual, Expected const& expected){
     using A = std::remove_cvref_t<Actual>;
     using B = std::remove_cvref_t<Expected>;
     if constexpr (std::is_integral_v<A> && std::is_integral_v<B>
                   && !std::is_same_v<A, bool> && !std::is_same_v<B, bool>) {
-        return evidence(std::cmp_equal(actual, expected));
+        return evidence(std::cmp_equal(comparable_integer(actual), comparable_integer(expected)));
     } else {
         return evidence(actual == expected);
     }

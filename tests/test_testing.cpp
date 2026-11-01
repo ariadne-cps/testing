@@ -31,6 +31,7 @@
 #include <condition_variable>
 #include <stdexcept>
 #include <sstream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -124,6 +125,27 @@ int main() {
     if (sign_summary.passed != 1 || sign_summary.failed != 1) return 15;
     if (sign_reporter.results.size() != 2 ||
         sign_reporter.results[1].outcome != Outcome::Failed) return 16;
+    Suite character_equality("character integral equality");
+    character_equality.add("character types and integer interoperability", [](Context& t) {
+        t.expect_equal('a', 'a');
+        t.expect_equal('a', 97);
+        t.expect_equal(L'a', L'a');
+        t.expect_equal(u'a', u'a');
+        t.expect_equal(U'a', U'a');
+        t.expect_equal(u8'a', u8'a');
+        t.expect_equal(static_cast<char>(-1), static_cast<int>(static_cast<char>(-1)));
+    });
+    character_equality.add("different characters and mixed signs", [](Context& t) {
+        t.expect_equal('a', 'b');
+        t.expect_equal(static_cast<char>(-1), std::numeric_limits<std::uint64_t>::max());
+    });
+    CaptureReporter character_reporter;
+    Summary const character_summary = character_equality.run(character_reporter);
+    if (character_summary.passed != 1 || character_summary.failed != 1 ||
+        character_summary.errors != 0 || character_reporter.results.size() != 2 ||
+        character_reporter.results[0].assertions.size() != 7 ||
+        character_reporter.results[1].assertions.size() != 2)
+        return 111;
     Suite progress("progress");
     std::ostringstream live;
     ConsoleReporter live_reporter(live);
