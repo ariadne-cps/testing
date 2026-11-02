@@ -1,6 +1,9 @@
 
 #include "ariadne-testing.hpp"
+#include <array>
+#include <cstdint>
 #include <cstdlib>
+#include <limits>
 #include <memory>
 #include <iostream>
 #include <ostream>
@@ -237,6 +240,65 @@ int main() {
                    observed.cases[i].assertions[0].actual == expected_actuals[i],
                    "relational temporary observation was poisoned at case " +
                        std::to_string(i));
+    }
+
+    // A single test matrix checks the five built-in relations through both
+    // the deferred Context API and the snapshot macros. Each pair exercises
+    // exactly the same mathematical ordering, including signed/unsigned
+    // boundaries and explicit boolean arithmetic promotion.
+    Suite arithmetic_matrix("built-in relational type combinations");
+    std::vector<std::array<bool, 5>> expected_cases;
+    auto add_type_pair = [&](std::string name, auto lhs, auto rhs,
+                             std::array<bool, 5> expected) {
+        expected_cases.push_back(expected);
+        arithmetic_matrix.add(std::move(name), [=](Context& c) {
+            c.check_compare<Comparison::NotEqual>([&] { return lhs; }, [&] { return rhs; }, "direct !=");
+            c.check_compare<Comparison::Less>([&] { return lhs; }, [&] { return rhs; }, "direct <");
+            c.check_compare<Comparison::LessEqual>([&] { return lhs; }, [&] { return rhs; }, "direct <=");
+            c.check_compare<Comparison::Greater>([&] { return lhs; }, [&] { return rhs; }, "direct >");
+            c.check_compare<Comparison::GreaterEqual>([&] { return lhs; }, [&] { return rhs; }, "direct >=");
+            ARIADNE_TESTING_EXPECT_NOT_EQUAL_CTX(c, lhs, rhs);
+            ARIADNE_TESTING_EXPECT_LESS_CTX(c, lhs, rhs);
+            ARIADNE_TESTING_EXPECT_LESS_EQUAL_CTX(c, lhs, rhs);
+            ARIADNE_TESTING_EXPECT_GREATER_CTX(c, lhs, rhs);
+            ARIADNE_TESTING_EXPECT_GREATER_EQUAL_CTX(c, lhs, rhs);
+        });
+    };
+    add_type_pair("bool/int", false, 1, {true, true, true, false, false});
+    add_type_pair("int/bool", 2, true, {true, false, false, true, true});
+    add_type_pair("bool/double equal", true, 1.0, {false, false, true, false, true});
+    add_type_pair("double/bool", 0.5, true, {true, true, true, false, false});
+    add_type_pair("bool/bool", false, true, {true, true, true, false, false});
+    add_type_pair("signed/unsigned", -1, 1u, {true, true, true, false, false});
+    add_type_pair("unsigned/signed", 1u, -1, {true, false, false, true, true});
+    add_type_pair("int/int equal", 1, 1, {false, false, true, false, true});
+    add_type_pair("double/double equal", 1.5, 1.5, {false, false, true, false, true});
+    add_type_pair("wide signed/unsigned", std::numeric_limits<std::int64_t>::min(),
+                  std::numeric_limits<std::uint64_t>::max(),
+                  {true, true, true, false, false});
+    Capture arithmetic_capture;
+    auto const arithmetic_summary = arithmetic_matrix.run(arithmetic_capture);
+    verify(arithmetic_summary.failed == expected_cases.size() &&
+           arithmetic_summary.passed == 0 && arithmetic_summary.errors == 0 &&
+           arithmetic_summary.inconclusive == 0 &&
+           arithmetic_capture.cases.size() == expected_cases.size(),
+           "mixed arithmetic relations changed the suite summary");
+    if (arithmetic_capture.cases.size() == expected_cases.size()) {
+        for (std::size_t i = 0; i < expected_cases.size(); ++i) {
+            auto const& assertions = arithmetic_capture.cases[i].assertions;
+            verify(assertions.size() == 10,
+                   "missing mixed relational assertions at case " + std::to_string(i));
+            if (assertions.size() != 10) continue;
+            for (std::size_t j = 0; j < assertions.size(); ++j) {
+                auto const expected = expected_cases[i][j % 5]
+                    ? Outcome::Passed : Outcome::Failed;
+                verify(assertions[j].outcome == expected &&
+                       !assertions[j].actual.empty() &&
+                       !assertions[j].expected.empty(),
+                       "mixed relation mismatch at case " + std::to_string(i) +
+                       " check " + std::to_string(j));
+            }
+        }
     }
     return ok?0:1;
 }

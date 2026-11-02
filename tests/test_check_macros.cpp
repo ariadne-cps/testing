@@ -1,6 +1,8 @@
 #include "ariadne-testing.hpp"
 
+#include <array>
 #include <atomic>
+#include <functional>
 #include <chrono>
 #include <condition_variable>
 #include <exception>
@@ -210,6 +212,63 @@ int main() {
                "atomic timeout must preserve last observed value");
         verify(report.cases[10].assertions[0].actual == "deferred",
                "future macro must preserve deferred status");
+    }
+
+    // Keep the same typed macro expansion across accepted/unpermitted status,
+    // every postcondition outcome, and both result/exception alternatives.
+    // Deferred operations and verifiers are evaluated only on the active path.
+    Suite macro_matrix("shared macro control-flow specialization");
+    std::array<Outcome, 12> const macro_outcomes{
+        Outcome::Passed, Outcome::Failed, Outcome::Inconclusive,
+        Outcome::Failed, Outcome::Error,
+        Outcome::Passed, Outcome::Failed, Outcome::Inconclusive,
+        Outcome::Passed, Outcome::Failed, Outcome::Error, Outcome::Error};
+    for (int mode = 0; mode < static_cast<int>(macro_outcomes.size()); ++mode) {
+        macro_matrix.add("macro mode " + std::to_string(mode), [mode](Context& c) {
+            std::function<DomainResult()> operation = [mode] {
+                if (mode >= 8 && mode <= 10) throw Incomplete(7);
+                return DomainResult{mode == 3 ? DomainStatus::Unsat : DomainStatus::Sat, 42};
+            };
+            std::function<DomainStatus(DomainResult const&)> selector =
+                [](DomainResult const& r) { return r.status; };
+            std::function<Evidence(DomainResult const&)> verifier =
+                [mode](DomainResult const&) {
+                    if (mode == 4 || mode == 11)
+                        throw std::runtime_error("macro result verification failed");
+                    if (mode == 1 || mode == 6) return Evidence::False;
+                    if (mode == 2 || mode == 7) return Evidence::Indeterminate;
+                    return Evidence::True;
+                };
+            std::function<Evidence(std::exception const&)> exception_verifier =
+                [mode](std::exception const&) {
+                    if (mode == 10)
+                        throw std::runtime_error("macro exception verification failed");
+                    return mode == 9 ? Evidence::False : Evidence::True;
+                };
+            if (mode <= 4) {
+                ARIADNE_TESTING_EXPECT_STATUS_CTX(c, operation(), selector,
+                    (std::initializer_list<DomainStatus>{DomainStatus::Sat}), verifier);
+            } else {
+                ARIADNE_TESTING_EXPECT_ALTERNATIVE_CTX(c, operation(),
+                                                      verifier, exception_verifier);
+            }
+        });
+    }
+    Capture macro_capture;
+    auto const matrix_summary = macro_matrix.run(macro_capture);
+    verify(matrix_summary.passed == 3 && matrix_summary.failed == 4 &&
+           matrix_summary.inconclusive == 2 && matrix_summary.errors == 3 &&
+           macro_capture.cases.size() == macro_outcomes.size() &&
+           macro_capture.checks == 12,
+           "shared macro specialization changed its outcome summary");
+    if (macro_capture.cases.size() == macro_outcomes.size()) {
+        for (std::size_t i = 0; i < macro_outcomes.size(); ++i) {
+            auto const& result = macro_capture.cases[i];
+            verify(result.outcome == macro_outcomes[i] &&
+                   result.assertions.size() == 1 &&
+                   result.assertions[0].outcome == macro_outcomes[i],
+                   "incorrect shared macro outcome " + std::to_string(i));
+        }
     }
     return ok ? 0 : 1;
 }
