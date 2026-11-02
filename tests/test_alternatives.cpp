@@ -1,5 +1,6 @@
 #include "ariadne-testing.hpp"
 
+#include <functional>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -257,6 +258,89 @@ int main() {
         verify(aborted_capture.cases[3].outcome == Outcome::Passed &&
                aborted_capture.cases[3].assertions.size() == 1,
                "fatal alternative must not affect the following case");
+    }
+
+    // Keep all result/exception outcomes in the same concrete template
+    // instantiation. Unlike unrelated lambda callsites, the same operation
+    // and verifier signatures encounter every valid branch at runtime.
+    Suite alternatives_matrix("alternative outcome and verifier matrix");
+    int matrix_operations = 0, matrix_result_verifiers = 0, matrix_exception_verifiers = 0;
+    std::vector<Outcome> const alternative_outcomes{
+        Outcome::Passed, Outcome::Failed, Outcome::Inconclusive,
+        Outcome::Passed, Outcome::Failed, Outcome::Inconclusive,
+        Outcome::Error, Outcome::Error, Outcome::Failed,
+        Outcome::Error, Outcome::Error
+    };
+    for (int mode = 0; mode < static_cast<int>(alternative_outcomes.size()); ++mode) {
+        alternatives_matrix.add("alternative mode " + std::to_string(mode), [&, mode](Context& c) {
+            std::function<SolverResult()> operation = [&, mode]() -> SolverResult {
+                ++matrix_operations;
+                if (mode >= 3 && mode <= 6) throw Incomplete(7);
+                if (mode == 8) throw 42;
+                if (mode == 10) throw Incomplete(7);
+                return SolverResult{true, 9};
+            };
+            std::function<Evidence(SolverResult const&)> result_verifier =
+                [&, mode](SolverResult const&) -> Evidence {
+                    ++matrix_result_verifiers;
+                    if (mode == 7) throw std::runtime_error("bad result proof");
+                    if (mode == 9) throw 17;
+                    if (mode == 1) return Evidence::False;
+                    if (mode == 2) return Evidence::Indeterminate;
+                    return Evidence::True;
+                };
+            std::function<Evidence(std::exception const&)> exception_verifier =
+                [&, mode](std::exception const& error) -> Evidence {
+                    ++matrix_exception_verifiers;
+                    if (dynamic_cast<Incomplete const*>(&error) == nullptr)
+                        return Evidence::False;
+                    if (mode == 6) throw std::runtime_error("bad exception proof");
+                    if (mode == 10) throw 17;
+                    if (mode == 4) return Evidence::False;
+                    if (mode == 5) return Evidence::Indeterminate;
+                    return Evidence::True;
+                };
+            c.expect_alternative(operation, result_verifier, exception_verifier,
+                                 "accepted result or exception");
+        });
+    }
+    Capture alternatives_capture;
+    auto const alternatives_summary = alternatives_matrix.run(alternatives_capture);
+    verify(alternatives_summary.passed == 2 && alternatives_summary.failed == 3 &&
+           alternatives_summary.inconclusive == 2 && alternatives_summary.errors == 4 &&
+           alternatives_capture.checks == 11 &&
+           alternatives_capture.cases.size() == alternative_outcomes.size() &&
+           matrix_operations == 11 && matrix_result_verifiers == 5 &&
+           matrix_exception_verifiers == 5,
+           "alternative runtime matrix summary or callback isolation changed");
+    if (alternatives_capture.cases.size() == alternative_outcomes.size()) {
+        for (std::size_t i = 0; i < alternative_outcomes.size(); ++i) {
+            auto const& result = alternatives_capture.cases[i];
+            verify(result.outcome == alternative_outcomes[i] &&
+                   result.assertions.size() == 1 &&
+                   result.assertions[0].outcome == alternative_outcomes[i],
+                   "alternative runtime matrix classification changed at mode " +
+                   std::to_string(i));
+        }
+        verify(alternatives_capture.cases[1].assertions[0].detail ==
+                   "result alternative rejected" &&
+               alternatives_capture.cases[2].assertions[0].detail ==
+                   "result postcondition indeterminate" &&
+               alternatives_capture.cases[4].assertions[0].detail ==
+                   "exception alternative rejected" &&
+               alternatives_capture.cases[5].assertions[0].detail ==
+                   "exception postcondition indeterminate" &&
+               alternatives_capture.cases[6].assertions[0].detail ==
+                   "exception verifier threw: bad exception proof" &&
+               alternatives_capture.cases[7].assertions[0].detail ==
+                   "result verifier threw: bad result proof" &&
+               alternatives_capture.cases[8].assertions[0].detail ==
+                   "non-standard operation exception" &&
+               alternatives_capture.cases[9].assertions[0].detail ==
+                   "result verifier threw a non-standard exception" &&
+               alternatives_capture.cases[10].assertions[0].detail ==
+                   "exception verifier threw a non-standard exception",
+               "alternative runtime matrix lost detailed failure reasons");
     }
     return ok ? 0 : 1;
 }

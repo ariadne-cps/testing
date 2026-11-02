@@ -1,4 +1,5 @@
 #include "ariadne-testing.hpp"
+#include <functional>
 #include <iostream>
 #include <stdexcept>
 #include <string_view>
@@ -87,5 +88,85 @@ int main() {
         reporter.cases[2].assertions[0].actual!="UNKNOWN" ||
         reporter.cases[3].assertions[0].detail!="domain status not permitted")
         return 3;
+
+    // Reuse one Operation/Selector/Verifier type-instantiation across all
+    // permitted-status configurations and postcondition outcomes.
+    Suite status_matrix("typed status lifecycle matrix");
+    int operation_calls = 0, selector_calls = 0, verifier_calls = 0;
+    std::vector<Outcome> const status_expected{
+        Outcome::Passed, Outcome::Failed, Outcome::Inconclusive,
+        Outcome::Failed, Outcome::Failed, Outcome::Passed,
+        Outcome::Passed, Outcome::Error, Outcome::Error,
+        Outcome::Error, Outcome::Error, Outcome::Passed
+    };
+    for (int mode = 0; mode < static_cast<int>(status_expected.size()); ++mode) {
+        status_matrix.add("status mode " + std::to_string(mode), [&, mode](Context& c) {
+            std::function<SolverResult()> operation = [&, mode] {
+                ++operation_calls;
+                if (mode == 7) throw std::runtime_error("operation unavailable");
+                return SolverResult{
+                    mode == 3 ? Status::UNSAT :
+                    mode == 11 ? Status::UNKNOWN : Status::SAT, true, 42};
+            };
+            std::function<Status(SolverResult const&)> selector = [&, mode](SolverResult const& r) {
+                ++selector_calls;
+                if (mode == 8) throw std::runtime_error("status unavailable");
+                return r.status;
+            };
+            std::function<Evidence(SolverResult const&)> verifier = [&, mode](SolverResult const&) {
+                ++verifier_calls;
+                if (mode == 9) throw std::runtime_error("postcondition unavailable");
+                if (mode == 10) throw 17;
+                if (mode == 1) return Evidence::False;
+                if (mode == 2) return Evidence::Indeterminate;
+                return Evidence::True;
+            };
+            if (mode == 4) {
+                c.expect_status(operation, selector, {}, verifier, "status with empty allowance");
+            } else if (mode == 5) {
+                c.expect_status(operation, selector, {Status::UNSAT, Status::SAT},
+                                verifier, "second allowed status");
+            } else if (mode == 6) {
+                c.expect_status(operation, selector, {Status::SAT, Status::SAT},
+                                verifier, "duplicate allowed status");
+            } else if (mode == 11) {
+                c.expect_status(operation, selector, {Status::SAT, Status::UNKNOWN},
+                                verifier, "unknown allowed status");
+            } else {
+                c.expect_status(operation, selector, {Status::SAT},
+                                verifier, "status outcome matrix");
+            }
+        });
+    }
+    Capture status_capture;
+    auto const status_summary = status_matrix.run(status_capture);
+    if (status_summary.passed != 4 || status_summary.failed != 3 ||
+        status_summary.inconclusive != 1 || status_summary.errors != 4 ||
+        status_capture.cases.size() != status_expected.size() ||
+        status_capture.checks != static_cast<int>(status_expected.size()) ||
+        operation_calls != 12 || selector_calls != 11 || verifier_calls != 8) {
+        std::cerr << "Typed status matrix summary, CHECK order, or call isolation changed\n";
+        return 4;
+    }
+    for (std::size_t i = 0; i < status_expected.size(); ++i) {
+        auto const& outcome = status_capture.cases[i];
+        if (outcome.outcome != status_expected[i] || outcome.assertions.size() != 1 ||
+            outcome.assertions[0].outcome != status_expected[i]) {
+            std::cerr << "Typed status matrix outcome changed at mode " << i << '\n';
+            return 5;
+        }
+    }
+    if (status_capture.cases[1].assertions[0].detail != "status postcondition failed" ||
+        status_capture.cases[2].assertions[0].detail != "status postcondition indeterminate" ||
+        status_capture.cases[3].assertions[0].detail != "domain status not permitted" ||
+        status_capture.cases[4].assertions[0].expected != "one of []" ||
+        status_capture.cases[5].assertions[0].expected != "one of [UNSAT, SAT]" ||
+        status_capture.cases[6].assertions[0].expected != "one of [SAT, SAT]" ||
+        status_capture.cases[11].assertions[0].actual != "UNKNOWN" ||
+        status_capture.cases[9].assertions[0].detail != "postcondition unavailable" ||
+        status_capture.cases[10].assertions[0].description != "Unhandled non-standard exception") {
+        std::cerr << "Typed status matrix lost specific diagnostics or ordering\n";
+        return 6;
+    }
     return 0;
 }
