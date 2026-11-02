@@ -2,6 +2,7 @@
 #include "ariadne-testing.hpp"
 #include <array>
 #include <cstdint>
+#include <array>
 #include <cstdlib>
 #include <limits>
 #include <memory>
@@ -16,6 +17,32 @@ using namespace Ariadne::Testing;
 
 namespace Demo {
 struct Value { int identity; int center; int radius; };
+
+struct TernaryNumber { int value; bool known; };
+std::ostream& operator<<(std::ostream& output, TernaryNumber const& number) {
+    return output << "ternary(" << number.value << ','
+                  << (number.known ? "known" : "unknown") << ')';
+}
+Evidence ternary_relation(bool operands_known, bool truth) {
+    return !operands_known ? Evidence::Indeterminate
+         : truth ? Evidence::True : Evidence::False;
+}
+Evidence operator!=(TernaryNumber const& lhs, TernaryNumber const& rhs) {
+    return ternary_relation(lhs.known && rhs.known, lhs.value != rhs.value);
+}
+Evidence operator<(TernaryNumber const& lhs, TernaryNumber const& rhs) {
+    return ternary_relation(lhs.known && rhs.known, lhs.value < rhs.value);
+}
+Evidence operator<=(TernaryNumber const& lhs, TernaryNumber const& rhs) {
+    return ternary_relation(lhs.known && rhs.known, lhs.value <= rhs.value);
+}
+Evidence operator>(TernaryNumber const& lhs, TernaryNumber const& rhs) {
+    return ternary_relation(lhs.known && rhs.known, lhs.value > rhs.value);
+}
+Evidence operator>=(TernaryNumber const& lhs, TernaryNumber const& rhs) {
+    return ternary_relation(lhs.known && rhs.known, lhs.value >= rhs.value);
+}
+
 std::ostream& operator<<(std::ostream& os, Value const& v) {
     return os << "value(" << v.identity << ',' << v.center << ',' << v.radius << ')';
 }
@@ -297,6 +324,64 @@ int main() {
                        !assertions[j].expected.empty(),
                        "mixed relation mismatch at case " + std::to_string(i) +
                        " check " + std::to_string(j));
+            }
+        }
+    }
+
+    // The deferred Context API and the snapshot macros must agree for
+    // domain-defined three-valued comparisons, not only built-in integers.
+    // Exercise uncertainty, equality and both strict ordering directions.
+    Suite ternary_suite("shared domain comparison semantics");
+    std::array<std::array<Outcome, 5>, 4> const ternary_expected{{
+        {Outcome::Inconclusive, Outcome::Inconclusive, Outcome::Inconclusive,
+         Outcome::Inconclusive, Outcome::Inconclusive},
+        {Outcome::Failed, Outcome::Failed, Outcome::Passed,
+         Outcome::Failed, Outcome::Passed},
+        {Outcome::Passed, Outcome::Passed, Outcome::Passed,
+         Outcome::Failed, Outcome::Failed},
+        {Outcome::Passed, Outcome::Failed, Outcome::Failed,
+         Outcome::Passed, Outcome::Passed}
+    }};
+    for (int mode = 0; mode < 4; ++mode) {
+        ternary_suite.add("ternary relation " + std::to_string(mode),
+                          [mode](Context& c) {
+            Demo::TernaryNumber lhs{mode == 3 ? 2 : 1, mode != 0};
+            Demo::TernaryNumber rhs{mode == 2 ? 2 : 1, true};
+            c.check_compare<Comparison::NotEqual>([&] { return lhs; },
+                                                  [&] { return rhs; }, "direct !=");
+            c.check_compare<Comparison::Less>([&] { return lhs; },
+                                              [&] { return rhs; }, "direct <");
+            c.check_compare<Comparison::LessEqual>([&] { return lhs; },
+                                                   [&] { return rhs; }, "direct <=");
+            c.check_compare<Comparison::Greater>([&] { return lhs; },
+                                                 [&] { return rhs; }, "direct >");
+            c.check_compare<Comparison::GreaterEqual>([&] { return lhs; },
+                                                      [&] { return rhs; }, "direct >=");
+            ARIADNE_TESTING_EXPECT_NOT_EQUAL_CTX(c, lhs, rhs);
+            ARIADNE_TESTING_EXPECT_LESS_CTX(c, lhs, rhs);
+            ARIADNE_TESTING_EXPECT_LESS_EQUAL_CTX(c, lhs, rhs);
+            ARIADNE_TESTING_EXPECT_GREATER_CTX(c, lhs, rhs);
+            ARIADNE_TESTING_EXPECT_GREATER_EQUAL_CTX(c, lhs, rhs);
+        });
+    }
+    Capture ternary_capture;
+    auto const ternary_summary = ternary_suite.run(ternary_capture);
+    verify(ternary_summary.failed == 3 && ternary_summary.inconclusive == 1 &&
+           ternary_summary.passed == 0 && ternary_summary.errors == 0 &&
+           ternary_capture.cases.size() == ternary_expected.size(),
+           "domain comparison matrix summary changed");
+    if (ternary_capture.cases.size() == ternary_expected.size()) {
+        for (std::size_t i = 0; i < ternary_capture.cases.size(); ++i) {
+            auto const& assertions = ternary_capture.cases[i].assertions;
+            verify(assertions.size() == 10,
+                   "missing domain comparisons at case " + std::to_string(i));
+            if (assertions.size() != 10) continue;
+            for (std::size_t j = 0; j < assertions.size(); ++j) {
+                verify(assertions[j].outcome == ternary_expected[i][j % 5] &&
+                       assertions[j].actual.find("ternary(") != std::string::npos &&
+                       assertions[j].expected.find("ternary(") != std::string::npos,
+                       "direct and macro domain relations differ at case " +
+                       std::to_string(i) + " check " + std::to_string(j));
             }
         }
     }

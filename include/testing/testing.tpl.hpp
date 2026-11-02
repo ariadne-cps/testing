@@ -402,49 +402,12 @@ template<Comparison Relation, class ActualFn, class ExpectedFn>
         auto const index = begin_check(description);
         decltype(auto) actual = std::invoke(std::forward<ActualFn>(actual_fn));
         decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
-        using A = std::remove_cvref_t<decltype(actual)>;
-        using B = std::remove_cvref_t<decltype(expected)>;
-        constexpr bool built_in_integers =
-            std::is_integral_v<A> && std::is_integral_v<B>
-            && !std::is_same_v<A,bool> && !std::is_same_v<B,bool>;
-        // Built-in arithmetic comparisons promote bool to int. Apply the
-        // same promotion explicitly so MSVC does not reject bool relational
-        // operators when warnings are treated as errors. Domain-specific
-        // operators still receive their original types for ADL.
-        constexpr bool boolean_arithmetic =
-            (std::is_same_v<A, bool> || std::is_same_v<B, bool>) &&
-            std::is_arithmetic_v<A> && std::is_arithmetic_v<B>;
-        decltype(auto) comparable_actual = [&]() -> decltype(auto) {
-            if constexpr (boolean_arithmetic)
-                return static_cast<std::common_type_t<int, A, B>>(actual);
-            else return (actual);
-        }();
-        decltype(auto) comparable_expected = [&]() -> decltype(auto) {
-            if constexpr (boolean_arithmetic)
-                return static_cast<std::common_type_t<int, A, B>>(expected);
-            else return (expected);
-        }();
-        auto const verdict = [&]() -> Evidence {
-            if constexpr (Relation == Comparison::NotEqual) {
-                if constexpr (built_in_integers) return Detail::evidence(!std::cmp_equal(comparable_actual, comparable_expected));
-                else return Detail::evidence(comparable_actual != comparable_expected);
-            } else if constexpr (Relation == Comparison::Less) {
-                if constexpr (built_in_integers) return Detail::evidence(std::cmp_less(comparable_actual, comparable_expected));
-                else return Detail::evidence(comparable_actual < comparable_expected);
-            } else if constexpr (Relation == Comparison::LessEqual) {
-                if constexpr (built_in_integers) return Detail::evidence(std::cmp_less_equal(comparable_actual, comparable_expected));
-                else return Detail::evidence(comparable_actual <= comparable_expected);
-            } else if constexpr (Relation == Comparison::Greater) {
-                if constexpr (built_in_integers) return Detail::evidence(std::cmp_greater(comparable_actual, comparable_expected));
-                else return Detail::evidence(comparable_actual > comparable_expected);
-            } else {
-                static_assert(Relation == Comparison::GreaterEqual);
-                if constexpr (built_in_integers) return Detail::evidence(std::cmp_greater_equal(comparable_actual, comparable_expected));
-                else return Detail::evidence(comparable_actual >= comparable_expected);
-            }
-        }();
-        record(outcome(verdict), description,
-               Detail::render(actual), Detail::render(expected), {}, location, index);
+        // Share signedness, bool promotion and ADL domain comparison rules
+        // with the snapshot macros, without reevaluating either operand.
+        auto const observed = Detail::observe_compare<Relation>(actual, expected);
+        record(outcome(observed.verdict), description,
+               std::move(observed.actual), std::move(observed.expected),
+               {}, location, index);
     }
 
 template<class Predicate, class OperandFn>
