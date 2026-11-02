@@ -43,6 +43,10 @@ struct Capture final : Reporter {
     void suite_finished(std::string_view, Summary const&) override {}
 };
 
+bool throws_from_binary_predicate(int, int) {
+    throw std::runtime_error("binary predicate failure");
+}
+
 struct MacroFixture : ContextFixture {
     using ContextFixture::ContextFixture;
 
@@ -268,6 +272,109 @@ int main() {
                    result.assertions.size() == 1 &&
                    result.assertions[0].outcome == macro_outcomes[i],
                    "incorrect shared macro outcome " + std::to_string(i));
+        }
+    }
+
+    // Deferred macro operands are observed only after CHECK publication.
+    // Exceptions must abort that case, preserve their original diagnostics,
+    // and never evaluate the operands or predicates that come later.
+    Suite macro_exceptions("macro deferred evaluation exceptions");
+    Capture thrown_report;
+    int manifest_reads = 0, observed_reads = 0;
+    int replay_reads = 0, lhs_reads = 0, rhs_reads = 0;
+    std::vector<OracleRow> const oracle_rows{
+        {OracleRowId{"frozen", 0, 0}, true}};
+    macro_exceptions.add("manifest accessor throws", [&](Context& c) {
+        auto manifest = [&]() -> std::vector<OracleRow> const& {
+            if (thrown_report.checks != 1)
+                throw std::logic_error("manifest evaluated before CHECK");
+            ++manifest_reads;
+            throw std::runtime_error("manifest accessor failure");
+        };
+        auto observed = [&]() -> std::vector<OracleRow> const& {
+            ++observed_reads;
+            return oracle_rows;
+        };
+        ARIADNE_TESTING_EXPECT_ORACLE_ROWS_CTX(c, manifest(), observed());
+    });
+    macro_exceptions.add("observed accessor throws", [&](Context& c) {
+        auto manifest = [&]() -> std::vector<OracleRow> const& {
+            if (thrown_report.checks != 2)
+                throw std::logic_error("manifest evaluated before CHECK");
+            ++manifest_reads;
+            return oracle_rows;
+        };
+        auto observed = [&]() -> std::vector<OracleRow> const& {
+            ++observed_reads;
+            throw std::runtime_error("observed accessor failure");
+        };
+        ARIADNE_TESTING_EXPECT_ORACLE_ROWS_CTX(c, manifest(), observed());
+    });
+    macro_exceptions.add("replay accessor throws", [&](Context& c) {
+        auto replay = [&]() -> OracleReplayPlan {
+            if (thrown_report.checks != 3)
+                throw std::logic_error("replay evaluated before CHECK");
+            ++replay_reads;
+            throw std::runtime_error("replay accessor failure");
+        };
+        ARIADNE_TESTING_EXPECT_ORACLE_REPLAY_CTX(c, replay());
+    });
+    macro_exceptions.add("left operand throws", [&](Context& c) {
+        auto left = [&]() -> int {
+            if (thrown_report.checks != 4)
+                throw std::logic_error("left evaluated before CHECK");
+            ++lhs_reads;
+            throw std::runtime_error("left operand failure");
+        };
+        auto right = [&] { ++rhs_reads; return 2; };
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(
+            c, throws_from_binary_predicate, left(), right());
+    });
+    macro_exceptions.add("right operand throws", [&](Context& c) {
+        auto left = [&] {
+            if (thrown_report.checks != 5)
+                throw std::logic_error("left evaluated before CHECK");
+            ++lhs_reads;
+            return 1;
+        };
+        auto right = [&]() -> int {
+            ++rhs_reads;
+            throw std::runtime_error("right operand failure");
+        };
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(
+            c, throws_from_binary_predicate, left(), right());
+    });
+    macro_exceptions.add("binary predicate throws", [&](Context& c) {
+        auto left = [&] {
+            if (thrown_report.checks != 6)
+                throw std::logic_error("left evaluated before CHECK");
+            ++lhs_reads;
+            return 1;
+        };
+        auto right = [&] { ++rhs_reads; return 2; };
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(
+            c, throws_from_binary_predicate, left(), right());
+    });
+    auto const thrown_summary = macro_exceptions.run(thrown_report);
+    verify(thrown_summary.errors == 6 && thrown_summary.failed == 0 &&
+           thrown_summary.passed == 0 && thrown_report.cases.size() == 6 &&
+           thrown_report.checks == 6 &&
+           manifest_reads == 2 && observed_reads == 1 && replay_reads == 1 &&
+           lhs_reads == 3 && rhs_reads == 2,
+           "macro exceptions changed deferred evaluation or CHECK ordering");
+    if (thrown_report.cases.size() == 6) {
+        std::array<std::string_view, 6> const details{
+            "manifest accessor failure", "observed accessor failure",
+            "replay accessor failure", "left operand failure",
+            "right operand failure", "binary predicate failure"};
+        for (std::size_t i = 0; i < details.size(); ++i) {
+            auto const& result = thrown_report.cases[i];
+            verify(result.outcome == Outcome::Error &&
+                   result.assertions.size() == 1 &&
+                   result.assertions[0].outcome == Outcome::Error &&
+                   result.assertions[0].detail == details[i] &&
+                   result.assertions[0].description == "Unhandled std::exception",
+                   "macro exception or diagnostic lost for " + result.name);
         }
     }
     return ok ? 0 : 1;
