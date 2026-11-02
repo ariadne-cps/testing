@@ -348,11 +348,12 @@ template<class ActualFn, class ExpectedFn, class ComparatorFn, class PathFn>
         for (; a != a_end; ++a) ++actual_count;
         for (; e != e_end; ++e) ++expected_count;
 
-        // Count mismatches always fail, even when earlier elements are
-        // mathematically indeterminate.
-        auto const status = first_failure || actual_count != expected_count
-            ? Outcome::Failed : first_unknown ? Outcome::Inconclusive
-            : Outcome::Passed;
+        // A remaining tail always sets first_failure above, so differing
+        // counts cannot occur without it. Earlier uncertainty never masks
+        // a definite mismatch or a missing element.
+        auto const status = first_failure ? Outcome::Failed
+                          : first_unknown ? Outcome::Inconclusive
+                          : Outcome::Passed;
         std::string info = "actual_count=" + std::to_string(actual_count)
                          + ", expected_count=" + std::to_string(expected_count);
         auto const mismatch = first_failure ? first_failure : first_unknown;

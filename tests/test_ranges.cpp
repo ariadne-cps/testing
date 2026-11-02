@@ -161,7 +161,11 @@ int main() {
         {"long mismatched strings", {long_a}, {long_b}, Outcome::Failed, 0, -1},
         {"empty actual", {}, {"1"}, Outcome::Failed, 0, -1},
         {"empty expected", {"1"}, {}, Outcome::Failed, 0, -1},
-        {"long equal strings", {long_a}, {long_a}, Outcome::Passed, -1, -1}
+        {"long equal strings", {long_a}, {long_a}, Outcome::Passed, -1, -1},
+        {"uncertainty before extra actual", {"?", "2", "3"}, {"1", "2"},
+         Outcome::Failed, 2, 0},
+        {"uncertainty before extra expected", {"?", "2"}, {"1", "2", "3"},
+         Outcome::Failed, 2, 0}
     };
     auto compare_scenario = [](Context& c, RangeScenario const& scenario) {
         c.check_ranges(
@@ -245,6 +249,17 @@ int main() {
             std::cerr << "range matrix: lost uncertainty context for " << scenario.name << '\n';
             return 17;
         }
+    }
+    // A definite range-length mismatch overrides an earlier unknown
+    // element, and preserves which side exhausted first.
+    auto const& extra_actual = matrix_report.cases[16].assertions[0];
+    auto const& extra_expected = matrix_report.cases[17].assertions[0];
+    if (extra_actual.actual.find("value=3") == std::string::npos ||
+        extra_actual.expected.find("value=<end>") == std::string::npos ||
+        extra_expected.actual.find("value=<end>") == std::string::npos ||
+        extra_expected.expected.find("value=3") == std::string::npos) {
+        std::cerr << "range matrix: unequal tails lost their mismatch side\n";
+        return 19;
     }
     auto const& truncated = matrix_report.cases[12].assertions[0];
     if (truncated.actual.find(std::string(93, 'a') + "...") == std::string::npos ||
