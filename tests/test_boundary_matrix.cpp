@@ -2,6 +2,7 @@
 
 #include <array>
 #include <chrono>
+#include <cstdlib>
 #include <fstream>
 #include <filesystem>
 #include <functional>
@@ -445,6 +446,73 @@ int main() {
         }
     }
 
+
+    // A Context can be constructed around a caller-owned CaseResult. An
+    // unknown prior outcome must not be silently downgraded by later checks.
+    // This also exercises the defensive Outcome priority contract.
+    Suite context_boundaries("external result and temporary directory contracts");
+    context_boundaries.add("unknown prior outcome retains blocking priority", [](Context& c) {
+        CaseResult external;
+        external.outcome = static_cast<Outcome>(99);
+        {
+            Context context(external);
+            context.prove(true, "subsequent successful assertion");
+            context.prove(false, "subsequent failed assertion");
+        }
+        c.prove(external.outcome == static_cast<Outcome>(99) &&
+                external.assertions.size() == 2 &&
+                external.assertions[0].outcome == Outcome::Passed &&
+                external.assertions[1].outcome == Outcome::Failed,
+                "unknown input outcomes retain error-level priority");
+    });
+#if !defined(_WIN32)
+    context_boundaries.add("unwritable temporary root rejects case allocation", [](Context& c) {
+        if (::geteuid() == 0) {
+            c.skip("permission restrictions are not enforced for root");
+            return;
+        }
+        auto const restricted = c.work_directory() / "restricted";
+        std::filesystem::create_directory(restricted);
+        std::filesystem::permissions(restricted,
+            std::filesystem::perms::owner_read | std::filesystem::perms::owner_exec,
+            std::filesystem::perm_options::replace);
+        char const* current = std::getenv("TMPDIR");
+        std::optional<std::string> original =
+            current ? std::optional<std::string>{current} : std::nullopt;
+        bool rejected = false;
+        bool const configured = ::setenv("TMPDIR", restricted.c_str(), 1) == 0;
+        if (configured) {
+            try {
+                CaseResult attempted;
+                Context isolated(attempted);
+                (void)isolated.work_directory();
+            } catch (std::filesystem::filesystem_error const& error) {
+                rejected = error.code() == std::errc::permission_denied &&
+                    std::string(error.what()).find("create work directory") !=
+                        std::string::npos;
+            }
+        }
+        if (original) (void)::setenv("TMPDIR", original->c_str(), 1);
+        else (void)::unsetenv("TMPDIR");
+        std::filesystem::permissions(restricted, std::filesystem::perms::owner_all,
+                                     std::filesystem::perm_options::replace);
+        c.prove(configured && rejected,
+                "permission denial must be reported as filesystem_error");
+    });
+#endif
+    Capture context_boundary_capture;
+    auto const context_boundary_summary = context_boundaries.run(context_boundary_capture);
+#if defined(_WIN32)
+    constexpr std::size_t context_boundary_count = 1;
+#else
+    constexpr std::size_t context_boundary_count = 2;
+#endif
+    ok &= verify(context_boundary_summary.passed + context_boundary_summary.skipped ==
+                     context_boundary_count &&
+                 context_boundary_summary.failed == 0 &&
+                 context_boundary_summary.errors == 0 &&
+                 context_boundary_capture.cases.size() == context_boundary_count,
+                 "external result or filesystem boundary regression");
     return ok ? 0 : 1;
 }
 
