@@ -44,6 +44,22 @@ struct SimulatedFuture {
     }
 };
 
+// A custom Future can violate the std::future_status contract. Both waiting
+// APIs must report the unexpected value as Error without consuming the result.
+struct UnexpectedFuture {
+    int relative_calls = 0;
+    int absolute_calls = 0;
+    template<class Rep, class Period>
+    std::future_status wait_for(std::chrono::duration<Rep, Period>) {
+        ++relative_calls;
+        return static_cast<std::future_status>(99);
+    }
+    std::future_status wait_until(std::chrono::steady_clock::time_point) {
+        ++absolute_calls;
+        return static_cast<std::future_status>(99);
+    }
+};
+
 int main() {
     auto verify = [](bool value, std::string const& description) {
         if (!value) std::cerr << description << '\n';
@@ -390,6 +406,43 @@ int main() {
                      !result.assertions[0].detail.empty(),
                      "filesystem: missing Error assertion or underlying detail in " +
                      result.name);
+    }
+
+    // An adapter returning a nonstandard future_status must never masquerade
+    // as ready, timed out or deferred. Cover relative and absolute deadlines.
+    Suite unexpected_future("invalid future status classification");
+    unexpected_future.add("relative invalid status", [](Context& c) {
+        UnexpectedFuture future;
+        c.expect_ready(future, std::chrono::milliseconds{1}, "relative readiness");
+        c.prove(future.relative_calls == 1 && future.absolute_calls == 0,
+                "relative wait must invoke only wait_for once");
+    });
+    unexpected_future.add("absolute invalid status", [](Context& c) {
+        UnexpectedFuture future;
+        c.expect_ready_until(future, std::chrono::steady_clock::now() +
+                                     std::chrono::seconds{1}, "absolute readiness");
+        c.prove(future.relative_calls == 0 && future.absolute_calls == 1,
+                "absolute wait must invoke only wait_until once");
+    });
+    Capture unexpected_report;
+    auto const unexpected_summary = unexpected_future.run(unexpected_report);
+    ok &= verify(unexpected_summary.errors == 2 && unexpected_summary.passed == 0 &&
+                 unexpected_report.cases.size() == 2,
+                 "nonstandard future statuses must be errors");
+    if (unexpected_report.cases.size() == 2) {
+        for (std::size_t i = 0; i != 2; ++i) {
+            auto const& entry = unexpected_report.cases[i];
+            ok &= verify(entry.outcome == Outcome::Error &&
+                         entry.assertions.size() == 2 &&
+                         entry.assertions[0].outcome == Outcome::Error &&
+                         entry.assertions[0].actual == "unexpected future status" &&
+                         entry.assertions[0].wait.has_value() &&
+                         entry.assertions[0].wait->status == WaitStatus::Unexpected &&
+                         entry.assertions[0].wait->absolute_deadline == (i == 1) &&
+                         entry.assertions[1].outcome == Outcome::Passed,
+                         "invalid future status or deadline diagnostic changed at " +
+                         std::to_string(i));
+        }
     }
 
     return ok ? 0 : 1;

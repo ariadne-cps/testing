@@ -162,5 +162,36 @@ int main() {
             }
         }
     }
+    // Check the documented defensive fallbacks for enum values supplied
+    // through the public Context API (for example, corrupted deserialization).
+    Suite malformed_enums("malformed mathematical evidence contracts");
+    malformed_enums.add("unexpected evidence", [](Context& c) {
+        std::function<Evidence()> const predicate = [] {
+            return static_cast<Evidence>(99);
+        };
+        c.expect_evidence(predicate, EvidenceExpectation::DefinitelyTrue,
+                          "malformed evidence must not become proof");
+    });
+    malformed_enums.add("unexpected expectation", [](Context& c) {
+        std::function<Evidence()> const predicate = [] { return Evidence::True; };
+        c.expect_evidence(predicate, static_cast<EvidenceExpectation>(99),
+                          "unsupported evidence expectation must be error");
+    });
+    Capture malformed_report;
+    auto const malformed_summary = malformed_enums.run(malformed_report);
+    if (malformed_summary.errors != 2 || malformed_summary.failed != 0 ||
+        malformed_report.results.size() != 2) {
+        std::cerr << "Malformed evidence values lost their Error classification\n";
+        return 6;
+    }
+    if (malformed_report.results[0].assertions.size() != 1 ||
+        malformed_report.results[1].assertions.size() != 1 ||
+        malformed_report.results[0].assertions[0].actual != "invalid" ||
+        malformed_report.results[0].assertions[0].expected != "definitely true" ||
+        malformed_report.results[1].assertions[0].actual != "true" ||
+        malformed_report.results[1].assertions[0].expected != "invalid") {
+        std::cerr << "Malformed evidence names or expectations changed\n";
+        return 7;
+    }
     return 0;
 }
