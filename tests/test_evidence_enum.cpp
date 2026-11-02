@@ -1,5 +1,7 @@
 #include "ariadne-testing.hpp"
 
+#include <array>
+#include <functional>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -108,6 +110,57 @@ int main() {
     if (!rejected_invalid_evidence) {
         std::cerr << "Malformed Evidence was not rejected by negation\n";
         return 3;
+    }
+
+    // All meaningful expectation/evidence combinations share one callable
+    // specialization. Check classification and diagnostic names for each pair.
+    std::array<Evidence, 3> const evidence_values{
+        Evidence::True, Evidence::False, Evidence::Indeterminate};
+    std::array<EvidenceExpectation, 4> const expectation_values{
+        EvidenceExpectation::DefinitelyTrue, EvidenceExpectation::PossiblyTrue,
+        EvidenceExpectation::NotPossibly, EvidenceExpectation::Indeterminate};
+    std::array<std::string_view, 3> const observed_names{
+        "true", "false", "indeterminate"};
+    std::array<std::string_view, 4> const expectation_names{
+        "definitely true", "possibly true", "not possibly true", "indeterminate"};
+    std::array<std::array<Outcome, 3>, 4> const expectation_outcomes{{
+        {Outcome::Passed, Outcome::Failed, Outcome::Inconclusive},
+        {Outcome::Passed, Outcome::Failed, Outcome::Passed},
+        {Outcome::Failed, Outcome::Passed, Outcome::Inconclusive},
+        {Outcome::Failed, Outcome::Failed, Outcome::Passed}
+    }};
+    Suite expectation_matrix("public evidence expectation combinations");
+    for (std::size_t i = 0; i < expectation_values.size(); ++i) {
+        for (std::size_t j = 0; j < evidence_values.size(); ++j) {
+            auto const actual = evidence_values[j];
+            auto const expected = expectation_values[i];
+            expectation_matrix.add("expectation " + std::to_string(i) + "/" +
+                                   std::to_string(j), [actual, expected](Context& c) {
+                std::function<Evidence()> const predicate = [actual] { return actual; };
+                c.expect_evidence(predicate, expected, "mathematical evidence expectation");
+            });
+        }
+    }
+    Capture expectation_capture;
+    auto const expectation_summary = expectation_matrix.run(expectation_capture);
+    if (expectation_summary.passed != 5 || expectation_summary.failed != 5 ||
+        expectation_summary.inconclusive != 2 || expectation_summary.errors != 0 ||
+        expectation_capture.results.size() != 12) {
+        std::cerr << "Incorrect evidence expectation matrix summary\n";
+        return 4;
+    }
+    for (std::size_t i = 0; i < expectation_values.size(); ++i) {
+        for (std::size_t j = 0; j < evidence_values.size(); ++j) {
+            auto const& result = expectation_capture.results[i * 3 + j];
+            if (result.outcome != expectation_outcomes[i][j] ||
+                result.assertions.size() != 1 ||
+                result.assertions[0].outcome != expectation_outcomes[i][j] ||
+                result.assertions[0].actual != observed_names[j] ||
+                result.assertions[0].expected != expectation_names[i]) {
+                std::cerr << "Evidence expectation mismatch at " << i << '/' << j << '\n';
+                return 5;
+            }
+        }
     }
     return 0;
 }

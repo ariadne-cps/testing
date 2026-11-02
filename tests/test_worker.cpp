@@ -35,6 +35,22 @@ struct EvidenceScenario {
     }
 };
 
+// One callable specialization exercises the runner's normal, empty and
+// exception paths, rather than generating separate lambdas per outcome.
+struct RunScenario {
+    int mode;
+    int* invocations = nullptr;
+    void operator()(WorkerBatch::Worker& worker) const {
+        if (invocations) ++*invocations;
+        if (mode == 1) return;
+        if (mode == 2) throw std::runtime_error("standard runner failure");
+        if (mode == 3) throw 17;
+        worker.check([] { return true; }, "check before completion");
+        if (mode == 4) throw std::runtime_error("failure after a worker check");
+        if (mode == 5) throw 18;
+    }
+};
+
 int main() {
     Suite suite("worker result aggregation");
     Capture capture;
@@ -250,5 +266,68 @@ int main() {
                    "worker predicate exception diagnostics changed");
         }
     }
+
+    // A recorded check must survive a later exception, whereas a callback
+    // returning without any checks must be classified as Error.
+    Suite runner_matrix("worker callback lifecycle matrix");
+    for (int mode = 0; mode < 6; ++mode) {
+        runner_matrix.add("runner mode " + std::to_string(mode), [mode](Context& c) {
+            WorkerBatch batch(1);
+            batch.run(0, RunScenario{mode});
+            batch.flush(c);
+        });
+    }
+    Capture runner_capture;
+    auto const runner_summary = runner_matrix.run(runner_capture);
+    verify(runner_summary.passed == 1 && runner_summary.errors == 5 &&
+           runner_summary.failed == 0 && runner_summary.inconclusive == 0 &&
+           runner_capture.checks == 8 && runner_capture.cases.size() == 6,
+           "worker callback outcome matrix summary changed");
+    if (runner_capture.cases.size() == 6) {
+        for (std::size_t i = 0; i < 6; ++i) {
+            auto const expected = i == 0 ? Outcome::Passed : Outcome::Error;
+            auto const expected_checks = i >= 4 ? 2u : 1u;
+            verify(runner_capture.cases[i].outcome == expected &&
+                   runner_capture.cases[i].assertions.size() == expected_checks,
+                   "worker callback outcome or check count changed at mode " +
+                   std::to_string(i));
+        }
+        verify(runner_capture.cases[1].assertions[0].detail ==
+                   "worker completed without recording checks" &&
+               runner_capture.cases[2].assertions[0].detail ==
+                   "standard runner failure" &&
+               runner_capture.cases[3].assertions[0].detail ==
+                   "non-standard worker exception" &&
+               runner_capture.cases[4].assertions[1].detail ==
+                   "failure after a worker check" &&
+               runner_capture.cases[5].assertions[1].detail ==
+                   "non-standard worker exception",
+               "worker callback diagnostics changed");
+    }
+
+    // Invalid slots, repeated slots and a flushed batch must reject the
+    // callback before invoking it. Reuse the same RunScenario type.
+    Suite runner_rejections("worker runner precondition contracts");
+    runner_rejections.add("invalid and repeated callbacks are not evaluated", [](Context& c) {
+        WorkerBatch batch(1);
+        int invocations = 0;
+        bool outside = false, repeated = false, flushed = false;
+        try { batch.run(1, RunScenario{0, &invocations}); }
+        catch (std::logic_error const&) { outside = true; }
+        batch.run(0, RunScenario{0, &invocations});
+        try { batch.run(0, RunScenario{0, &invocations}); }
+        catch (std::logic_error const&) { repeated = true; }
+        batch.flush(c);
+        try { batch.run(0, RunScenario{0, &invocations}); }
+        catch (std::logic_error const&) { flushed = true; }
+        c.prove(outside && repeated && flushed && invocations == 1,
+                "rejected runner callbacks must never be invoked");
+    });
+    Capture rejection_capture;
+    auto const rejection_summary = runner_rejections.run(rejection_capture);
+    verify(rejection_summary.passed == 1 && rejection_summary.failed == 0 &&
+           rejection_summary.errors == 0 && rejection_capture.checks == 2 &&
+           rejection_capture.cases.size() == 1,
+           "worker runner preconditions or check replay changed");
     return ok ? 0 : 1;
 }
