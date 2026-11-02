@@ -201,6 +201,16 @@ add_executable(test_crash_diagnostics test_crash_diagnostics.cpp)
 target_link_libraries(test_crash_diagnostics PRIVATE ariadne-testing testing)
 add_test(NAME test_crash_diagnostics COMMAND $<TARGET_FILE:test_crash_diagnostics>)
 set_tests_properties(test_crash_diagnostics PROPERTIES TIMEOUT 30)
+# Source-based LLVM coverage ordinarily writes a raw profile only on clean
+# termination. The SIGABRT probe intentionally ends by signal, so its two
+# signal-handler functions would otherwise be exercised but uncounted.
+# On Darwin, LLVM's %c mode syncs counters to a mapped profile continuously.
+# Keep the special profile isolated to this CTest test: Linux uses GCC/gcov
+# and regular builds must preserve the original signal-handling semantics.
+if(COVERAGE AND APPLE AND CMAKE_CXX_COMPILER_ID MATCHES "AppleClang|Clang")
+    set_tests_properties(test_crash_diagnostics PROPERTIES
+        ENVIRONMENT "LLVM_PROFILE_FILE=${PROJECT_BINARY_DIR}/coverage/profiles/crash-%p-%c.profraw")
+endif()
 if(WIN32)
     set_tests_properties(test_crash_diagnostics PROPERTIES
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:ariadne-testing>")
