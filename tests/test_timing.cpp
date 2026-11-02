@@ -3,6 +3,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <future>
+#include <functional>
 #include <iostream>
 #include <mutex>
 #include <string>
@@ -97,6 +98,44 @@ int main() {
                deferred.diagnostics[0].kind==DiagnosticKind::Elapsed &&
                deferred.diagnostics[0].duration==10ns,
                "deferred wait and elapsed note must remain separate");
+    }
+
+    // The same measure() callable specialization must emit an elapsed event
+    // on normal return, std::exception, and non-standard exception. Exceptions
+    // propagate to Suite, and the following test remains runnable.
+    Suite measured("measurement exception propagation");
+    for (int mode = 0; mode < 3; ++mode) {
+        measured.add("measurement " + std::to_string(mode), [mode](Context& c) {
+            std::function<void()> operation = [mode] {
+                if (mode == 1) throw std::runtime_error("measured standard failure");
+                if (mode == 2) throw 17;
+            };
+            c.measure("measure including exceptional exits", operation);
+            c.prove(true, "normal measured operation continues");
+        });
+    }
+    Capture measured_capture;
+    auto const measured_summary = measured.run(measured_capture);
+    verify(measured_summary.passed == 1 && measured_summary.errors == 2 &&
+           measured_summary.failed == 0 && measured_capture.cases.size() == 3,
+           "measure must preserve normal and exceptional outcomes");
+    if (measured_capture.cases.size() == 3) {
+        for (std::size_t i = 0; i < 3; ++i) {
+            auto const& result = measured_capture.cases[i];
+            verify(result.diagnostics.size() == 1 &&
+                   result.diagnostics[0].kind == DiagnosticKind::Elapsed &&
+                   result.diagnostics[0].description ==
+                       "measure including exceptional exits" &&
+                   result.diagnostics[0].duration.count() >= 0 &&
+                   result.assertions.size() == 1 &&
+                   result.outcome == (i == 0 ? Outcome::Passed : Outcome::Error),
+                   "measure lost a diagnostic or failed to propagate an exception");
+        }
+        verify(measured_capture.cases[1].assertions[0].detail ==
+                   "measured standard failure" &&
+               measured_capture.cases[2].assertions[0].description ==
+                   "Unhandled non-standard exception",
+               "measure changed the exception classification or detail");
     }
     return ok?0:1;
 }

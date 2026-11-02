@@ -515,5 +515,67 @@ int main() {
               "name=\"implementation\" value=\"native-only\"") != std::string::npos &&
           implementation_xml.str().find("<properties>") != std::string::npos,
           "JUnit must retain implementation-only case metadata");
+
+    // External report records can contain unknown enum representations.
+    // All reporter formats must use their documented defensive fallbacks
+    // rather than dropping events, mislabeling them as success, or crashing.
+    CaseResult invalid_record;
+    invalid_record.suite_name = "external result contracts";
+    invalid_record.name = "malformed fields";
+    invalid_record.case_index = 1;
+    invalid_record.case_total = 1;
+    invalid_record.outcome = Outcome::Error;
+    AssertionRecord invalid_assertion{};
+    invalid_assertion.outcome = static_cast<Outcome>(127);
+    invalid_assertion.description = "invalid assertion classification";
+    invalid_assertion.check_index = 1;
+    invalid_assertion.wait = WaitObservation{static_cast<WaitStatus>(127),
+        std::chrono::nanoseconds{5}, std::chrono::nanoseconds{17}, true};
+    invalid_record.assertions.push_back(invalid_assertion);
+    DiagnosticEvent invalid_diagnostic{};
+    invalid_diagnostic.kind = static_cast<DiagnosticKind>(127);
+    invalid_diagnostic.description = "unrecognized event";
+    invalid_diagnostic.context = {"outer", "inner"};
+    invalid_record.diagnostics.push_back(invalid_diagnostic);
+    ArtifactRecord invalid_artifact;
+    invalid_artifact.path = "external.dat";
+    invalid_artifact.label = "unrecognized artifact";
+    invalid_artifact.kind = static_cast<ArtifactKind>(127);
+    invalid_artifact.lifetime = static_cast<ArtifactLifetime>(127);
+    invalid_record.artifacts.push_back(invalid_artifact);
+    Summary invalid_summary;
+    invalid_summary.errors = 1;
+    std::ostringstream invalid_json, invalid_xml, invalid_console;
+    JsonReporter invalid_json_reporter(invalid_json);
+    JUnitReporter invalid_junit_reporter(invalid_xml);
+    ConsoleReporter invalid_console_reporter(invalid_console);
+    invalid_json_reporter.case_finished(invalid_record);
+    invalid_junit_reporter.case_finished(invalid_record);
+    invalid_console_reporter.diagnostic_emitted(invalid_record, invalid_record.diagnostics[0]);
+    invalid_console_reporter.case_finished(invalid_record);
+    invalid_json_reporter.suite_finished(invalid_record.suite_name, invalid_summary);
+    invalid_junit_reporter.suite_finished(invalid_record.suite_name, invalid_summary);
+    invalid_console_reporter.suite_finished(invalid_record.suite_name, invalid_summary);
+    check(invalid_json.str().find("\"kind\":\"unknown\"") != std::string::npos &&
+          invalid_json.str().find("\"status\":\"unexpected\"") != std::string::npos &&
+          invalid_json.str().find("\"lifetime\":\"unknown\"") != std::string::npos &&
+          invalid_json.str().find("\"outcome\":\"error\"") != std::string::npos,
+          "JSON must preserve defensive fallbacks for malformed result records");
+    check(invalid_console.str().find("[INFO] outer / inner / unrecognized event") != std::string::npos &&
+          invalid_xml.str().find("diagnostic unknown: unrecognized event") != std::string::npos &&
+          invalid_xml.str().find("artifact unknown: external.dat") != std::string::npos &&
+          invalid_xml.str().find("wait: unexpected elapsed_ns=5") != std::string::npos,
+          "Console and JUnit must retain unknown classifications and context");
+    CaseResult invalid_outcome = invalid_record;
+    invalid_outcome.outcome = static_cast<Outcome>(127);
+    invalid_outcome.assertions.clear();
+    invalid_outcome.diagnostics.clear();
+    invalid_outcome.artifacts.clear();
+    std::ostringstream unknown_console;
+    ConsoleReporter unknown_reporter(unknown_console);
+    unknown_reporter.case_finished(invalid_outcome);
+    unknown_reporter.suite_finished(invalid_outcome.suite_name, invalid_summary);
+    check(unknown_console.str().find("[UNKNOWN] malformed fields") != std::string::npos,
+          "unrecognized case outcome must remain explicitly visible");
     return ok?0:1;
 }
