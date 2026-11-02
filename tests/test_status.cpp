@@ -122,7 +122,7 @@ int main() {
                 return Evidence::True;
             };
             if (mode == 4) {
-                c.expect_status(operation, selector, {}, verifier, "status with empty allowance");
+                c.expect_status(operation, selector, std::initializer_list<Status>{}, verifier, "status with empty allowance");
             } else if (mode == 5) {
                 c.expect_status(operation, selector, {Status::UNSAT, Status::SAT},
                                 verifier, "second allowed status");
