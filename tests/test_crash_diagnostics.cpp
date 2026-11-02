@@ -1,6 +1,9 @@
 #include "ariadne-testing.hpp"
 #include <csignal>
 #include <string>
+#include <chrono>
+#include <sstream>
+#include <thread>
 #include <iostream>
 
 #ifndef _WIN32
@@ -10,6 +13,51 @@
 #endif
 
 using namespace Ariadne::Testing;
+
+#ifndef _WIN32
+// Exercise the async-signal-safe best-effort paths without a signal matrix.
+// Every crashing child is reaped under a deadline to prevent CI hangs.
+bool exercise_crash_boundary(bool with_checkpoint) {
+    pid_t const child = ::fork();
+    if (child < 0) return false;
+    if (child == 0) {
+        if (with_checkpoint) (void)::close(STDERR_FILENO);
+        CrashDiagnostics diagnostics;
+        if (with_checkpoint) {
+            std::ostringstream ignored_console;
+            ConsoleReporter concise(ignored_console, ConsoleDetail::Concise);
+            CaseResult current;
+            current.suite_name = "crash boundary";
+            current.name = "failed stderr write";
+            current.case_index = 1;
+            current.case_total = 1;
+            concise.case_started(current);
+            concise.check_started(current, 1, "checkpoint published");
+        }
+        std::raise(SIGABRT);
+        _exit(10); // Signal propagation is mandatory.
+    }
+    int status = 0;
+    auto const deadline = std::chrono::steady_clock::now() + std::chrono::seconds{4};
+    for (;;) {
+        pid_t const finished = ::waitpid(child, &status, WNOHANG);
+        if (finished == child) break;
+        if (finished < 0 && errno != EINTR) {
+            (void)::kill(child, SIGKILL);
+            (void)::waitpid(child, &status, 0);
+            return false;
+        }
+        if (std::chrono::steady_clock::now() >= deadline) {
+            (void)::kill(child, SIGKILL);
+            (void)::waitpid(child, &status, 0);
+            return false;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds{10});
+    }
+    return WIFSIGNALED(status) && WTERMSIG(status) == SIGABRT;
+}
+#endif
+
 
 int main() {
 #ifndef _WIN32
@@ -61,6 +109,16 @@ int main() {
         output.find("[CHECK ") != std::string::npos) {
         std::cerr << "Missing concise crash breadcrumb, or noisy progress: " << output << '\n';
         return 7;
+    }
+    // A crash before the first case produces no checkpoint (no false RUN
+    // message); a failed stderr write must not prevent signal termination.
+    if (!exercise_crash_boundary(false)) {
+        std::cerr << "SIGABRT with no published checkpoint did not terminate\n";
+        return 8;
+    }
+    if (!exercise_crash_boundary(true)) {
+        std::cerr << "SIGABRT with a closed stderr did not terminate\n";
+        return 9;
     }
 #endif
     return 0;

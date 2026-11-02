@@ -167,5 +167,17 @@ int main(){
     for (auto const& outcome : metadata_capture.cases)
         check(outcome.outcome == Outcome::Passed && outcome.artifacts.empty(),
               "rejected Oracle metadata must not register an artifact");
+    // Public integrity objects may carry issue kinds from a newer consumer.
+    // Rendering must preserve the record and use an explicit unknown label.
+    OracleIntegrity unrecognized;
+    unrecognized.expected_rows = 4;
+    unrecognized.observed_rows = 5;
+    unrecognized.issues.push_back({
+        static_cast<OracleIssueKind>(255), 3, K{"future", 7, 9}});
+    check(!unrecognized.valid() &&
+          unrecognized.description() ==
+              "expected_rows=4; observed_rows=5; issues=1; first=unknown oracle issue"
+              " at index=3; key=future; iteration=7; repetition=9",
+          "unknown public Oracle issue kind must remain diagnosable");
     return ok?0:1;
 }
