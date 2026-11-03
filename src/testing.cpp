@@ -443,6 +443,11 @@ void Context::emit(DiagnosticKind kind, std::string description, std::string val
     if (_reporter) _reporter->diagnostic_emitted(_result, _result.diagnostics.back());
 }
 
+bool Context::capture_passing_values() const noexcept {
+    // A null reporter retains the old full snapshot contract.
+    return !_reporter || _reporter->capture_passing_values();
+}
+
 void Context::note(std::string description, std::source_location location) {
     emit(DiagnosticKind::Note, std::move(description), {}, {}, location);
 }

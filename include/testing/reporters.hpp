@@ -29,6 +29,12 @@ enum class ConsoleDetail { All, Concise };
 class Reporter {
   public:
     virtual ~Reporter() = default;
+    /** @brief Whether passing comparisons need their rendered operand values.
+     *  @details Structured and custom reporters retain historical full payloads
+     *  by default. A console-only run can omit costly successful-value
+     *  formatting; failed and inconclusive comparisons always retain values.
+     */
+    virtual bool capture_passing_values() const noexcept { return true; }
     // Optional lifecycle notifications, compatible with existing reporters.
     /** @brief Called before any selected case, only for active filters. */
     virtual void selection_started(SelectionInfo const&) { }
@@ -60,6 +66,7 @@ class CrashDiagnostics final {
 class ConsoleReporter final : public Reporter {
   public:
     explicit ConsoleReporter(std::ostream& output, ConsoleDetail detail = ConsoleDetail::All);
+    bool capture_passing_values() const noexcept override { return false; }
     void selection_started(SelectionInfo const& info) override;
     void diagnostic_emitted(CaseResult const& result, DiagnosticEvent const& event) override;
     void case_started(CaseResult const& result) override;
@@ -142,6 +149,7 @@ class JUnitReporter final : public Reporter {
 class ReporterFanout final : public Reporter {
   public:
     explicit ReporterFanout(std::initializer_list<std::reference_wrapper<Reporter>> targets);
+    bool capture_passing_values() const noexcept override;
     void selection_started(SelectionInfo const& info) override;
     void case_started(CaseResult const& result) override;
     void check_started(CaseResult const& result, std::size_t index,

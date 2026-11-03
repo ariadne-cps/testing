@@ -4,6 +4,32 @@ This document is the evolving architectural contract and design journal for
 `ariadne-cps/testing`. Update it whenever changing semantics, dependencies,
 CI conventions, or migration decisions.
 
+## 2026-11-03 — Avoid eager formatting of successful numerical assertions
+
+Migrating the numerical suites to `ARIADNE_TESTING_EXPECT_EQUAL` exposed
+a severe runtime regression: the snapshot helper rendered both operands,
+including very large exact `Integer` and `Dyadic` values, even when
+their comparison was proven successful. In `test_dyadic` this repeats
+thousands of times across 2048 large-number add/sub oracle rows.
+
+The snapshot API now accepts a per-reporter decision about successful-value
+retention. `ConsoleReporter` does not request full passing operand
+payloads, as it never prints them. JSON, JUnit, and all third-party reporters
+retain the previous full-payload default. `ReporterFanout` enables full
+capture if **any** attached reporter requires it. A non-success verdict
+always retains actual/expected renderings, independent of reporter.
+Equality and relational macros continue to evaluate each operand exactly
+once and after the CHECK notification. Direct `Context::expect_equal`
+uses the same optimization; snapshot functions with the legacy no-argument
+signature still work and retain their original complete payloads.
+
+Regression tests count calls to a deliberately expensive rendering operator
+in passing and failing assertions under console-only, JSON, and fanout
+reporters. This is a performance-semantic correction, not a change to the
+number of checks, accepted evidence, oracle completeness or test expectations.
+Measured before/after wall-time remains to be established on the same host
+and build configuration.
+
 ## Current architecture (2026-10-30)
 
 `testing` depends only on `configuration` for CMake/build infrastructure,

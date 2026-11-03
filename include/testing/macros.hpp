@@ -91,9 +91,9 @@
  */
 #define ARIADNE_TESTING_EXPECT_EQUAL_CTX(context, actual, expected) \
     (context).check_equal_snapshot( \
-        [&]() { \
+        [&](bool capture_passing_values) { \
             return ([&](auto const& observed_actual) { \
-                return ::Ariadne::Testing::Detail::observe_equal(observed_actual, (expected)); \
+                return ::Ariadne::Testing::Detail::observe_equal(observed_actual, (expected), capture_passing_values); \
             }((actual))); \
         }, \
         #actual " == " #expected)
@@ -324,10 +324,10 @@
  */
 #define ARIADNE_TESTING_EXPECT_NOT_EQUAL_CTX(context, actual, expected) \
     (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::NotEqual>( \
-        [&]() { \
+        [&](bool capture_passing_values) { \
             return ([&](auto const& observed_actual) { \
                 return ::Ariadne::Testing::Detail::observe_compare< \
-                    ::Ariadne::Testing::Comparison::NotEqual>(observed_actual, (expected)); \
+                    ::Ariadne::Testing::Comparison::NotEqual>(observed_actual, (expected), capture_passing_values); \
             }((actual))); \
         }, #actual " != " #expected)
 
@@ -336,10 +336,10 @@
  */
 #define ARIADNE_TESTING_EXPECT_LESS_CTX(context, actual, expected) \
     (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::Less>( \
-        [&]() { \
+        [&](bool capture_passing_values) { \
             return ([&](auto const& observed_actual) { \
                 return ::Ariadne::Testing::Detail::observe_compare< \
-                    ::Ariadne::Testing::Comparison::Less>(observed_actual, (expected)); \
+                    ::Ariadne::Testing::Comparison::Less>(observed_actual, (expected), capture_passing_values); \
             }((actual))); \
         }, #actual " < " #expected)
 
@@ -348,10 +348,10 @@
  */
 #define ARIADNE_TESTING_EXPECT_LESS_EQUAL_CTX(context, actual, expected) \
     (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::LessEqual>( \
-        [&]() { \
+        [&](bool capture_passing_values) { \
             return ([&](auto const& observed_actual) { \
                 return ::Ariadne::Testing::Detail::observe_compare< \
-                    ::Ariadne::Testing::Comparison::LessEqual>(observed_actual, (expected)); \
+                    ::Ariadne::Testing::Comparison::LessEqual>(observed_actual, (expected), capture_passing_values); \
             }((actual))); \
         }, #actual " <= " #expected)
 
@@ -360,10 +360,10 @@
  */
 #define ARIADNE_TESTING_EXPECT_GREATER_CTX(context, actual, expected) \
     (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::Greater>( \
-        [&]() { \
+        [&](bool capture_passing_values) { \
             return ([&](auto const& observed_actual) { \
                 return ::Ariadne::Testing::Detail::observe_compare< \
-                    ::Ariadne::Testing::Comparison::Greater>(observed_actual, (expected)); \
+                    ::Ariadne::Testing::Comparison::Greater>(observed_actual, (expected), capture_passing_values); \
             }((actual))); \
         }, #actual " > " #expected)
 
@@ -372,10 +372,10 @@
  */
 #define ARIADNE_TESTING_EXPECT_GREATER_EQUAL_CTX(context, actual, expected) \
     (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::GreaterEqual>( \
-        [&]() { \
+        [&](bool capture_passing_values) { \
             return ([&](auto const& observed_actual) { \
                 return ::Ariadne::Testing::Detail::observe_compare< \
-                    ::Ariadne::Testing::Comparison::GreaterEqual>(observed_actual, (expected)); \
+                    ::Ariadne::Testing::Comparison::GreaterEqual>(observed_actual, (expected), capture_passing_values); \
             }((actual))); \
         }, #actual " >= " #expected)
 

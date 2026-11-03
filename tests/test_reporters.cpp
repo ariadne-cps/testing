@@ -8,6 +8,22 @@
 #include <vector>
 using namespace Ariadne::Testing;
 
+// Counts expensive value serializations, independently of comparisons.
+struct CountedRendering {
+    int value;
+    int* serializations;
+    friend bool operator==(CountedRendering const& a, CountedRendering const& b) {
+        return a.value == b.value;
+    }
+    friend bool operator<(CountedRendering const& a, CountedRendering const& b) {
+        return a.value < b.value;
+    }
+    friend std::ostream& operator<<(std::ostream& out, CountedRendering const& v) {
+        ++*v.serializations;
+        return out << v.value;
+    }
+};
+
 struct InformativeFixture : ContextFixture {
     using ContextFixture::ContextFixture;
 
@@ -577,5 +593,43 @@ int main() {
     unknown_reporter.suite_finished(invalid_outcome.suite_name, invalid_summary);
     check(unknown_console.str().find("[UNKNOWN] malformed fields") != std::string::npos,
           "unrecognized case outcome must remain explicitly visible");
+    // A console-only suite must not stringify successful values.
+    // Failures still retain both operands, and structured or custom
+    // reporters continue to receive complete successful snapshots.
+    int rendered = 0;
+    CountedRendering one{1,&rendered}, one_again{1,&rendered};
+    CountedRendering two{2,&rendered};
+    Suite compare_suite("lazy successful payloads");
+    compare_suite.add("success", [&](Context& c) {
+        ARIADNE_TESTING_EXPECT_EQUAL_CTX(c,one,one_again);
+        ARIADNE_TESTING_EXPECT_LESS_CTX(c,one,two);
+        c.expect_equal(one,one_again,"direct eager equality");
+    });
+    compare_suite.add("failure", [&](Context& c) {
+        ARIADNE_TESTING_EXPECT_EQUAL_CTX(c,one,two);
+    });
+    std::ostringstream console_only_output;
+    ConsoleReporter console_only(console_only_output,ConsoleDetail::Concise);
+    auto const console_summary=compare_suite.run(console_only);
+    check(console_summary.passed==1 && console_summary.failed==1 &&
+          rendered==2,
+          "console-only success serialized values or failure lost diagnostics");
+    rendered=0;
+    std::ostringstream rich_output;
+    JsonReporter rich_payload(rich_output);
+    auto const rich_summary=compare_suite.run(rich_payload);
+    check(rich_summary.passed==1 && rich_summary.failed==1 &&
+          rendered==8 &&
+          rich_output.str().find("\\"actual\\":\\"1\\"")!=std::string::npos,
+          "structured reporter failed to preserve complete success payloads");
+    rendered=0;
+    std::ostringstream mixed_output, mixed_json;
+    ConsoleReporter mixed_console(mixed_output,ConsoleDetail::Concise);
+    JsonReporter mixed_rich(mixed_json);
+    ReporterFanout mixed_reporter{std::ref(mixed_console),std::ref(mixed_rich)};
+    auto const mixed_summary=compare_suite.run(mixed_reporter);
+    check(mixed_summary.passed==1 && mixed_summary.failed==1 && rendered==8,
+          "fanout must retain payloads required by any attached reporter");
+
     return ok?0:1;
 }

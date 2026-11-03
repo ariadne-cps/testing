@@ -728,6 +728,12 @@ ReporterFanout::ReporterFanout(std::initializer_list<std::reference_wrapper<Repo
     : _targets(targets) {
     if (_targets.empty()) throw std::invalid_argument("ReporterFanout requires a reporter");
 }
+bool ReporterFanout::capture_passing_values() const noexcept {
+    // The richest attached reporter determines the retained successful
+    // operand payload; JSON/JUnit/custom capture must not lose information.
+    return std::any_of(_targets.begin(), _targets.end(),
+        [](auto const& target) { return target.get().capture_passing_values(); });
+}
 void ReporterFanout::selection_started(SelectionInfo const& info) {
     for (auto& r : _targets) r.get().selection_started(info);
 }

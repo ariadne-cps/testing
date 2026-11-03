@@ -563,6 +563,7 @@ class Suite;
     void record_oracle_replay(OracleReplayPlan const& plan,
                               std::string_view description,
                               std::source_location location, std::size_t index);
+    bool capture_passing_values() const noexcept;
     void record(Outcome outcome, std::string_view description, std::string actual,
                 std::string expected, std::string detail, std::source_location location,
                 std::size_t index,

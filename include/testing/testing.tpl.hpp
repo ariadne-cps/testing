@@ -95,13 +95,17 @@ struct EqualityObservation {
 };
 
 template<class A, class B>
-EqualityObservation observe_equal(A const& actual, B const& expected){
+EqualityObservation observe_equal(A const& actual, B const& expected,
+                                  bool capture_passing_values = true){
     auto const verdict = equal_evidence(actual, expected);
+    if (verdict == Evidence::True && !capture_passing_values)
+        return {verdict, {}, {}};
     return {verdict, render(actual), render(expected)};
 }
 
 template<Comparison Relation, class A, class B>
-EqualityObservation observe_compare(A const& actual, B const& expected) {
+EqualityObservation observe_compare(A const& actual, B const& expected,
+                                    bool capture_passing_values = true) {
     using Left = std::remove_cvref_t<A>;
     using Right = std::remove_cvref_t<B>;
     constexpr bool built_in_integers =
@@ -143,6 +147,8 @@ EqualityObservation observe_compare(A const& actual, B const& expected) {
             verdict = evidence(std::cmp_greater_equal(lhs, rhs));
         else verdict = evidence(lhs >= rhs);
     }
+    if (verdict == Evidence::True && !capture_passing_values)
+        return {verdict, {}, {}};
     return {verdict, render(actual), render(expected)};
 }
 
@@ -254,8 +260,11 @@ template<class ActualFn, class ExpectedFn>
         decltype(auto) actual = std::invoke(std::forward<ActualFn>(actual_fn));
         decltype(auto) expected = std::invoke(std::forward<ExpectedFn>(expected_fn));
         auto const verdict = Detail::equal_evidence(actual, expected);
+        const bool capture = verdict != Evidence::True || capture_passing_values();
         record(outcome(verdict), description,
-               Detail::render(actual), Detail::render(expected), {}, location, index);
+               capture ? Detail::render(actual) : std::string{},
+               capture ? Detail::render(expected) : std::string{},
+               {}, location, index);
     }
 
 template<class ComparisonFn>
@@ -263,7 +272,17 @@ template<class ComparisonFn>
                      std::string_view description,
                      std::source_location location){
         auto const index = begin_check(description);
-        auto observation = std::invoke(std::forward<ComparisonFn>(comparison_fn));
+        auto observation = [&]() {
+            // Macro snapshots accept the reporter's value-capture policy.
+            // Older callers providing nullary comparison functions retain
+            // the legacy complete payloads without an API break.
+            if constexpr (std::is_invocable_v<ComparisonFn, bool>) {
+                return std::invoke(std::forward<ComparisonFn>(comparison_fn),
+                                   capture_passing_values());
+            } else {
+                return std::invoke(std::forward<ComparisonFn>(comparison_fn));
+            }
+        }();
         record(outcome(observation.verdict), description,
                std::move(observation.actual), std::move(observation.expected),
                {}, location, index);
@@ -274,7 +293,17 @@ template<Comparison Relation, class ComparisonFn>
                      std::string_view description,
                      std::source_location location){
         auto const index = begin_check(description);
-        auto observation = std::invoke(std::forward<ComparisonFn>(comparison_fn));
+        auto observation = [&]() {
+            // Macro snapshots accept the reporter's value-capture policy.
+            // Older callers providing nullary comparison functions retain
+            // the legacy complete payloads without an API break.
+            if constexpr (std::is_invocable_v<ComparisonFn, bool>) {
+                return std::invoke(std::forward<ComparisonFn>(comparison_fn),
+                                   capture_passing_values());
+            } else {
+                return std::invoke(std::forward<ComparisonFn>(comparison_fn));
+            }
+        }();
         record(outcome(observation.verdict), description,
                std::move(observation.actual), std::move(observation.expected),
                {}, location, index);
