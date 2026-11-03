@@ -715,10 +715,10 @@
 // Fixture and suite registration helpers.
 // Only the name/stringification is a macro; semantics are type-checked C++.
 #define ARIADNE_TESTING_ADD_TEST_TO(suite, Fixture, method) \
-    ::Ariadne::Testing::add_fixture_test<Fixture>((suite), #method, &Fixture::method)
+    ::Ariadne::Testing::add_fixture_test<Fixture, &Fixture::method>((suite), #method)
 
 #define ARIADNE_TESTING_ADD_TEST_NO_THROW_TO(suite, Fixture, method) \
-    ::Ariadne::Testing::add_fixture_test<Fixture>((suite), #method, &Fixture::method, \
+    ::Ariadne::Testing::add_fixture_test<Fixture, &Fixture::method>((suite), #method, \
         ::Ariadne::Testing::FixtureCheck::NoThrow)
 
 // Conventional single-suite main; explicit *_TO supports multiple suites.

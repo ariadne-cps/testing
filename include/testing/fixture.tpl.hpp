@@ -89,6 +89,27 @@ void run_fixture_lifecycle(Fixture& fixture, Operation&& operation) {
 }
 } // namespace Detail
 
+template<class Fixture, auto Method>
+void add_fixture_test(Suite& suite, std::string_view method_name,
+                      FixtureCheck check) {
+    static_assert(std::is_constructible_v<Fixture, Context&>,
+                  "Fixture must be constructible from Ariadne::Testing::Context&");
+    static_assert(std::is_invocable_r_v<void, decltype(Method), Fixture&>,
+                  "Method must be a callable fixture member");
+    if (method_name.starts_with("test_")) method_name.remove_prefix(5);
+    suite.add(std::string(method_name), [check](Context& context) {
+        Fixture fixture(context);
+        Detail::run_fixture_lifecycle(fixture, [&](Fixture& instance) {
+            if (check == FixtureCheck::NoThrow) {
+                context.expect_no_throw([&] { std::invoke(Method, instance); },
+                                        "operation completes");
+            } else {
+                std::invoke(Method, instance);
+            }
+        });
+    });
+}
+
 template<class Fixture>
 void add_fixture_test(Suite& suite, std::string_view method_name,
                       void (Fixture::*method)(),

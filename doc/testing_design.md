@@ -1591,3 +1591,26 @@ message to the expected multiline text, so accidental extra diagnostics or
 formatting regressions are rejected. Crash handling remains async-signal-safe:
 the message is formatted before the fatal signal, and the handler only writes
 previously prepared bytes. No normal test output or acceptance rules change.
+
+## 2026-11-03 — Optimize normal fixture registration without spurious GCC warnings
+
+The standard `ARIADNE_TESTING_ADD_TEST[_TO]` and
+`ARIADNE_TESTING_ADD_TEST_NO_THROW[_TO]` registration macros now select the
+fixture member as a compile-time non-type template argument. GCC 13 reports
+`-Wmaybe-uninitialized` under `-O3 -Werror` for some fixture instantiations
+when a runtime pointer-to-member is captured by the registration callable,
+even though the fixture was constructed from its live Context reference.
+The issue was observed in CDCL and earlier in Set, whereas the same direct
+registration macros were already successful in Utility, Threading, Symbolic,
+Expression Set and other consumers.
+
+The compile-time overload
+`add_fixture_test<Fixture, &Fixture::method>(suite, name, check)` uses
+`std::invoke` with the known member and preserves per-case construction,
+set_up/tear_down ordering, case naming, and Direct/NoThrow exception
+classification. The original runtime-pointer
+`add_fixture_test<Fixture>(suite, name, &Fixture::method, check)` overload
+remains available for explicit callers; existing lifecycle tests cover it.
+Standard fixture cases remain directly registered, never artificial
+parameter variants. The regression path is exercised by existing lifecycle
+tests and GCC optimized warning-as-error builds, with no warning suppression.

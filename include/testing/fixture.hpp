@@ -72,6 +72,16 @@ void add_fixture_test(Suite& suite, std::string_view method_name,
                       void (Fixture::*method)(),
                       FixtureCheck check = FixtureCheck::Direct);
 
+/** @brief Register a fixture method selected at compile time.
+ *  @details Used by the standard registration macros to avoid GCC
+ *  -Wmaybe-uninitialized false positives from runtime member pointers
+ *  while retaining the same fixture lifecycle and exception handling.
+ *  The original runtime-pointer overload remains available.
+ */
+template<class Fixture, auto Method>
+void add_fixture_test(Suite& suite, std::string_view method_name,
+                      FixtureCheck check = FixtureCheck::Direct);
+
 inline int run_suite(Suite const& suite, std::ostream& output = std::cout) {
     ConsoleReporter reporter(output, ConsoleDetail::All);
     return suite.run(reporter).successful() ? 0 : 1;
