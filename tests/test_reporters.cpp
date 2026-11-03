@@ -620,7 +620,7 @@ int main() {
     auto const rich_summary=compare_suite.run(rich_payload);
     check(rich_summary.passed==1 && rich_summary.failed==1 &&
           rendered==8 &&
-          rich_output.str().find("\\"actual\\":\\"1\\"")!=std::string::npos,
+          rich_output.str().find(R"("actual":"1")")!=std::string::npos,
           "structured reporter failed to preserve complete success payloads");
     rendered=0;
     std::ostringstream mixed_output, mixed_json;

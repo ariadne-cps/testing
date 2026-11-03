@@ -30,6 +30,12 @@ number of checks, accepted evidence, oracle completeness or test expectations.
 Measured before/after wall-time remains to be established on the same host
 and build configuration.
 
+Follow-up build correction: the JSON value-serialization regression assertion
+in `test_reporters.cpp` now uses a C++ raw string literal, avoiding an
+incorrectly escaped quote sequence rejected by Clang with `-Werror`.
+This changes no runtime assertion or result reporting semantics. CI still
+needs to complete before any downstream submodule propagation resumes.
+
 ## Current architecture (2026-10-30)
 
 `testing` depends only on `configuration` for CMake/build infrastructure,
