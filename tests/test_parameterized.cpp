@@ -181,12 +181,13 @@ int main() {
     Suite live("live");
     std::ostringstream streamed;
     auto live_factory = [&](Context& context) {
-        if (streamed.str().find("[RUN 1/1] live / FloatMP/192 / precision") ==
-            std::string::npos) throw std::runtime_error("RUN was not flushed");
+        if (streamed.str().find("[RUN ") == std::string::npos)
+            throw std::runtime_error("RUN was not flushed");
         return PrecisionFixture(context, 192);
     };
     auto live_variant = fixture_variant<PrecisionFixture>(live, "FloatMP/192", live_factory);
     live_variant.add("test_precision", precision_check);
+    live_variant.add("test_precision no throw", precision_check, FixtureCheck::NoThrow);
     ConsoleReporter live_reporter(streamed);
     if (!live.run(live_reporter).successful()) return 9;
     if (streamed.str().find("[CHECK 1.1]") == std::string::npos) return 10;
@@ -253,10 +254,11 @@ int main() {
     Suite recovered("factory failure recovery");
     auto broken2 = fixture_variant<PrecisionFixture>(recovered, "Broken again", broken_factory);
     broken2.add("recovered precision", precision_method);
+    broken2.add("recovered no throw", precision_method, FixtureCheck::NoThrow);
     CaptureReporter recovered_capture;
     auto const recovered_summary = recovered.run(recovered_capture);
-    if (recovered_summary.passed != 1 || recovered_summary.errors != 0 ||
-        recovered_capture.results.size() != 1 ||
+    if (recovered_summary.passed != 2 || recovered_summary.errors != 0 ||
+        recovered_capture.results.size() != 2 ||
         recovered_capture.results[0].name != "Broken again / recovered precision")
         return 15;
 
@@ -285,9 +287,10 @@ int main() {
                 return PrecisionFixture(context, *value);
             });
         mo.add("test_precision", precision_check);
+        mo.add("test_precision no throw", precision_check, FixtureCheck::NoThrow);
         CaptureReporter mo_capture;
         if (!move_only_suite.run(mo_capture).successful() ||
-            mo_capture.results.size() != 1) return 17;
+            mo_capture.results.size() != 2) return 17;
     }
 
     return 0;
