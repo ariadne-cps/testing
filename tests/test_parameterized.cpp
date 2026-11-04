@@ -95,32 +95,40 @@ int main() {
     int first_factories = 0;
     int second_factories = 0;
     int executions = 0;
-    auto full = fixture_variant<InterfaceFixture>(suite, "TaylorPicard", [&](Context& context) {
+    auto full_factory = [&](Context& context) {
         ++first_factories;
         return InterfaceFixture(context, std::make_unique<FirstImplementation>(), executions);
-    });
-    ARIADNE_TESTING_ADD_VARIANT_TEST(full, test_value);
-    ARIADNE_TESTING_ADD_VARIANT_TEST(full, test_other);
-    ARIADNE_TESTING_ADD_VARIANT_TEST_NO_THROW(full, test_demonstration);
+    };
+    auto full = fixture_variant<InterfaceFixture>(suite, "TaylorPicard", full_factory);
+    auto full_value = [](InterfaceFixture& f) { f.test_value(); };
+    auto full_other = [](InterfaceFixture& f) { f.test_other(); };
+    auto full_demo = [](InterfaceFixture& f) { f.test_demonstration(); };
+    full.add("test_value", full_value);
+    full.add("test_other", full_other);
+    full.add("test_demonstration", full_demo, FixtureCheck::NoThrow);
 
-    auto subset = fixture_variant<InterfaceFixture>(suite, "Affine", [&](Context& context) {
+    auto subset_factory = [&](Context& context) {
         ++second_factories;
         return InterfaceFixture(context, std::make_unique<SecondImplementation>(), executions);
-    });
-    ARIADNE_TESTING_ADD_VARIANT_TEST(subset, test_value);
+    };
+    auto subset = fixture_variant<InterfaceFixture>(suite, "Affine", subset_factory);
+    auto subset_value = [](InterfaceFixture& f) { f.test_value(); };
+    subset.add("test_value", subset_value);
     if (first_factories != 0 || second_factories != 0 || executions != 0) return 1;
 
     // A move-only factory is supported, because Suite stores a copyable
     // wrapper around its owned factory rather than copying the factory itself.
-    auto state = std::make_unique<int>(64);
-    auto precision = fixture_variant<PrecisionFixture>(
-        suite, "FloatMP/64", [value = std::move(state)](Context& context) {
-            return PrecisionFixture(context, *value);
-        });
-    ARIADNE_TESTING_ADD_VARIANT_TEST(precision, test_precision);
+    auto state = std::make_shared<int>(64);
+    auto precision_factory = [state](Context& context) {
+        return PrecisionFixture(context, *state);
+    };
+    auto precision = fixture_variant<PrecisionFixture>(suite, "FloatMP/64", precision_factory);
+    auto precision_check = [](PrecisionFixture& f) { f.test_precision(); };
+    precision.add("test_precision", precision_check);
 
     auto nonmovable = fixture_variant<NotMovableFixture>(suite, "NonMovable");
-    ARIADNE_TESTING_ADD_VARIANT_TEST(nonmovable, test_exists);
+    auto nonmovable_exists = [](NotMovableFixture& f) { f.test_exists(); };
+    nonmovable.add("test_exists", nonmovable_exists);
 
     // A typed generic test is instantiated separately per compile-time tag.
     auto paradigm_check = []<class Tag>(Context& context, std::type_identity<Tag>) {
@@ -172,13 +180,13 @@ int main() {
     // Reports of variant cases must be flushed before the factory starts.
     Suite live("live");
     std::ostringstream streamed;
-    auto live_variant = fixture_variant<PrecisionFixture>(live, "FloatMP/192",
-        [&](Context& context) {
-            if (streamed.str().find("[RUN 1/1] live / FloatMP/192 / precision") ==
-                std::string::npos) throw std::runtime_error("RUN was not flushed");
-            return PrecisionFixture(context, 192);
-        });
-    ARIADNE_TESTING_ADD_VARIANT_TEST(live_variant, test_precision);
+    auto live_factory = [&](Context& context) {
+        if (streamed.str().find("[RUN 1/1] live / FloatMP/192 / precision") ==
+            std::string::npos) throw std::runtime_error("RUN was not flushed");
+        return PrecisionFixture(context, 192);
+    };
+    auto live_variant = fixture_variant<PrecisionFixture>(live, "FloatMP/192", live_factory);
+    live_variant.add("test_precision", precision_check);
     ConsoleReporter live_reporter(streamed);
     if (!live.run(live_reporter).successful()) return 9;
     if (streamed.str().find("[CHECK 1.1]") == std::string::npos) return 10;
@@ -251,6 +259,36 @@ int main() {
         recovered_capture.results.size() != 1 ||
         recovered_capture.results[0].name != "Broken again / recovered precision")
         return 15;
+
+    // The same variant registration groups must also take the NoThrow branch.
+    Suite variant_no_throw("variant NoThrow twins");
+    auto nt_full = fixture_variant<InterfaceFixture>(variant_no_throw, "TaylorPicard NT", full_factory);
+    nt_full.add("test_value", full_value, FixtureCheck::NoThrow);
+    nt_full.add("test_other", full_other, FixtureCheck::NoThrow);
+    auto nt_subset = fixture_variant<InterfaceFixture>(variant_no_throw, "Affine NT", subset_factory);
+    nt_subset.add("test_value", subset_value, FixtureCheck::NoThrow);
+    auto nt_precision = fixture_variant<PrecisionFixture>(variant_no_throw, "FloatMP/64 NT", precision_factory);
+    nt_precision.add("test_precision", precision_check, FixtureCheck::NoThrow);
+    auto nt_nonmovable = fixture_variant<NotMovableFixture>(variant_no_throw, "NonMovable NT");
+    nt_nonmovable.add("test_exists", nonmovable_exists, FixtureCheck::NoThrow);
+    CaptureReporter variant_nt_capture;
+    auto const variant_nt_summary = variant_no_throw.run(variant_nt_capture);
+    if (variant_nt_summary.passed != 5 || variant_nt_summary.errors != 0 ||
+        variant_nt_capture.results.size() != 5) return 16;
+
+    // A move-only factory remains supported via the copyable wrapper.
+    {
+        auto move_only_state = std::make_unique<int>(64);
+        Suite move_only_suite("move-only factory");
+        auto mo = fixture_variant<PrecisionFixture>(move_only_suite, "MoveOnly",
+            [value = std::move(move_only_state)](Context& context) {
+                return PrecisionFixture(context, *value);
+            });
+        mo.add("test_precision", precision_check);
+        CaptureReporter mo_capture;
+        if (!move_only_suite.run(mo_capture).successful() ||
+            mo_capture.results.size() != 1) return 17;
+    }
 
     return 0;
 }
