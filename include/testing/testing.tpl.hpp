@@ -108,12 +108,14 @@ EqualityObservation observe_compare(A const& actual, B const& expected,
                                     bool capture_passing_values = true) {
     using Left = std::remove_cvref_t<A>;
     using Right = std::remove_cvref_t<B>;
+    // Bitwise operators keep these pure compile-time conjunctions free of
+    // short-circuit branch regions; the operands are all constant expressions.
     constexpr bool built_in_integers =
-        std::is_integral_v<Left> && std::is_integral_v<Right> &&
-        !std::is_same_v<Left, bool> && !std::is_same_v<Right, bool>;
+        std::is_integral_v<Left> & std::is_integral_v<Right> &
+        !std::is_same_v<Left, bool> & !std::is_same_v<Right, bool>;
     constexpr bool boolean_arithmetic =
-        (std::is_same_v<Left, bool> || std::is_same_v<Right, bool>) &&
-        std::is_arithmetic_v<Left> && std::is_arithmetic_v<Right>;
+        (std::is_same_v<Left, bool> | std::is_same_v<Right, bool>) &
+        std::is_arithmetic_v<Left> & std::is_arithmetic_v<Right>;
     decltype(auto) lhs = [&]() -> decltype(auto) {
         if constexpr (boolean_arithmetic)
             return static_cast<std::common_type_t<int, Left, Right>>(actual);
