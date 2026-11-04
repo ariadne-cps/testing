@@ -340,5 +340,40 @@ int main() {
     std::filesystem::remove_all(external_directory, symlink_cleanup_error);
     verify(!symlink_cleanup_error, "external fixture cleanup failed");
 
+#if defined(__linux__)
+    // A regular file whose read(2) fails: /proc/self/mem is S_IFREG, opens
+    // successfully, and reading its unmapped first page returns EIO. No
+    // portable fixture can induce an OS-level read error on macOS/Windows,
+    // so this case is limited to Linux, where the contract is exercisable.
+    Suite read_errors("binary read errors on regular files");
+    read_errors.add("read failures are Error, not Failed", [](Context& c) {
+        auto const good = c.work_directory() / "good.bin";
+        { std::ofstream out(good, std::ios::binary); out << "ABC"; }
+        c.expect_file_equal("/proc/self/mem", good, "actual read error");
+        c.expect_file_equal(good, "/proc/self/mem", "reference read error");
+        c.expect_file_signature("/proc/self/mem", "A", "signature read error");
+    });
+    Capture read_capture;
+    auto const read_summary = read_errors.run(read_capture);
+    verify(read_summary.errors == 1 && read_summary.failed == 0 &&
+           read_capture.cases.size() == 1,
+           "read-error case must be classified as Error");
+    if (read_capture.cases.size() == 1) {
+        auto const& assertions = read_capture.cases[0].assertions;
+        verify(assertions.size() == 3, "read-error case assertion count changed");
+        if (assertions.size() == 3) {
+            verify(assertions[0].outcome == Outcome::Error &&
+                   assertions[0].detail == "error reading actual file",
+                   "actual read error detail changed");
+            verify(assertions[1].outcome == Outcome::Error &&
+                   assertions[1].detail == "error reading reference file",
+                   "reference read error detail changed");
+            verify(assertions[2].outcome == Outcome::Error &&
+                   assertions[2].detail == "error reading actual file",
+                   "signature read error detail changed");
+        }
+    }
+#endif
+
     return ok ? 0 : 1;
 }

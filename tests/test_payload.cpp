@@ -161,5 +161,16 @@ int main() {
         fatal_capture.cases[2].outcome != Outcome::Passed ||
         fatal_capture.cases[2].assertions.size() != 1)
         return 10;
+
+    // The same fixture registration must also take the NoThrow policy branch.
+    Suite no_throw_suite("payload fixture NoThrow policy");
+    add_fixture_test<Fixture, &Fixture::test_payload>(no_throw_suite, "payload",
+                                                      FixtureCheck::NoThrow);
+    Capture no_throw_capture;
+    auto const no_throw_summary = no_throw_suite.run(no_throw_capture);
+    if (no_throw_summary.passed != 1 || no_throw_summary.failed != 0 ||
+        no_throw_summary.errors != 0 || no_throw_capture.cases.size() != 1 ||
+        no_throw_capture.cases[0].assertions.back().description != "operation completes")
+        return 11;
     return 0;
 }

@@ -458,11 +458,14 @@ int main() {
             Context context(external);
             context.prove(true, "subsequent successful assertion");
             context.prove(false, "subsequent failed assertion");
+            // A null reporter retains the full value-capture contract.
+            context.expect_equal(2, 2, "null reporter comparison");
         }
         c.prove(external.outcome == static_cast<Outcome>(99) &&
-                external.assertions.size() == 2 &&
+                external.assertions.size() == 3 &&
                 external.assertions[0].outcome == Outcome::Passed &&
-                external.assertions[1].outcome == Outcome::Failed,
+                external.assertions[1].outcome == Outcome::Failed &&
+                external.assertions[2].outcome == Outcome::Passed,
                 "unknown input outcomes retain error-level priority");
     });
 #if !defined(_WIN32)

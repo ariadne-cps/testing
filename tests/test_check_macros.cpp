@@ -377,5 +377,28 @@ int main() {
                    "macro exception or diagnostic lost for " + result.name);
         }
     }
+
+    // The same fixture methods must also take the NoThrow registration branch,
+    // wrapping each body in expect_no_throw without changing these outcomes.
+    Suite no_throw_suite("macro fixture NoThrow policy");
+    add_fixture_test<MacroFixture, &MacroFixture::test_status>(
+        no_throw_suite, "status", FixtureCheck::NoThrow);
+    add_fixture_test<MacroFixture, &MacroFixture::test_status_only>(
+        no_throw_suite, "status only", FixtureCheck::NoThrow);
+    add_fixture_test<MacroFixture, &MacroFixture::test_alternative>(
+        no_throw_suite, "alternative", FixtureCheck::NoThrow);
+    add_fixture_test<MacroFixture, &MacroFixture::test_alternative_void>(
+        no_throw_suite, "alternative void", FixtureCheck::NoThrow);
+    add_fixture_test<MacroFixture, &MacroFixture::test_atomic>(
+        no_throw_suite, "atomic", FixtureCheck::NoThrow);
+    add_fixture_test<MacroFixture, &MacroFixture::test_ready>(
+        no_throw_suite, "ready", FixtureCheck::NoThrow);
+    add_fixture_test<MacroFixture, &MacroFixture::test_eventually>(
+        no_throw_suite, "eventually", FixtureCheck::NoThrow);
+    Capture no_throw_report;
+    auto const no_throw_summary = no_throw_suite.run(no_throw_report);
+    verify(no_throw_summary.passed == 7 && no_throw_summary.failed == 0 &&
+           no_throw_summary.errors == 0 && no_throw_report.cases.size() == 7,
+           "NoThrow macro fixture outcomes changed");
     return ok ? 0 : 1;
 }

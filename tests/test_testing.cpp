@@ -255,6 +255,38 @@ int main() {
         named_fixture_reporter.results[0].assertions[0].outcome != Outcome::Passed)
         return report_self_test_failure(79, __LINE__);
 
+    // The compile-time method overload must keep an unprefixed label verbatim,
+    // exactly like the runtime member-pointer overload above.
+    Suite plain_label("unprefixed compile-time fixture label");
+    add_fixture_test<FixtureExample, &FixtureExample::test_second>(plain_label, "plain_label");
+    CaptureReporter plain_label_reporter;
+    auto const plain_label_summary = plain_label.run(plain_label_reporter);
+    if (plain_label_summary.passed != 1 || plain_label_summary.failed != 0 ||
+        plain_label_summary.errors != 0 ||
+        plain_label_reporter.results.size() != 1 ||
+        plain_label_reporter.results[0].name != "plain_label" ||
+        plain_label_reporter.results[0].assertions.size() != 1 ||
+        plain_label_reporter.results[0].assertions[0].outcome != Outcome::Passed)
+        return report_self_test_failure(120, __LINE__);
+
+    // The same compile-time registration must also take the NoThrow branch,
+    // classifying an uncaught body exception as a failing check.
+    Suite no_throw_label("compile-time NoThrow registration");
+    add_fixture_test<FixtureExample, &FixtureExample::test_second>(no_throw_label, "second",
+                                                                  FixtureCheck::NoThrow);
+    add_fixture_test<FixtureExample, &FixtureExample::test_first>(no_throw_label, "first",
+                                                                 FixtureCheck::NoThrow);
+    CaptureReporter no_throw_reporter;
+    auto const no_throw_summary = no_throw_label.run(no_throw_reporter);
+    if (no_throw_summary.passed != 2 || no_throw_summary.failed != 0 ||
+        no_throw_summary.errors != 0 ||
+        no_throw_reporter.results.size() != 2 ||
+        no_throw_reporter.results[0].name != "second" ||
+        no_throw_reporter.results[1].name != "first" ||
+        no_throw_reporter.results[0].assertions.back().description != "operation completes" ||
+        no_throw_reporter.results[0].assertions.back().outcome != Outcome::Passed)
+        return report_self_test_failure(121, __LINE__);
+
     Suite expressions("macro expressions");
     std::ostringstream expression_output;
     int evaluation_count = 0;
@@ -653,6 +685,23 @@ int main() {
             alias_capture.results[0].name != "manual_label" ||
             alias_capture.results[0].assertions.size() != 3)
             return report_self_test_failure(80, __LINE__);
+
+        // Both registration overloads must also take the NoThrow branch.
+        Suite compact_no_throw("compact NoThrow aliases");
+        add_fixture_test<CompactFixture, &CompactFixture::test_compact>(
+            compact_no_throw, "compact compile-time", FixtureCheck::NoThrow);
+        add_fixture_test<CompactFixture>(compact_no_throw, "compact runtime",
+            &CompactFixture::test_compact, FixtureCheck::NoThrow);
+        CaptureReporter compact_no_throw_capture;
+        auto const compact_no_throw_summary = compact_no_throw.run(compact_no_throw_capture);
+        if (compact_no_throw_summary.passed != 2 || compact_no_throw_summary.failed != 0 ||
+            compact_no_throw_summary.errors != 0 ||
+            compact_no_throw_capture.results.size() != 2 ||
+            compact_no_throw_capture.results[0].name != "compact compile-time" ||
+            compact_no_throw_capture.results[1].name != "compact runtime" ||
+            compact_no_throw_capture.results[0].assertions.back().description !=
+                "operation completes")
+            return report_self_test_failure(122, __LINE__);
     }
     // A failed proof must make run_suite return a nonzero exit status while
     // retaining the original FAIL diagnostics.

@@ -67,20 +67,20 @@ int main() {
             [](SolverResult const& r) { return r.status; }, {Status::SAT},
             [](SolverResult const&) -> bool { throw std::logic_error("verifier"); }, "error");
     });
-    s.add("empty allowed set", [](Context& c) {
+    s.add("permitted status without verifier", [](Context& c) {
         c.expect_status([] { return SolverResult{Status::SAT,true,0}; },
             [](SolverResult const& r) { return r.status; },
-            std::initializer_list<Status>{}, "nothing permitted");
+            std::initializer_list<Status>{Status::SAT}, "default verifier accepts");
     });
     Capture reporter;
     auto const summary=s.run(reporter);
-    if (summary.passed!=3 || summary.failed!=4 ||
+    if (summary.passed!=4 || summary.failed!=3 ||
         summary.inconclusive!=1 || summary.errors!=1 ||
         reporter.cases.size()!=9 || reporter.checks!=9 ||
         operations!=1 || selectors!=1 || validators!=1 || forbidden!=0) return 1;
     std::vector<Outcome> expected{Outcome::Passed,Outcome::Passed,Outcome::Passed,
         Outcome::Failed,Outcome::Failed,Outcome::Failed,Outcome::Inconclusive,
-        Outcome::Error,Outcome::Failed};
+        Outcome::Error,Outcome::Passed};
     for (std::size_t i=0; i<expected.size(); ++i)
         if (reporter.cases[i].outcome!=expected[i]) return 2;
     if (reporter.cases[2].assertions.size()!=1 ||

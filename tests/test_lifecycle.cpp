@@ -228,5 +228,45 @@ int main(){
                  "fixture body failed: matrix body; tear_down failed: matrix teardown",
                "fixture lifecycle single and combined failures lost their causes");
     }
+
+    // The same fixture registrations must also take the NoThrow policy branch:
+    // a caught body exception becomes a failing check, while setup/teardown
+    // failures and fatal prerequisites keep their Error/Failed classification.
+    Trace no_throw_trace;
+    Fixture::trace = &no_throw_trace;
+    Suite no_throw_suite("fixture NoThrow policy");
+    add_fixture_test<Fixture, &Fixture::test_modify>(no_throw_suite, "modify", FixtureCheck::NoThrow);
+    add_fixture_test<Fixture, &Fixture::test_fresh>(no_throw_suite, "fresh", FixtureCheck::NoThrow);
+    add_fixture_test<Fixture, &Fixture::test_throw>(no_throw_suite, "throw", FixtureCheck::NoThrow);
+    add_fixture_test<Fixture, &Fixture::test_abort>(no_throw_suite, "abort", FixtureCheck::NoThrow);
+    add_fixture_test<SetupFail, &SetupFail::test_case>(no_throw_suite, "setup fail", FixtureCheck::NoThrow);
+    add_fixture_test<TeardownFail, &TeardownFail::test_success>(no_throw_suite, "teardown success", FixtureCheck::NoThrow);
+    add_fixture_test<TeardownFail, &TeardownFail::test_exception>(no_throw_suite, "teardown exception", FixtureCheck::NoThrow);
+    add_fixture_test<TeardownFail, &TeardownFail::test_abort>(no_throw_suite, "teardown abort", FixtureCheck::NoThrow);
+    add_fixture_test<NonstandardFailures>(no_throw_suite, "both fail",
+        &NonstandardFailures::test_both_fail, FixtureCheck::NoThrow);
+    Capture no_throw_capture;
+    auto const no_throw_summary = no_throw_suite.run(no_throw_capture);
+    Fixture::trace = nullptr;
+    verify(no_throw_summary.passed == 2 && no_throw_summary.failed == 2 &&
+           no_throw_summary.errors == 5 && no_throw_summary.skipped == 0 &&
+           no_throw_summary.inconclusive == 0 && no_throw_capture.cases.size() == 9,
+           "NoThrow fixture outcomes: pass=" + std::to_string(no_throw_summary.passed) +
+           ", fail=" + std::to_string(no_throw_summary.failed) +
+           ", error=" + std::to_string(no_throw_summary.errors));
+    if (no_throw_capture.cases.size() == 9) {
+        std::vector<Outcome> const no_throw_expected{
+            Outcome::Passed, Outcome::Passed, Outcome::Failed, Outcome::Failed,
+            Outcome::Error, Outcome::Error, Outcome::Error, Outcome::Error,
+            Outcome::Error};
+        for (std::size_t i = 0; i < no_throw_expected.size(); ++i)
+            verify(no_throw_capture.cases[i].outcome == no_throw_expected[i],
+                   "NoThrow case outcome " + std::to_string(i));
+        auto const& caught = no_throw_capture.cases[2].assertions;
+        verify(caught.size() == 1 && caught[0].outcome == Outcome::Failed &&
+               caught[0].description == "operation completes" &&
+               caught[0].detail == "body failed",
+               "NoThrow must classify a caught body exception as a failing check");
+    }
     return ok?0:1;
 }

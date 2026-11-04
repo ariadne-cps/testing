@@ -64,8 +64,9 @@ int main() {
             (std::vector<int>{1,2}), comparator);
     });
     suite.add("named path function", [](Context& c) {
-        ARIADNE_TESTING_EXPECT_RANGES_AT_CTX(c, (std::vector<Uncertain>{{1},{2}}),
-            (std::vector<Uncertain>{{1},{2}}), same_value,
+        ARIADNE_TESTING_EXPECT_RANGES_AT_CTX(c, (std::vector<int>{1,3}),
+            (std::vector<int>{1,2}),
+            [](int a, int b) { return a==b; },
             [](std::size_t i) { return std::to_string(i); });
     });
     suite.add("single pass", [](Context& c) {
@@ -78,7 +79,7 @@ int main() {
     ARIADNE_TESTING_ADD_TEST_TO(suite,Fixture,test_short);
     Capture report;
     auto const summary=suite.run(report);
-    if(summary.passed!=5 || summary.failed!=4 || summary.inconclusive!=1 ||
+    if(summary.passed!=4 || summary.failed!=5 || summary.inconclusive!=1 ||
        summary.errors!=0 || evaluations!=1 || report.cases.size()!=10) return 1;
     if(report.cases[1].assertions[0].detail.find("first_mismatch_index=1")==std::string::npos ||
        report.cases[1].assertions[0].actual.find("value=7")==std::string::npos) return 2;
@@ -269,6 +270,17 @@ int main() {
         std::cerr << "range matrix: long mismatched elements were not truncated\n";
         return 18;
     }
+
+    // The same fixture registration must also take the NoThrow policy branch.
+    Suite no_throw_suite("ranges fixture NoThrow policy");
+    add_fixture_test<Fixture, &Fixture::test_short>(no_throw_suite, "short",
+                                                    FixtureCheck::NoThrow);
+    Capture no_throw_capture;
+    auto const no_throw_summary = no_throw_suite.run(no_throw_capture);
+    if (no_throw_summary.passed != 1 || no_throw_summary.failed != 0 ||
+        no_throw_summary.errors != 0 || no_throw_capture.cases.size() != 1 ||
+        no_throw_capture.cases[0].assertions.back().description != "operation completes")
+        return 20;
 
     return 0;
 }

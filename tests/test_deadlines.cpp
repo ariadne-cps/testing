@@ -256,5 +256,20 @@ int main() {
                assertions[0].wait->absolute_deadline,
                "atomic transition must preserve ready status and deadline");
     }
+
+    // The same fixture methods must also take the NoThrow registration branch,
+    // wrapping the body in expect_no_throw without changing these outcomes.
+    Suite no_throw_suite("deadline fixture NoThrow policy");
+    add_fixture_test<DeadlineFixture, &DeadlineFixture::test_future>(
+        no_throw_suite, "future", FixtureCheck::NoThrow);
+    add_fixture_test<DeadlineFixture, &DeadlineFixture::test_condition>(
+        no_throw_suite, "condition", FixtureCheck::NoThrow);
+    add_fixture_test<DeadlineFixture, &DeadlineFixture::test_atomic>(
+        no_throw_suite, "atomic", FixtureCheck::NoThrow);
+    Capture no_throw_capture;
+    auto const no_throw_summary = no_throw_suite.run(no_throw_capture);
+    verify(no_throw_summary.passed == 3 && no_throw_summary.failed == 0 &&
+           no_throw_summary.errors == 0 && no_throw_capture.results.size() == 3,
+           "NoThrow deadline fixture outcomes changed");
     return ok ? 0 : 1;
 }
