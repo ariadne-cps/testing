@@ -131,10 +131,16 @@ int main() {
     suite_variant(suite, "Effective").add_typed<EffectiveTag>("api", paradigm_check);
 
     // A failing factory must produce an Error and must not suppress later cases.
-    auto broken = fixture_variant<PrecisionFixture>(suite, "Broken", [](Context&) -> PrecisionFixture {
-        throw std::runtime_error("factory failure");
-    });
-    ARIADNE_TESTING_ADD_VARIANT_TEST(broken, test_precision);
+    // The factory fails on its first invocation only, so the same variant
+    // registration group later runs the method body successfully.
+    auto broken_factory = [](Context& c) -> PrecisionFixture {
+        static int calls = 0;
+        if (calls++ == 0) throw std::runtime_error("factory failure");
+        return PrecisionFixture(c, 96);
+    };
+    auto broken = fixture_variant<PrecisionFixture>(suite, "Broken", broken_factory);
+    auto precision_method = [](PrecisionFixture& fixture) { fixture.test_precision(); };
+    broken.add("test_precision", precision_method);
     suite_variant(suite, "AfterError").add("still runs", [](Context& context) {
         context.prove(true, "runner continues");
     });
@@ -234,6 +240,17 @@ int main() {
         policies_capture.results[1].assertions[1].description != "operation completes" ||
         policies_capture.results[1].assertions[1].outcome != Outcome::Passed)
         return 14;
+
+    // Re-run the same variant group with a succeeding factory invocation.
+    Suite recovered("factory failure recovery");
+    auto broken2 = fixture_variant<PrecisionFixture>(recovered, "Broken again", broken_factory);
+    broken2.add("recovered precision", precision_method);
+    CaptureReporter recovered_capture;
+    auto const recovered_summary = recovered.run(recovered_capture);
+    if (recovered_summary.passed != 1 || recovered_summary.errors != 0 ||
+        recovered_capture.results.size() != 1 ||
+        recovered_capture.results[0].name != "Broken again / recovered precision")
+        return 15;
 
     return 0;
 }
