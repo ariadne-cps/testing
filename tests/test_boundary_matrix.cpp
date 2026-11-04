@@ -48,16 +48,17 @@ struct SimulatedFuture {
 // A custom Future can violate the std::future_status contract. Both waiting
 // APIs must report the unexpected value as Error without consuming the result.
 struct UnexpectedFuture {
+    std::future_status status = static_cast<std::future_status>(99);
     int relative_calls = 0;
     int absolute_calls = 0;
     template<class Rep, class Period>
     std::future_status wait_for(std::chrono::duration<Rep, Period>) {
         ++relative_calls;
-        return static_cast<std::future_status>(99);
+        return status;
     }
     std::future_status wait_until(std::chrono::steady_clock::time_point) {
         ++absolute_calls;
-        return static_cast<std::future_status>(99);
+        return status;
     }
 };
 
@@ -425,12 +426,24 @@ int main() {
         c.prove(future.relative_calls == 0 && future.absolute_calls == 1,
                 "absolute wait must invoke only wait_until once");
     });
+    // The same future instantiation must also produce the standard statuses.
+    for (int mode = 0; mode < 3; ++mode) {
+        unexpected_future.add("standard status " + std::to_string(mode), [mode](Context& c) {
+            UnexpectedFuture future{
+                mode == 0 ? std::future_status::ready :
+                mode == 1 ? std::future_status::timeout : std::future_status::deferred};
+            c.expect_ready(future, std::chrono::milliseconds{1}, "relative readiness");
+            c.expect_ready_until(future, std::chrono::steady_clock::now() +
+                                         std::chrono::seconds{1}, "absolute readiness");
+        });
+    }
     Capture unexpected_report;
     auto const unexpected_summary = unexpected_future.run(unexpected_report);
-    ok &= verify(unexpected_summary.errors == 2 && unexpected_summary.passed == 0 &&
-                 unexpected_report.cases.size() == 2,
+    ok &= verify(unexpected_summary.errors == 2 && unexpected_summary.passed == 1 &&
+                 unexpected_summary.failed == 2 &&
+                 unexpected_report.cases.size() == 5,
                  "nonstandard future statuses must be errors");
-    if (unexpected_report.cases.size() == 2) {
+    if (unexpected_report.cases.size() == 5) {
         for (std::size_t i = 0; i != 2; ++i) {
             auto const& entry = unexpected_report.cases[i];
             ok &= verify(entry.outcome == Outcome::Error &&
