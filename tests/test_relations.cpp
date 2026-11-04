@@ -15,6 +15,11 @@
 
 using namespace Ariadne::Testing;
 
+// ADL magnitude used by the domain-specific within-tolerance check.
+struct Meter { int value; };
+constexpr Meter operator-(Meter a, Meter b) { return {a.value - b.value}; }
+constexpr int mag(Meter m) { return m.value < 0 ? -m.value : m.value; }
+
 namespace Demo {
 struct Value { int identity; int center; int radius; };
 
@@ -385,5 +390,29 @@ int main() {
             }
         }
     }
+    // Character operands use integer comparison rules and render as chars;
+    // an ADL magnitude drives a domain-specific within check; legacy nullary
+    // snapshot callables keep the complete-payload behavior.
+    Suite extras("rendering, magnitude and snapshot edge cases");
+    extras.add("char comparison and rendering", [](Context& c) {
+        c.check_compare<Comparison::Less>(
+            [] { return static_cast<signed char>('a'); },
+            [] { return static_cast<signed char>('b'); }, "char less");
+        ARIADNE_TESTING_EXPECT_EQUAL_CTX(c, 'x', 'x');
+    });
+    extras.add("ADL magnitude within tolerance", [](Context& c) {
+        ARIADNE_TESTING_EXPECT_WITHIN_CTX(c, Meter{11}, Meter{10}, 2);
+    });
+    extras.add("legacy nullary snapshot callables", [](Context& c) {
+        c.check_equal_snapshot(
+            [] { return Detail::observe_equal(1, 1); }, "nullary equal snapshot");
+        c.check_compare_snapshot<Comparison::Less>(
+            [] { return Detail::observe_compare<Comparison::Less>(1, 2); },
+            "nullary compare snapshot");
+    });
+    Capture extras_capture;
+    auto const extras_summary = extras.run(extras_capture);
+    ok &= extras_summary.passed == 3 && extras_summary.failed == 0 &&
+          extras_summary.errors == 0 && extras_capture.cases.size() == 3;
     return ok?0:1;
 }
