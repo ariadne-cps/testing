@@ -122,12 +122,15 @@ int main(){
     ARIADNE_TESTING_ADD_TEST_TO(suite,TeardownFail,test_abort);
     ARIADNE_TESTING_ADD_TEST_NO_THROW_TO(suite,NoThrow,test_exception);
     auto shared=std::make_shared<Shared>();
-    auto group=fixture_variant<Variant>(suite,"shared resource",
-        [shared](Context& c){return Variant(c,shared);});
-    ARIADNE_TESTING_ADD_VARIANT_TEST(group,test_first);
-    ARIADNE_TESTING_ADD_VARIANT_TEST(group,test_second);
+    auto variant_factory=[shared](Context& c){return Variant(c,shared);};
+    auto group=fixture_variant<Variant>(suite,"shared resource",variant_factory);
+    auto first_method=[](Variant& fixture){fixture.test_first();};
+    auto second_method=[](Variant& fixture){fixture.test_second();};
+    group.add("test_first",first_method);
+    group.add("test_second",second_method);
     auto failing=fixture_variant<VariantFail>(suite,"variant failure");
-    ARIADNE_TESTING_ADD_VARIANT_TEST(failing,test_exception);
+    auto fail_method=[](VariantFail& fixture){fixture.test_exception();};
+    failing.add("test_exception",fail_method);
     Capture capture;
     auto const summary=suite.run(capture);
     Fixture::trace=nullptr;
@@ -268,5 +271,20 @@ int main(){
                caught[0].detail == "body failed",
                "NoThrow must classify a caught body exception as a failing check");
     }
+
+    // The same variant registration groups must also take the NoThrow branch:
+    // re-register the identical factory and method callables with NoThrow.
+    Suite variant_no_throw("variant NoThrow policy");
+    auto nt_group=fixture_variant<Variant>(variant_no_throw,"shared resource",variant_factory);
+    nt_group.add("test_first",first_method,FixtureCheck::NoThrow);
+    nt_group.add("test_second",second_method,FixtureCheck::NoThrow);
+    auto nt_failing=fixture_variant<VariantFail>(variant_no_throw,"variant failure");
+    nt_failing.add("test_exception",fail_method,FixtureCheck::NoThrow);
+    Capture variant_nt;
+    auto const variant_nt_summary=variant_no_throw.run(variant_nt);
+    verify(variant_nt_summary.passed==2 && variant_nt_summary.failed==1 &&
+           variant_nt_summary.errors==0 && variant_nt.cases.size()==3,
+           "variant NoThrow outcomes: pass="+std::to_string(variant_nt_summary.passed)+
+           ", fail="+std::to_string(variant_nt_summary.failed));
     return ok?0:1;
 }

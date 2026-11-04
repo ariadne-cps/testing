@@ -47,6 +47,10 @@ bool throws_from_binary_predicate(int, int) {
     throw std::runtime_error("binary predicate failure");
 }
 
+// Drives MacroFixture::test_alternative* through both outcomes in the same
+// macro instantiation.
+static bool alternative_throws = true;
+
 struct MacroFixture : ContextFixture {
     using ContextFixture::ContextFixture;
 
@@ -62,17 +66,28 @@ struct MacroFixture : ContextFixture {
             (std::initializer_list<DomainStatus>{DomainStatus::Unsat}));
     }
     void test_alternative() {
-        ARIADNE_TESTING_EXPECT_ALTERNATIVE(incomplete(),
-            [](DomainResult const&) { return false; },
+        // Flip the operation's outcome across executions so the single macro
+        // instantiation sees both the result and the exception path.
+        auto operation = [&]() -> DomainResult {
+            if (alternative_throws) throw Incomplete(7);
+            return solve(DomainStatus::Sat);
+        };
+        ARIADNE_TESTING_EXPECT_ALTERNATIVE(operation(),
+            [](DomainResult const&) { return true; },
             [](std::exception const& e) {
                 auto const* partial = dynamic_cast<Incomplete const*>(&e);
                 return partial && partial->progress == 7;
             });
     }
     void test_alternative_void() {
-        ARIADNE_TESTING_EXPECT_ALTERNATIVE((void)0,
+        auto operation = [&]() -> void {
+            if (alternative_throws) throw Incomplete(7);
+        };
+        ARIADNE_TESTING_EXPECT_ALTERNATIVE(operation(),
             [](std::monostate const&) { return true; },
-            [](std::exception const&) { return false; });
+            [](std::exception const& e) {
+                return dynamic_cast<Incomplete const*>(&e) != nullptr;
+            });
     }
     void test_atomic() {
         std::atomic<int> state{8};
@@ -113,11 +128,11 @@ int main() {
             [&](DomainResult const& r) { ++selectors; return r.status; },
             (std::initializer_list<DomainStatus>{DomainStatus::Unsat}));
     });
-    suite.add("context unpermitted status", [&](Context& c) {
+    suite.add("context second permitted status", [&](Context& c) {
         ARIADNE_TESTING_EXPECT_STATUS_CTX(c, (++operations, solve(DomainStatus::Sat)),
             [&](DomainResult const& r) { ++selectors; return r.status; },
-            (std::initializer_list<DomainStatus>{DomainStatus::Unsat}),
-            [&](DomainResult const&) { ++rejected_verifiers; return true; });
+            (std::initializer_list<DomainStatus>{DomainStatus::Unsat, DomainStatus::Sat}),
+            [&](DomainResult const& r) { ++verifiers; return r.reason == 42; });
     });
     suite.add("context returned alternative", [&](Context& c) {
         ARIADNE_TESTING_EXPECT_ALTERNATIVE_CTX(c,
@@ -192,17 +207,17 @@ int main() {
             ok = false;
         }
     };
-    verify(summary.passed == 14 && summary.failed == 4 &&
+    verify(summary.passed == 15 && summary.failed == 3 &&
            summary.errors == 0 && summary.inconclusive == 0 &&
            summary.skipped == 0 && report.cases.size() == 18 &&
            report.checks == 18,
            "public macro summary/check count changed");
-    verify(operations == 4 && selectors == 3 && verifiers == 5 &&
+    verify(operations == 4 && selectors == 3 && verifiers == 6 &&
            rejected_verifiers == 0,
            "deferred operations or postconditions were evaluated incorrectly");
     if (report.cases.size() == 18) {
         for (std::size_t i = 0; i < report.cases.size(); ++i) {
-            Outcome const expected = i == 2 || i == 8 || i == 9 || i == 10
+            Outcome const expected = i == 8 || i == 9 || i == 10
                 ? Outcome::Failed : Outcome::Passed;
             verify(report.cases[i].outcome == expected &&
                    report.cases[i].assertions.size() == 1,
@@ -397,8 +412,21 @@ int main() {
         no_throw_suite, "eventually", FixtureCheck::NoThrow);
     Capture no_throw_report;
     auto const no_throw_summary = no_throw_suite.run(no_throw_report);
+    // The same macro instantiation must also take the non-throwing outcome.
+    alternative_throws = false;
     verify(no_throw_summary.passed == 7 && no_throw_summary.failed == 0 &&
            no_throw_summary.errors == 0 && no_throw_report.cases.size() == 7,
            "NoThrow macro fixture outcomes changed");
+
+    // Re-run the alternative fixture methods so the same macro instantiation
+    // also takes the other outcome (result vs exception) at runtime.
+    Suite dual_paths("macro fixture alternate outcomes");
+    add_fixture_test<MacroFixture, &MacroFixture::test_alternative>(dual_paths, "alternative again");
+    add_fixture_test<MacroFixture, &MacroFixture::test_alternative_void>(dual_paths, "alternative void again");
+    Capture dual_report;
+    auto const dual_summary = dual_paths.run(dual_report);
+    verify(dual_summary.passed == 2 && dual_summary.failed == 0 &&
+           dual_report.cases.size() == 2,
+           "dual-path alternative outcomes changed");
     return ok ? 0 : 1;
 }
