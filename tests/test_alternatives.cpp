@@ -29,6 +29,35 @@ struct Capture final : Reporter {
     void suite_finished(std::string_view, Summary const&) override {}
 };
 
+// Route alternative checks through one type-erased instantiation so a single
+// template group observes both outcomes at runtime.
+template<class Vr>
+auto erase_result(Vr&& vr) {
+    return [vr = std::forward<Vr>(vr)]<class R>(R const& r) mutable -> Evidence {
+        return Detail::evidence(vr(r));
+    };
+}
+template<class Ve>
+auto erase_exception(Ve&& ve) {
+    return [ve = std::forward<Ve>(ve)](std::exception const& e) mutable -> Evidence {
+        return Detail::evidence(ve(e));
+    };
+}
+template<class Op, class Vr, class Ve>
+void expect_alt(Context& c, Op&& op, Vr&& vr, Ve&& ve, std::string_view desc) {
+    c.expect_alternative(std::function<SolverResult()>(std::forward<Op>(op)),
+                         std::function<Evidence(SolverResult const&)>(erase_result(std::forward<Vr>(vr))),
+                         std::function<Evidence(std::exception const&)>(erase_exception(std::forward<Ve>(ve))),
+                         desc);
+}
+template<class Op, class Vr, class Ve>
+void expect_alt_void(Context& c, Op&& op, Vr&& vr, Ve&& ve, std::string_view desc) {
+    c.expect_alternative(std::function<void()>(std::forward<Op>(op)),
+                         std::function<Evidence(std::monostate const&)>(erase_result(std::forward<Vr>(vr))),
+                         std::function<Evidence(std::exception const&)>(erase_exception(std::forward<Ve>(ve))),
+                         desc);
+}
+
 int main() {
     int operations = 0;
     int result_verifications = 0;
@@ -36,7 +65,7 @@ int main() {
     Suite suite("result or exception with explicit postconditions");
     Capture capture;
     suite.add("result with witness", [&](Context& c) {
-        c.expect_alternative([&] {
+        expect_alt(c, [&] {
                 ++operations;
                 if (capture.checks != 1) throw std::logic_error("CHECK not announced");
                 return SolverResult{true, 9};
@@ -51,7 +80,7 @@ int main() {
             }, "complete result");
     });
     suite.add("incomplete with valid partial progress", [&](Context& c) {
-        c.expect_alternative([&]() -> SolverResult {
+        expect_alt(c, [&]() -> SolverResult {
                 ++operations;
                 if (capture.checks != 2) throw std::logic_error("CHECK not announced");
                 throw Incomplete(7);
@@ -64,7 +93,7 @@ int main() {
             }, "partial result accepted");
     });
     suite.add("budget alternative accepted", [](Context& c) {
-        c.expect_alternative([]() -> SolverResult { throw Deadline(50); },
+        expect_alt(c, []() -> SolverResult { throw Deadline(50); },
             [](SolverResult const&) { return false; },
             [](std::exception const& error) {
                 auto const* deadline = dynamic_cast<Deadline const*>(&error);
@@ -72,19 +101,19 @@ int main() {
             }, "explicit budget exhaustion");
     });
     suite.add("returned result rejected", [](Context& c) {
-        c.expect_alternative([] { return SolverResult{false, 9}; },
+        expect_alt(c, [] { return SolverResult{false, 9}; },
             [](SolverResult const& r) { return r.witness; },
             [](std::exception const&) { return false; }, "missing witness");
     });
     suite.add("wrong exception type rejected", [](Context& c) {
-        c.expect_alternative([]() -> SolverResult { throw std::logic_error("other"); },
+        expect_alt(c, []() -> SolverResult { throw std::logic_error("other"); },
             [](SolverResult const&) { return true; },
             [](std::exception const& e) {
                 return dynamic_cast<Incomplete const*>(&e) != nullptr;
             }, "unexpected solver failure");
     });
     suite.add("incorrect partial payload rejected", [](Context& c) {
-        c.expect_alternative([]() -> SolverResult { throw Incomplete(3); },
+        expect_alt(c, []() -> SolverResult { throw Incomplete(3); },
             [](SolverResult const&) { return true; },
             [](std::exception const& e) {
                 auto const* partial = dynamic_cast<Incomplete const*>(&e);
@@ -92,53 +121,53 @@ int main() {
             }, "wrong partial state");
     });
     suite.add("nonstandard operation exception rejected", [](Context& c) {
-        c.expect_alternative([]() -> SolverResult { throw 42; },
+        expect_alt(c, []() -> SolverResult { throw 42; },
             [](SolverResult const&) { return true; },
             [](std::exception const&) { return true; }, "unexpected nonstandard throw");
     });
     suite.add("result verifier throws", [](Context& c) {
-        c.expect_alternative([] { return SolverResult{true, 9}; },
+        expect_alt(c, [] { return SolverResult{true, 9}; },
             [](SolverResult const&) -> bool {
                 throw std::runtime_error("result verification failed");
             },
             [](std::exception const&) { return true; }, "result verifier error");
     });
     suite.add("exception verifier throws", [](Context& c) {
-        c.expect_alternative([]() -> SolverResult { throw Incomplete(7); },
+        expect_alt(c, []() -> SolverResult { throw Incomplete(7); },
             [](SolverResult const&) { return true; },
             [](std::exception const&) -> bool {
                 throw std::runtime_error("exception verification failed");
             }, "exception verifier error");
     });
     suite.add("result verifier throws nonstandard", [](Context& c) {
-        c.expect_alternative([] { return SolverResult{true, 9}; },
+        expect_alt(c, [] { return SolverResult{true, 9}; },
             [](SolverResult const&) -> bool { throw 17; },
             [](std::exception const&) { return true; }, "nonstandard result verifier");
     });
     suite.add("exception verifier throws nonstandard", [](Context& c) {
-        c.expect_alternative([]() -> SolverResult { throw Incomplete(7); },
+        expect_alt(c, []() -> SolverResult { throw Incomplete(7); },
             [](SolverResult const&) { return true; },
             [](std::exception const&) -> bool { throw 18; },
             "nonstandard exception verifier");
     });
     suite.add("uncertain result verification", [](Context& c) {
-        c.expect_alternative([] { return SolverResult{true, 9}; },
+        expect_alt(c, [] { return SolverResult{true, 9}; },
             [](SolverResult const&) { return Evidence::Indeterminate; },
             [](std::exception const&) { return Evidence::True; }, "unproven result");
     });
     suite.add("uncertain partial state verification", [](Context& c) {
-        c.expect_alternative([]() -> SolverResult { throw Incomplete(7); },
+        expect_alt(c, []() -> SolverResult { throw Incomplete(7); },
             [](SolverResult const&) { return Evidence::True; },
             [](std::exception const&) { return Evidence::Indeterminate; },
             "unproven partial state");
     });
     suite.add("void result accepted", [](Context& c) {
-        c.expect_alternative([] {},
+        expect_alt_void(c, [] {},
             [](std::monostate const&) { return true; },
             [](std::exception const&) { return false; }, "void success");
     });
     suite.add("void operation exception accepted", [](Context& c) {
-        c.expect_alternative([] { throw Deadline(10); },
+        expect_alt_void(c, [] { throw Deadline(10); },
             [](std::monostate const&) { return false; },
             [](std::exception const& e) {
                 auto const* deadline = dynamic_cast<Deadline const*>(&e);
@@ -200,7 +229,7 @@ int main() {
     int continued_after_fatal = 0;
     int unexpected_verifiers = 0;
     aborts.add("operation prerequisite aborts", [&](Context& c) {
-        c.expect_alternative([&]() -> SolverResult {
+        expect_alt(c, [&]() -> SolverResult {
                 c.require([] { return false; }, "operation prerequisite");
                 ++continued_after_fatal;
                 return SolverResult{true, 9};
@@ -211,7 +240,7 @@ int main() {
         ++continued_after_fatal;
     });
     aborts.add("exception verifier prerequisite aborts", [&](Context& c) {
-        c.expect_alternative([]() -> SolverResult { throw Incomplete(7); },
+        expect_alt(c, []() -> SolverResult { throw Incomplete(7); },
             [&](SolverResult const&) { ++unexpected_verifiers; return true; },
             [&](std::exception const&) {
                 c.require([] { return false; }, "exception verifier prerequisite");
@@ -221,7 +250,7 @@ int main() {
         ++continued_after_fatal;
     });
     aborts.add("result verifier prerequisite aborts", [&](Context& c) {
-        c.expect_alternative([] { return SolverResult{true, 9}; },
+        expect_alt(c, [] { return SolverResult{true, 9}; },
             [&](SolverResult const&) {
                 c.require([] { return false; }, "result verifier prerequisite");
                 ++continued_after_fatal;
@@ -300,7 +329,7 @@ int main() {
                     if (mode == 5) return Evidence::Indeterminate;
                     return Evidence::True;
                 };
-            c.expect_alternative(operation, result_verifier, exception_verifier,
+            expect_alt(c, operation, result_verifier, exception_verifier,
                                  "accepted result or exception");
         });
     }

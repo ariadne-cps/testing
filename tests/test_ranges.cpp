@@ -22,16 +22,32 @@ Truth same_value(Uncertain a, Uncertain b) {
 struct Fixture : ContextFixture {
     using ContextFixture::ContextFixture;
     void test_short() {
-        ARIADNE_TESTING_EXPECT_RANGES((std::vector<int>{1,2}), (std::vector<int>{1,2}));
+        // Alternate the data across executions so this instantiation also
+        // observes a mismatch.
+        static bool second_run = false;
+        std::vector<int> a{1,2};
+        std::vector<int> b{1,2};
+        if (second_run) a[1] = 9;
+        second_run = true;
+        ARIADNE_TESTING_EXPECT_RANGES(a, b);
     }
 };
 int main() {
     Suite suite("ranges");
     int evaluations=0;
-    suite.add("equal", [&](Context& c) {
-        ARIADNE_TESTING_EXPECT_RANGES_CTX(c, (++evaluations, std::vector<int>{1,2,3}),
-                                (std::vector<unsigned>{1u,2u,3u}));
-    });
+    // The same operand callables run twice: once equal, once with a late
+    // mismatch, so this instantiation covers the mismatch diagnostics too.
+    std::function<void(Context&)> equal_case = [&](Context& c) {
+        ++evaluations;
+        std::vector<int> a{1,2,3};
+        std::vector<unsigned> b{1u,2u,3u};
+        auto actual = [&]() -> std::vector<int> const& { return a; };
+        auto expected = [&]() -> std::vector<unsigned> const& { return b; };
+        c.check_ranges(actual, expected, "equal");
+        a[1] = 7;
+        c.check_ranges(actual, expected, "equal with late mismatch");
+    };
+    suite.add("equal", equal_case);
     suite.add("mismatch", [](Context& c) {
         ARIADNE_TESTING_EXPECT_RANGES_CTX(c, (std::vector<int>{1,7,3}),
                                 (std::vector<int>{1,2,3}));
@@ -54,33 +70,48 @@ int main() {
             [](int a, int b) { return a==b; },
             [](std::size_t i) { return std::string("node/")+std::to_string(i); });
     });
-    suite.add("non-copyable comparator", [](Context& c) {
+    std::function<void(Context&)> noncopyable_case = [](Context& c) {
         struct Comparator {
             Comparator() = default;
             Comparator(Comparator const&) = delete;
             bool operator()(int a, int b) const { return a == b; }
-        } comparator;
-        ARIADNE_TESTING_EXPECT_RANGES_BY_CTX(c, (std::vector<int>{1,2}),
-            (std::vector<int>{1,2}), comparator);
-    });
+        };
+        Comparator comparator;
+        std::vector<int> a{1,2};
+        std::vector<int> b{1,2};
+        auto actual = [&]() -> std::vector<int> const& { return a; };
+        auto expected = [&]() -> std::vector<int> const& { return b; };
+        auto make_comparator = [&]() -> Comparator const& { return comparator; };
+        c.check_ranges(actual, expected, make_comparator, "non-copyable comparator");
+        a[1] = 7;
+        c.check_ranges(actual, expected, make_comparator, "non-copyable comparator mismatch");
+    };
+    suite.add("non-copyable comparator", noncopyable_case);
     suite.add("named path function", [](Context& c) {
         ARIADNE_TESTING_EXPECT_RANGES_AT_CTX(c, (std::vector<int>{1,3}),
             (std::vector<int>{1,2}),
             [](int a, int b) { return a==b; },
             [](std::size_t i) { return std::to_string(i); });
     });
-    suite.add("single pass", [](Context& c) {
-        std::istringstream lhs("1 2 3");
+    std::function<void(Context&)> single_pass_case = [](Context& c) {
+        static bool second_run = false;
+        std::istringstream lhs(second_run ? "1 7 3" : "1 2 3");
         std::istringstream rhs("1 2 3");
+        if (!second_run) second_run = true;
         auto a=std::ranges::subrange(std::istream_iterator<int>(lhs),std::istream_iterator<int>());
         auto b=std::ranges::subrange(std::istream_iterator<int>(rhs),std::istream_iterator<int>());
-        ARIADNE_TESTING_EXPECT_RANGES_CTX(c,a,b);
-    });
+        auto actual = [&]() -> decltype(a) const& { return a; };
+        auto expected = [&]() -> decltype(b) const& { return b; };
+        c.check_ranges(actual, expected, "single pass");
+        // A consumed single-pass range cannot be re-read; only run once per stream.
+    };
+    suite.add("single pass", single_pass_case);
+    suite.add("single pass mismatch", single_pass_case);
     ARIADNE_TESTING_ADD_TEST_TO(suite,Fixture,test_short);
     Capture report;
     auto const summary=suite.run(report);
-    if(summary.passed!=4 || summary.failed!=5 || summary.inconclusive!=1 ||
-       summary.errors!=0 || evaluations!=1 || report.cases.size()!=10) return 1;
+    if(summary.passed!=2 || summary.failed!=8 || summary.inconclusive!=1 ||
+       summary.errors!=0 || evaluations!=1 || report.cases.size()!=11) return 1;
     if(report.cases[1].assertions[0].detail.find("first_mismatch_index=1")==std::string::npos ||
        report.cases[1].assertions[0].actual.find("value=7")==std::string::npos) return 2;
     if(report.cases[2].assertions[0].detail.find("actual_count=3, expected_count=2")==std::string::npos) return 3;
@@ -104,14 +135,19 @@ int main() {
             (std::vector<std::string>{std::string(120, 'a')}),
             (std::vector<std::string>{std::string(120, 'b')}));
     });
-    range_boundaries.add("two empty ranges compare equal", [](Context& c) {
-        ARIADNE_TESTING_EXPECT_RANGES_CTX(c, (std::vector<int>{}),
-                                  (std::vector<int>{}));
-    });
+    std::function<void(Context&)> empty_ranges_case = [](Context& c) {
+        static bool second_run = false;
+        std::vector<int> a{};
+        std::vector<int> b{second_run ? std::vector<int>{1} : std::vector<int>{}};
+        second_run = true;
+        ARIADNE_TESTING_EXPECT_RANGES_CTX(c, a, b);
+    };
+    range_boundaries.add("two empty ranges compare equal", empty_ranges_case);
+    range_boundaries.add("empty vs nonempty range", empty_ranges_case);
     Capture boundary_capture;
     auto const boundary_summary = range_boundaries.run(boundary_capture);
-    if (boundary_summary.passed != 1 || boundary_summary.failed != 2 ||
-        boundary_summary.errors != 0 || boundary_capture.cases.size() != 3)
+    if (boundary_summary.passed != 1 || boundary_summary.failed != 3 ||
+        boundary_summary.errors != 0 || boundary_capture.cases.size() != 4)
         return 7;
     auto const& mixed_assertion = boundary_capture.cases[0].assertions[0];
     if (mixed_assertion.outcome != Outcome::Failed ||
@@ -277,7 +313,7 @@ int main() {
                                                     FixtureCheck::NoThrow);
     Capture no_throw_capture;
     auto const no_throw_summary = no_throw_suite.run(no_throw_capture);
-    if (no_throw_summary.passed != 1 || no_throw_summary.failed != 0 ||
+    if (no_throw_summary.passed != 0 || no_throw_summary.failed != 1 ||
         no_throw_summary.errors != 0 || no_throw_capture.cases.size() != 1 ||
         no_throw_capture.cases[0].assertions.back().description != "operation completes")
         return 20;
