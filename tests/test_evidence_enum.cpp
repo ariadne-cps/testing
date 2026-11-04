@@ -36,12 +36,12 @@ int main() {
         c.check([] { return Evidence::Indeterminate; }, "direct evidence check");
     });
     suite.add("indeterminate expectation", [](Context& c) {
-        c.expect_evidence([] { return Evidence::Indeterminate; },
-                          EvidenceExpectation::Indeterminate, "expected uncertainty");
+        std::function<Evidence()> const predicate = [] { return Evidence::Indeterminate; };
+        c.expect_evidence(predicate, EvidenceExpectation::Indeterminate, "expected uncertainty");
     });
     suite.add("not possibly expectation", [](Context& c) {
-        c.expect_evidence([] { return Evidence::Indeterminate; },
-                          EvidenceExpectation::NotPossibly, "cannot exclude truth");
+        std::function<Evidence()> const predicate = [] { return Evidence::Indeterminate; };
+        c.expect_evidence(predicate, EvidenceExpectation::NotPossibly, "cannot exclude truth");
     });
     suite.add("unary predicate", [](Context& c) {
         c.check_unary([](int) { return Evidence::Indeterminate; },

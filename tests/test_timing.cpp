@@ -59,14 +59,20 @@ int main() {
         std::atomic<int> a{1};
         c.expect_atomic_until(a,[](int v){return v==1;},deadline,"ready atomic");
     });
+    suite.add("timeout and deferred share the instantiation", [](Context& c) {
+        std::promise<int> p; auto future=p.get_future();
+        c.expect_ready(future,0ms,"timeout future");
+        auto deferred=std::async(std::launch::deferred,[]{return 3;});
+        c.expect_ready_until(deferred,std::chrono::steady_clock::now()-1ms,"deferred absolute");
+    });
     Capture capture;auto const summary=suite.run(capture);
     bool ok=true;
     auto verify=[&](bool condition,std::string const& message) {
         if(!condition){std::cerr<<message<<'\n';ok=false;}
     };
-    verify(summary.passed==2 && summary.failed==2 && summary.errors==1 &&
-           capture.cases.size()==5,"unexpected timing suite summary");
-    if(capture.cases.size()==5) {
+    verify(summary.passed==2 && summary.failed==3 && summary.errors==1 &&
+           capture.cases.size()==6,"unexpected timing suite summary");
+    if(capture.cases.size()==6) {
         auto inspect=[&](std::size_t index,WaitStatus status,bool absolute) {
             auto const& checks=capture.cases[index].assertions;
             verify(checks.size()==3,"expected three timed assertions");
@@ -84,6 +90,13 @@ int main() {
         inspect(0,WaitStatus::Ready,false);
         inspect(1,WaitStatus::Timeout,true);
         inspect(4,WaitStatus::Ready,true);
+        auto const& shared=capture.cases[5].assertions;
+        verify(shared.size()==2 && shared[0].wait && shared[1].wait &&
+               shared[0].wait->status==WaitStatus::Timeout &&
+               !shared[0].wait->absolute_deadline &&
+               shared[1].wait->status==WaitStatus::Deferred &&
+               shared[1].wait->absolute_deadline,
+               "shared future instantiation must observe timeout and deferred");
         auto const& errors=capture.cases[2].assertions;
         verify(errors.size()==3,"missing invalid wait checks");
         for(auto const& a:errors)
