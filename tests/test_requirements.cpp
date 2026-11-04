@@ -92,13 +92,17 @@ int main() {
     Suite named_fixture("explicit names and NoThrow");
     add_fixture_test<Fixture>(named_fixture, "without_prefix",
         &Fixture::test_fixture, FixtureCheck::NoThrow);
+    add_fixture_test<Fixture, &Fixture::test_fixture>(named_fixture, "compile_time_no_throw",
+                                                        FixtureCheck::NoThrow);
     Captured named_capture;
     auto const named_summary = named_fixture.run(named_capture);
-    if (named_summary.passed != 1 || named_summary.failed != 0 ||
-        named_summary.errors != 0 || named_capture.results.size() != 1 ||
+    if (named_summary.passed != 2 || named_summary.failed != 0 ||
+        named_summary.errors != 0 || named_capture.results.size() != 2 ||
         named_capture.results[0].name != "without_prefix" ||
         named_capture.results[0].assertions.size() != 3 ||
-        named_capture.results[0].assertions[2].outcome != Outcome::Passed)
+        named_capture.results[0].assertions[2].outcome != Outcome::Passed ||
+        named_capture.results[1].name != "compile_time_no_throw" ||
+        named_capture.results[1].assertions.size() != 3)
         return 10;
 
     // An expected exception type must reject both an absent exception and
