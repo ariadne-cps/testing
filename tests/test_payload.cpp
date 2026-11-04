@@ -1,4 +1,5 @@
 #include "ariadne-testing.hpp"
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -22,27 +23,38 @@ struct Capture : Reporter {
     void case_finished(CaseResult const& r) override { cases.push_back(r); }
     void suite_finished(std::string_view, Summary const&) override {}
 };
+using IntProjector = std::function<int(PayloadError const&)>;
+// Route payload checks through one type-erased instantiation per exception
+// type so a single template group observes every verification path.
+inline void payload_erased(Context& c, std::function<void()> action,
+                           IntProjector projector, std::function<int()> expected,
+                           std::string_view desc) {
+    c.expect_throws_payload<PayloadError>(
+        std::move(action),
+        [projector]() -> IntProjector const& { return projector; },
+        [expected]() -> int { return expected(); },
+        desc);
+}
+
 struct Fixture : ContextFixture {
     using ContextFixture::ContextFixture;
     void test_payload() {
-        ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD(PayloadError,
-            throw PayloadError(17,"failure"),
-            [](PayloadError const& e) { return e.code; },17);
+        payload_erased(ctx(), [] { throw PayloadError(17,"failure"); },
+            [](PayloadError const& e) { return e.code; }, [] { return 17; }, "fixture payload");
     }
 };
 int main() {
     Suite s("payload");
     int actions=0, projections=0, expected_calls=0;
     s.add("match", [&](Context& c) {
-        ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX(c, PayloadError,
-            (++actions, throw PayloadError(17,"failure")),
+        payload_erased(c,
+            [&] { ++actions; throw PayloadError(17,"failure"); },
             [&](PayloadError const& e) { ++projections; return e.code; },
-            (++expected_calls, 17));
+            [&] { ++expected_calls; return 17; }, "payload match");
     });
     s.add("mismatch", [&](Context& c) {
-        ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX(c, PayloadError,
-            throw PayloadError(17,"failure"),
-            [](PayloadError const& e) { return e.code; },42);
+        payload_erased(c, [] { throw PayloadError(17,"failure"); },
+            [](PayloadError const& e) { return e.code; }, [] { return 42; }, "payload mismatch");
     });
     s.add("indeterminate", [&](Context& c) {
         ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX(c, EvidenceError,
@@ -50,30 +62,26 @@ int main() {
             [](EvidenceError const& e) { return e.value; },(EvidenceValue{false,true}));
     });
     s.add("wrong type", [&](Context& c) {
-        ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX(c, PayloadError,
-            throw std::logic_error("wrong"),
-            [](PayloadError const& e) { return e.code; },17);
+        payload_erased(c, [] { throw std::logic_error("wrong"); },
+            [](PayloadError const& e) { return e.code; }, [] { return 17; }, "wrong type");
     });
     s.add("missing", [&](Context& c) {
-        ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX(c, PayloadError,
-            (void)0,
-            [](PayloadError const& e) { return e.code; },17);
+        payload_erased(c, [] {},
+            [](PayloadError const& e) { return e.code; }, [] { return 17; }, "missing");
     });
     s.add("projector error", [&](Context& c) {
-        ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX(c, PayloadError,
-            throw PayloadError(17,"failure"),
-            [](PayloadError const&) -> int { throw std::logic_error("projector"); },17);
+        payload_erased(c, [] { throw PayloadError(17,"failure"); },
+            [](PayloadError const&) -> int { throw std::logic_error("projector"); },
+            [] { return 17; }, "projector error");
     });
     s.add("expected error", [&](Context& c) {
-        ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX(c, PayloadError,
-            throw PayloadError(17,"failure"),
+        payload_erased(c, [] { throw PayloadError(17,"failure"); },
             [](PayloadError const& e) { return e.code; },
-            ([]() -> int { throw std::logic_error("expected"); })());
+            []() -> int { throw std::logic_error("expected"); }, "expected error");
     });
     s.add("signedness", [&](Context& c) {
-        ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX(c, PayloadError,
-            throw PayloadError(17,"failure"),
-            [](PayloadError const& e) { return e.code; },17u);
+        payload_erased(c, [] { throw PayloadError(17,"failure"); },
+            [](PayloadError const& e) { return e.code; }, [] { return 17; }, "signedness");
     });
     ARIADNE_TESTING_ADD_TEST_TO(s,Fixture,test_payload);
     Capture r; auto summary=s.run(r);
@@ -92,13 +100,12 @@ int main() {
     // from a payload projector throwing it after the right type (Error).
     Suite exception_boundaries("payload exception boundaries");
     exception_boundaries.add("operation throws nonstandard", [](Context& c) {
-        ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX(c, PayloadError,
-            throw 42, [](PayloadError const& e) { return e.code; }, 17);
+        payload_erased(c, [] { throw 42; },
+            [](PayloadError const& e) { return e.code; }, [] { return 17; }, "nonstandard op");
     });
     exception_boundaries.add("projector throws nonstandard", [](Context& c) {
-        ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX(c, PayloadError,
-            throw PayloadError(17, "payload"),
-            [](PayloadError const&) -> int { throw 42; }, 17);
+        payload_erased(c, [] { throw PayloadError(17, "payload"); },
+            [](PayloadError const&) -> int { throw 42; }, [] { return 17; }, "nonstandard projector");
     });
     exception_boundaries.add("subsequent case still passes", [](Context& c) {
         c.prove(true, "later payload check still executes");
@@ -122,22 +129,20 @@ int main() {
     Suite fatal_payload("fatal prerequisites in payload verification");
     int continued_after_fatal = 0;
     fatal_payload.add("projector prerequisite fails", [&](Context& c) {
-        ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX(c, PayloadError,
-            throw PayloadError(17, "payload"),
+        payload_erased(c, [] { throw PayloadError(17, "payload"); },
             [&](PayloadError const& error) {
                 ARIADNE_TESTING_REQUIRE_CTX(c, error.code == 42);
                 return error.code;
-            }, 17);
+            }, [] { return 17; }, "projector prerequisite");
         ++continued_after_fatal;
     });
     fatal_payload.add("expected-value prerequisite is indeterminate", [&](Context& c) {
-        ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX(c, PayloadError,
-            throw PayloadError(17, "payload"),
+        payload_erased(c, [] { throw PayloadError(17, "payload"); },
             [](PayloadError const& error) { return error.code; },
-            ([&] {
+            [&]() -> int {
                 ARIADNE_TESTING_REQUIRE_CTX(c, (EvidenceValue{false, true}));
                 return 17;
-            }()));
+            }, "expected prerequisite");
         ++continued_after_fatal;
     });
     fatal_payload.add("next case still executes", [&](Context& c) {
