@@ -50,6 +50,7 @@ bool throws_from_binary_predicate(int, int) {
 // Drives MacroFixture::test_alternative* through both outcomes in the same
 // macro instantiation.
 static bool alternative_throws = true;
+static bool alternative_verifier_throws = false;
 
 struct MacroFixture : ContextFixture {
     using ContextFixture::ContextFixture;
@@ -73,8 +74,12 @@ struct MacroFixture : ContextFixture {
             return solve(DomainStatus::Sat);
         };
         ARIADNE_TESTING_EXPECT_ALTERNATIVE(operation(),
-            [](DomainResult const&) { return true; },
-            [](std::exception const& e) {
+            [](DomainResult const&) -> bool {
+                if (alternative_verifier_throws) throw std::runtime_error("result verifier");
+                return true;
+            },
+            [](std::exception const& e) -> bool {
+                if (alternative_verifier_throws) throw std::runtime_error("exception verifier");
                 auto const* partial = dynamic_cast<Incomplete const*>(&e);
                 return partial && partial->progress == 7;
             });
@@ -84,8 +89,12 @@ struct MacroFixture : ContextFixture {
             if (alternative_throws) throw Incomplete(7);
         };
         ARIADNE_TESTING_EXPECT_ALTERNATIVE(operation(),
-            [](std::monostate const&) { return true; },
-            [](std::exception const& e) {
+            [](std::monostate const&) -> bool {
+                if (alternative_verifier_throws) throw std::runtime_error("void result verifier");
+                return true;
+            },
+            [](std::exception const& e) -> bool {
+                if (alternative_verifier_throws) throw std::runtime_error("void exception verifier");
                 return dynamic_cast<Incomplete const*>(&e) != nullptr;
             });
     }
@@ -106,6 +115,46 @@ struct MacroFixture : ContextFixture {
         ARIADNE_TESTING_EXPECT_EVENTUALLY(cv, lock, [] { return true; }, 0ms);
     }
 };
+
+// Route alternative checks through one type-erased instantiation so a single
+// template group observes both the result and the exception verifier paths.
+template<class Vr>
+auto erase_result(Vr&& vr) {
+    return [vr = std::forward<Vr>(vr)]<class R>(R const& r) mutable -> Evidence {
+        return Detail::evidence(vr(r));
+    };
+}
+template<class Ve>
+auto erase_exception(Ve&& ve) {
+    return [ve = std::forward<Ve>(ve)](std::exception const& e) mutable -> Evidence {
+        return Detail::evidence(ve(e));
+    };
+}
+template<class Op, class Vr, class Ve>
+void alt_erased(Context& c, Op&& op, Vr&& vr, Ve&& ve, std::string_view desc) {
+    c.expect_alternative(std::function<DomainResult()>(std::forward<Op>(op)),
+                         std::function<Evidence(DomainResult const&)>(erase_result(std::forward<Vr>(vr))),
+                         std::function<Evidence(std::exception const&)>(erase_exception(std::forward<Ve>(ve))),
+                         desc);
+}
+
+// Route oracle and binary-predicate checks through one type-erased
+// instantiation each, so a single template group observes throwing and
+// successful accessors alike.
+inline void oracle_rows_erased(Context& c, std::function<std::vector<OracleRow> const&()> manifest,
+                                std::function<std::vector<OracleRow> const&()> observed,
+                                std::string_view desc) {
+    c.check_oracle_rows(std::move(manifest), std::move(observed), desc);
+}
+inline void oracle_replay_erased(Context& c, std::function<OracleReplayPlan()> plan,
+                                 std::string_view desc) {
+    c.check_oracle_replay(std::move(plan), desc);
+}
+inline void binary_pred_erased(Context& c, std::function<bool(int,int)> pred,
+                               std::function<int()> left, std::function<int()> right,
+                               std::string_view desc) {
+    c.check_binary(std::move(pred), std::move(left), std::move(right), desc);
+}
 
 int main() {
     Suite suite("public checks macros");
@@ -135,8 +184,8 @@ int main() {
             [&](DomainResult const& r) { ++verifiers; return r.reason == 42; });
     });
     suite.add("context returned alternative", [&](Context& c) {
-        ARIADNE_TESTING_EXPECT_ALTERNATIVE_CTX(c,
-            (++operations, solve(DomainStatus::Sat)),
+        alt_erased(c,
+            [&]() -> DomainResult { ++operations; return solve(DomainStatus::Sat); },
             [&](DomainResult const& r) {
                 ++verifiers;
                 return r.status == DomainStatus::Sat && report.checks == 4;
@@ -144,10 +193,10 @@ int main() {
             [&](std::exception const&) {
                 ++rejected_verifiers;
                 return false;
-            });
+            }, "context result or exception");
     });
     suite.add("context exception alternative", [&](Context& c) {
-        ARIADNE_TESTING_EXPECT_ALTERNATIVE_CTX(c, incomplete(),
+        alt_erased(c, []() -> DomainResult { throw Incomplete(7); },
             [&](DomainResult const&) {
                 ++rejected_verifiers;
                 return false;
@@ -156,7 +205,7 @@ int main() {
                 ++verifiers;
                 auto const* partial = dynamic_cast<Incomplete const*>(&e);
                 return partial && partial->progress == 7 && report.checks == 5;
-            });
+            }, "context result or exception");
     });
     suite.add("context atomic progress", [&](Context& c) {
         std::atomic<int> value{4};
@@ -310,7 +359,7 @@ int main() {
             ++observed_reads;
             return oracle_rows;
         };
-        ARIADNE_TESTING_EXPECT_ORACLE_ROWS_CTX(c, manifest(), observed());
+        oracle_rows_erased(c, manifest, observed, "oracle rows");
     });
     macro_exceptions.add("observed accessor throws", [&](Context& c) {
         auto manifest = [&]() -> std::vector<OracleRow> const& {
@@ -323,7 +372,7 @@ int main() {
             ++observed_reads;
             throw std::runtime_error("observed accessor failure");
         };
-        ARIADNE_TESTING_EXPECT_ORACLE_ROWS_CTX(c, manifest(), observed());
+        oracle_rows_erased(c, manifest, observed, "oracle rows");
     });
     macro_exceptions.add("replay accessor throws", [&](Context& c) {
         auto replay = [&]() -> OracleReplayPlan {
@@ -332,7 +381,7 @@ int main() {
             ++replay_reads;
             throw std::runtime_error("replay accessor failure");
         };
-        ARIADNE_TESTING_EXPECT_ORACLE_REPLAY_CTX(c, replay());
+        oracle_replay_erased(c, replay, "oracle replay");
     });
     macro_exceptions.add("left operand throws", [&](Context& c) {
         auto left = [&]() -> int {
@@ -342,8 +391,7 @@ int main() {
             throw std::runtime_error("left operand failure");
         };
         auto right = [&] { ++rhs_reads; return 2; };
-        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(
-            c, throws_from_binary_predicate, left(), right());
+        binary_pred_erased(c, throws_from_binary_predicate, left, right, "binary predicate");
     });
     macro_exceptions.add("right operand throws", [&](Context& c) {
         auto left = [&] {
@@ -356,8 +404,7 @@ int main() {
             ++rhs_reads;
             throw std::runtime_error("right operand failure");
         };
-        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(
-            c, throws_from_binary_predicate, left(), right());
+        binary_pred_erased(c, throws_from_binary_predicate, left, right, "binary predicate");
     });
     macro_exceptions.add("binary predicate throws", [&](Context& c) {
         auto left = [&] {
@@ -367,17 +414,36 @@ int main() {
             return 1;
         };
         auto right = [&] { ++rhs_reads; return 2; };
-        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(
-            c, throws_from_binary_predicate, left(), right());
+        binary_pred_erased(c, throws_from_binary_predicate, left, right, "binary predicate");
+    });
+    macro_exceptions.add("oracle rows match", [&](Context& c) {
+        oracle_rows_erased(c,
+            [&]() -> std::vector<OracleRow> const& { ++manifest_reads; return oracle_rows; },
+            [&]() -> std::vector<OracleRow> const& { ++observed_reads; return oracle_rows; },
+            "oracle rows");
+    });
+    macro_exceptions.add("replay complete", [&](Context& c) {
+        oracle_replay_erased(c,
+            [&]() -> OracleReplayPlan {
+                ++replay_reads;
+                return OracleReplayPlan{1, {0}, true, true, {}};
+            },
+            "oracle replay");
+    });
+    macro_exceptions.add("binary predicate succeeds", [&](Context& c) {
+        binary_pred_erased(c, [](int a, int b) { return a < b; },
+            [&]() -> int { ++lhs_reads; return 1; },
+            [&]() -> int { ++rhs_reads; return 2; },
+            "binary predicate");
     });
     auto const thrown_summary = macro_exceptions.run(thrown_report);
     verify(thrown_summary.errors == 6 && thrown_summary.failed == 0 &&
-           thrown_summary.passed == 0 && thrown_report.cases.size() == 6 &&
-           thrown_report.checks == 6 &&
-           manifest_reads == 2 && observed_reads == 1 && replay_reads == 1 &&
-           lhs_reads == 3 && rhs_reads == 2,
+           thrown_summary.passed == 3 && thrown_report.cases.size() == 9 &&
+           thrown_report.checks == 9 &&
+           manifest_reads == 3 && observed_reads == 2 && replay_reads == 2 &&
+           lhs_reads == 4 && rhs_reads == 3,
            "macro exceptions changed deferred evaluation or CHECK ordering");
-    if (thrown_report.cases.size() == 6) {
+    if (thrown_report.cases.size() == 9) {
         std::array<std::string_view, 6> const details{
             "manifest accessor failure", "observed accessor failure",
             "replay accessor failure", "left operand failure",
@@ -391,6 +457,10 @@ int main() {
                    result.assertions[0].description == "Unhandled std::exception",
                    "macro exception or diagnostic lost for " + result.name);
         }
+        for (std::size_t i = details.size(); i < thrown_report.cases.size(); ++i)
+            verify(thrown_report.cases[i].outcome == Outcome::Passed &&
+                   thrown_report.cases[i].assertions.size() == 1,
+                   "shared-instantiation success case failed: " + thrown_report.cases[i].name);
     }
 
     // The same fixture methods must also take the NoThrow registration branch,
@@ -426,7 +496,17 @@ int main() {
     Capture dual_report;
     auto const dual_summary = dual_paths.run(dual_report);
     verify(dual_summary.passed == 2 && dual_summary.failed == 0 &&
-           dual_report.cases.size() == 2,
+           dual_summary.errors == 0 && dual_report.cases.size() == 2,
            "dual-path alternative outcomes changed");
+
+    // The same instantiation must also observe a throwing verifier.
+    alternative_verifier_throws = true;
+    Suite dual_throw("macro fixture throwing verifiers");
+    add_fixture_test<MacroFixture, &MacroFixture::test_alternative>(dual_throw, "alternative throwing verifier");
+    add_fixture_test<MacroFixture, &MacroFixture::test_alternative_void>(dual_throw, "alternative void throwing verifier");
+    Capture dual_throw_report;
+    auto const dual_throw_summary = dual_throw.run(dual_throw_report);
+    verify(dual_throw_summary.errors == 2 && dual_throw_report.cases.size() == 2,
+           "throwing-verifier alternative outcomes changed");
     return ok ? 0 : 1;
 }
