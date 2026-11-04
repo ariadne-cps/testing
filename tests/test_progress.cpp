@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <functional>
 #include <future>
 #include <iostream>
 #include <stdexcept>
@@ -23,13 +24,21 @@ struct Capture final : Reporter {
     void suite_finished(std::string_view, Summary const&) override {}
 };
 
+// Route atomic progress checks through one type-erased instantiation so a
+// single template group observes immediate, polling and timeout outcomes.
+inline void atomic_erased(Context& c, std::atomic<int> const& state,
+                          std::function<bool(int)> pred,
+                          std::chrono::milliseconds timeout, std::string_view desc) {
+    c.expect_atomic(state, std::move(pred), timeout, desc);
+}
+
 int main() {
     Capture capture;
     Suite suite("atomic progress and deadlines");
     int predicate_calls = 0;
     suite.add("initial progress meets goal at zero timeout", [&](Context& c) {
         std::atomic<int> state{4};
-        c.expect_atomic(state, [&](int observed) {
+        atomic_erased(c, state, [&](int observed) {
             ++predicate_calls;
             return capture.checks == 1 && observed >= 3;
         }, 0ms, "already ready");
@@ -46,31 +55,31 @@ int main() {
         });
         ready.get_future().wait();
         allow_update.set_value();
-        c.expect_atomic(state, [&](int observed) {
+        atomic_erased(c, state, [&](int observed) {
             ++predicate_calls;
             return capture.checks == 2 && observed >= 5;
-        }, 5s, "worker progress");
+        }, 5000ms, "worker progress");
     });
     suite.add("zero timeout reports last state", [](Context& c) {
         std::atomic<int> state{2};
-        c.expect_atomic(state, [](int observed) { return observed >= 3; },
+        atomic_erased(c, state, [](int observed) { return observed >= 3; },
                         0ms, "not yet ready");
     });
     suite.add("positive timeout reports last state", [](Context& c) {
         std::atomic<int> state{7};
-        c.expect_atomic(state, [](int observed) { return observed == 9; },
+        atomic_erased(c, state, [](int observed) { return observed == 9; },
                         3ms, "bounded timeout");
     });
     suite.add("negative timeout never invokes predicate", [&](Context& c) {
         std::atomic<int> state{1};
-        c.expect_atomic(state, [&](int) {
+        atomic_erased(c, state, [&](int) {
             ++predicate_calls;
             return true;
         }, -1ms, "invalid deadline");
     });
     suite.add("predicate exception is Error", [](Context& c) {
         std::atomic<int> state{1};
-        c.expect_atomic(state, [](int) -> bool {
+        atomic_erased(c, state, [](int) -> bool {
             throw std::logic_error("invalid progress predicate");
         }, 0ms, "predicate throws");
     });

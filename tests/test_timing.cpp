@@ -17,6 +17,14 @@ struct Capture : Reporter {
     void suite_finished(std::string_view, Summary const&) override {}
 };
 
+// Route atomic progress checks through one type-erased instantiation so a
+// single template group observes immediate, polling and timeout outcomes.
+inline void atomic_erased(Context& c, std::atomic<int> const& state,
+                          std::function<bool(int)> pred,
+                          std::chrono::milliseconds timeout, std::string_view desc) {
+    c.expect_atomic(state, std::move(pred), timeout, desc);
+}
+
 int main() {
     Suite suite("wait observations");
     suite.add("relative success", [](Context& c) {
@@ -26,7 +34,7 @@ int main() {
         std::condition_variable_any cv; std::mutex m; std::unique_lock<std::mutex> l(m);
         c.expect_eventually(cv,l,[]{return true;},0ms,"ready condition");
         std::atomic<int> a{1};
-        c.expect_atomic(a,[](int v){return v==1;},0ms,"ready atomic");
+        atomic_erased(c, a,[](int v){return v==1;},0ms,"ready atomic");
     });
     suite.add("expired absolute waits", [](Context& c) {
         auto const deadline=std::chrono::steady_clock::now()-1ms;
@@ -43,7 +51,7 @@ int main() {
         std::condition_variable_any cv;std::mutex m;std::unique_lock<std::mutex> l(m);
         c.expect_eventually(cv,l,[]{return true;},-1ms,"invalid condition");
         std::atomic<int> a{1};
-        c.expect_atomic(a,[](int){return true;},-1ms,"invalid atomic");
+        atomic_erased(c, a,[](int){return true;},-1ms,"invalid atomic");
     });
     suite.add("deferred future and timing note", [](Context& c) {
         auto future=std::async(std::launch::deferred,[]{return 1;});
