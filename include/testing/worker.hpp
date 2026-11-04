@@ -91,13 +91,13 @@ class WorkerBatch {
     template<class Callback>
     void run(std::size_t slot, Callback&& callback,
              std::source_location location = std::source_location::current()) {
+        Worker worker(*this, slot);
         {
             std::lock_guard<std::mutex> lock(_mutex);
             if (_flushed || slot >= _slots.size() || _slots[slot].started)
                 throw std::logic_error("invalid or repeated worker slot");
             _slots[slot].started = true;
         }
-        Worker worker(*this, slot);
         try {
             std::invoke(std::forward<Callback>(callback), worker);
         } catch (std::exception const& error) {

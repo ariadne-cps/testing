@@ -48,11 +48,7 @@
  *  Concise console output replays it only for problematic cases.
  */
 #define ARIADNE_TESTING_NOTE_CTX(context, stream_expression) \
-    do { \
-        std::ostringstream ariadne_testing_note_stream; \
-        ariadne_testing_note_stream << stream_expression; \
-        (context).note(ariadne_testing_note_stream.str()); \
-    } while (false)
+    ((context).note((std::ostringstream() << stream_expression).str()))
 
 /** @brief Fixture shorthand for an informative stream expression. */
 #define ARIADNE_TESTING_NOTE(stream_expression) \

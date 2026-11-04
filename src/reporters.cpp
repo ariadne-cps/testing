@@ -333,7 +333,8 @@ void crash_checkpoint(CaseResult const& result, std::size_t check,
             name_length, result.name.data(), result.case_index, result.case_total,
             result.case_index, check, desc_length, description.data());
     }
-    if (size < 0) return;
+    // snprintf with only %.*s/%zu conversions cannot return a negative size;
+    // even a hypothetical negative value would be capped by the min() below.
     crash_breadcrumb.length[target] =
         static_cast<unsigned short>(std::min(static_cast<std::size_t>(size), sizeof(buffer)-1));
     std::atomic_signal_fence(std::memory_order_release);
@@ -347,7 +348,8 @@ void crash_checkpoint_clear() {
     crash_breadcrumb.published = target;
 }
 void crash_emit_checkpoint() noexcept {
-    if (!crash_enabled) return;
+    // crash_enabled == 0 implies a zeroed breadcrumb (reset before disabling),
+    // so the empty-count check below already guards the disabled case.
     const auto current = crash_breadcrumb.published;
     std::atomic_signal_fence(std::memory_order_acquire);
     auto const count = crash_breadcrumb.length[current];
@@ -382,16 +384,20 @@ struct CrashDiagnostics::Impl {
 #ifdef _WIN32
     LPTOP_LEVEL_EXCEPTION_FILTER previous = nullptr;
 #else
-    static constexpr int count = 5;
-    int signals[count] = {SIGSEGV, SIGABRT, SIGILL, SIGFPE,
+    // Without SIGBUS the fifth entry would duplicate SIGSEGV, so it is
+    // omitted at compile time instead of being skipped at runtime.
+    static constexpr int count =
 #ifdef SIGBUS
-                          SIGBUS
+        5;
 #else
-                          SIGSEGV
+        4;
+#endif
+    int signals[count] = {SIGSEGV, SIGABRT, SIGILL, SIGFPE
+#ifdef SIGBUS
+        , SIGBUS
 #endif
     };
     struct sigaction previous[count]{};
-    bool installed[count]{};
 #endif
 };
 
@@ -401,28 +407,29 @@ CrashDiagnostics::CrashDiagnostics() : _impl(new Impl) {
     _impl->previous = ::SetUnhandledExceptionFilter(crash_exception_handler);
 #else
     for (int i = 0; i < Impl::count; ++i) {
-        if (i == 4 && _impl->signals[i] == SIGSEGV) continue;
         struct sigaction handler{};
         handler.sa_handler = crash_signal_handler;
         sigemptyset(&handler.sa_mask);
         handler.sa_flags = static_cast<decltype(handler.sa_flags)>(SA_RESETHAND);
-        _impl->installed[i] = ::sigaction(_impl->signals[i], &handler,
-                                          &_impl->previous[i]) == 0;
+        // sigaction cannot fail here: every entry is a valid signal number and
+        // both pointers refer to valid storage (only EINVAL/EFAULT are possible).
+        (void)::sigaction(_impl->signals[i], &handler, &_impl->previous[i]);
     }
 #endif
     crash_enabled = 1;
 }
 
 CrashDiagnostics::~CrashDiagnostics() {
+    // Reset the breadcrumb before disabling, so crash_enabled == 0 always
+    // implies an empty published checkpoint.
+    crash_breadcrumb = CrashBreadcrumb{};
     crash_enabled = 0;
 #ifdef _WIN32
     ::SetUnhandledExceptionFilter(_impl->previous);
 #else
     for (int i = 0; i < Impl::count; ++i)
-        if (_impl->installed[i])
-            (void)::sigaction(_impl->signals[i], &_impl->previous[i], nullptr);
+        (void)::sigaction(_impl->signals[i], &_impl->previous[i], nullptr);
 #endif
-    crash_breadcrumb = CrashBreadcrumb{};
     delete _impl;
 }
 

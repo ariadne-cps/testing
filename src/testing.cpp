@@ -565,16 +565,16 @@ SelectionResult Suite::run_selected(Reporter& reporter, CaseFilter const& filter
             context.record(Outcome::Skipped, "No assertions recorded", {}, {}, {},
                            std::source_location::current(), 0);
         }
-        switch (result.outcome) {
-            case Outcome::Passed: ++output.summary.passed; break;
-            case Outcome::Failed: ++output.summary.failed; break;
-            case Outcome::Inconclusive: ++output.summary.inconclusive; break;
-            case Outcome::Skipped: ++output.summary.skipped; break;
-            case Outcome::Error: ++output.summary.errors; break;
-            default:
-                ++output.summary.errors;
-                result.outcome = Outcome::Error;
-                break;
+        // result.outcome starts at Outcome::Passed and Context::record only
+        // assigns valid enumerators; the final else handles Outcome::Error and
+        // any hypothetical invalid value exactly like a switch default would.
+        if (result.outcome == Outcome::Passed) ++output.summary.passed;
+        else if (result.outcome == Outcome::Failed) ++output.summary.failed;
+        else if (result.outcome == Outcome::Inconclusive) ++output.summary.inconclusive;
+        else if (result.outcome == Outcome::Skipped) ++output.summary.skipped;
+        else {
+            ++output.summary.errors;
+            result.outcome = Outcome::Error;
         }
         reporter.case_finished(result);
     }
