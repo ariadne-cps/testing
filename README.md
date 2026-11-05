@@ -11,7 +11,7 @@ A C++20 testing framework designed for rigorous numerical software. It provides
 proof-oriented three-valued assertions, distinct test outcomes, source locations
 and structured test results, with no external test framework.
 
-The **only repository dependency** is `ariadne-cps/configuration`, used for
+The **only repository dependency** is [`ariadne-cps/build`](https://github.com/ariadne-cps/build), used for
 CMake configuration and test builds. Testing has no runtime dependency on
 Logging, Utility or Macro, nor on numerical domain libraries.
 
@@ -29,7 +29,7 @@ cmake --build build-debug --parallel --target tests
 ctest --test-dir build-debug --output-on-failure
 ```
 
-CMake initializes only the pinned Configuration submodule; recursive checkout
+CMake initializes only the pinned Build submodule (`ss/bui`); recursive checkout
 is not required. This framework is a **test-only dependency** and is not
 installed: consumers compile/link it from source for their test targets.
 

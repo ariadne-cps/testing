@@ -1614,3 +1614,12 @@ remains available for explicit callers; existing lifecycle tests cover it.
 Standard fixture cases remain directly registered, never artificial
 parameter variants. The regression path is exercised by existing lifecycle
 tests and GCC optimized warning-as-error builds, with no warning suppression.
+
+## 2026-11-05 — Migrate Testing to Build
+
+Testing now pins `ariadne-cps/build` at `ss/bui`, replacing the former
+Configuration checkout. Its CMake bootstrap uses only `ariadne-build`.
+CI runs the optional sccache preflight and reads the startup-timeout
+configuration from the pinned Build submodule instead of duplicating those
+files in this repository. This is an infrastructure-only migration;
+Testing's assertions, reporters, tests and public API are unchanged.

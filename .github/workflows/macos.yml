@@ -8,7 +8,8 @@ on:
 
 env:
   SCCACHE_GHA_ENABLED: "true"
-  SCCACHE_CONF: ${{ github.workspace }}/.github/sccache.toml
+  SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+  SCCACHE_CONF: ${{ github.workspace }}/ss/bui/cmake/sccache.toml
 
 jobs:
   build-test:
@@ -28,6 +29,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Initialize Build submodule
+        run: git submodule update --init -- ss/bui
+
       - name: Set up sccache
         uses: mozilla-actions/sccache-action@v0.0.11
         # Cache setup must not block a valid compilation.
@@ -44,7 +48,7 @@ jobs:
         run: brew install ninja
 
       - name: Initialize optional sccache before compilation
-        run: cmake -P cmake/InitializeSccache.cmake
+        run: cmake -P ss/bui/cmake/InitializeSccache.cmake
 
       - name: Configure CMake
         run: |
