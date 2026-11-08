@@ -25,5 +25,5 @@ endif()
 # Test support only: do not register public install headers or installation rules.
 add_library(ariadne-testing STATIC $<TARGET_OBJECTS:TESTING_SRC>)
 target_link_libraries(ariadne-testing INTERFACE testing)
-setup_standalone_project_tests(TARGET ariadne-testing TEST_DIRECTORY tests TEST_TARGET tests
+setup_standalone_project(TARGET ariadne-testing TEST_DIRECTORY tests TEST_TARGET tests
     SOURCES "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/src")
