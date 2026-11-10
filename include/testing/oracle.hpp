@@ -1,5 +1,5 @@
 /***************************************************************************
- *            oracle.hpp
+ *            testing/oracle.hpp
  *
  *  Copyright  2026  Luca Geretti
  *

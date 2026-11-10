@@ -1,5 +1,5 @@
 /***************************************************************************
- *            state.tpl.hpp
+ *            testing/state.tpl.hpp
  *
  *  Copyright  2026  Luca Geretti
  *

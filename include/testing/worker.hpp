@@ -1,5 +1,5 @@
 /***************************************************************************
- *            worker.hpp
+ *            testing/worker.hpp
  *
  *  Copyright  2026  Luca Geretti
  *

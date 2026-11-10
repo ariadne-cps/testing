@@ -1,5 +1,5 @@
 /***************************************************************************
- *            testing.tpl.hpp
+ *            testing/testing.tpl.hpp
  *
  *  Copyright  2026  Luca Geretti
  *

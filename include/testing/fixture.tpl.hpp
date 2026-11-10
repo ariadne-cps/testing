@@ -1,5 +1,5 @@
 /***************************************************************************
- *            fixture.tpl.hpp
+ *            testing/fixture.tpl.hpp
  *
  *  Copyright  2026  Luca Geretti
  *

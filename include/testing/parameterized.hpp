@@ -1,5 +1,5 @@
 /***************************************************************************
- *            parameterized.hpp
+ *            testing/parameterized.hpp
  *
  *  Copyright  2026  Luca Geretti
  *
