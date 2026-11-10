@@ -28,8 +28,6 @@
 #ifndef ARIADNE_TESTING_PARAMETERIZED_HPP
 #define ARIADNE_TESTING_PARAMETERIZED_HPP
 
-#include "testing/fixture.hpp"
-
 #include <functional>
 #include <memory>
 #include <stdexcept>
@@ -38,6 +36,8 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+#include "testing/fixture.hpp"
 
 namespace Ariadne::Testing {
 
@@ -48,7 +48,8 @@ class SuiteVariant {
   public:
     SuiteVariant(Suite& suite, std::string name)
         : _suite(&suite), _name(std::move(name)) {
-        if (_name.empty()) throw std::invalid_argument("Suite variant name must be nonempty");
+        if (_name.empty())
+            throw std::invalid_argument("Suite variant name must be nonempty");
     }
 
     template<class Callable>
@@ -101,6 +102,5 @@ auto fixture_variant(Suite& suite, std::string name);
 } // namespace Ariadne::Testing
 
 #include "testing/parameterized.tpl.hpp"
-
 
 #endif // ARIADNE_TESTING_PARAMETERIZED_HPP

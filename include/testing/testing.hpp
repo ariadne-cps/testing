@@ -32,38 +32,39 @@
 #ifndef ARIADNE_TESTING_TESTING_HPP
 #define ARIADNE_TESTING_TESTING_HPP
 
-#include <chrono>
+#include <algorithm>
 #include <atomic>
-#include <thread>
+#include <chrono>
+#include <cmath>
+#include <condition_variable>
+#include <cstdint>
+#include <exception>
 #include <filesystem>
 #include <fstream>
-#include <system_error>
-#include <cmath>
-#include <cstdint>
 #include <functional>
 #include <future>
-#include <exception>
-#include <variant>
 #include <initializer_list>
-#include <condition_variable>
-#include <mutex>
-#include <algorithm>
-#include <iterator>
-#include <optional>
-#include <span>
-#include "testing/oracle.hpp"
-#include "testing/results.hpp"
-#include "testing/reporters.hpp"
-#include <ranges>
 #include <iosfwd>
+#include <iterator>
+#include <mutex>
+#include <optional>
+#include <ranges>
 #include <source_location>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
+#include <thread>
 #include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
+
+#include "testing/oracle.hpp"
+#include "testing/reporters.hpp"
+#include "testing/results.hpp"
 
 namespace Ariadne::Testing {
 
@@ -71,34 +72,38 @@ namespace Ariadne::Testing {
 namespace Detail {
 
 template<class T>
-Evidence evidence(T const& value);
+Evidence evidence(const T& value);
 
 // Negating a proof must not turn uncertainty into a boolean success.
 inline Evidence negate(Evidence value) {
     switch (value) {
-        case Evidence::True: return Evidence::False;
-        case Evidence::False: return Evidence::True;
-        case Evidence::Indeterminate: return Evidence::Indeterminate;
-        default: throw std::logic_error("Invalid mathematical evidence");
+        case Evidence::True:
+            return Evidence::False;
+        case Evidence::False:
+            return Evidence::True;
+        case Evidence::Indeterminate:
+            return Evidence::Indeterminate;
+        default:
+            throw std::logic_error("Invalid mathematical evidence");
     }
 }
 
 template<class T>
-std::string render(T const& value);
+std::string render(const T& value);
 
 // Use the same evidence-preserving equality and integral signedness rules
 // for ordinary checks and exception payload comparisons.
 template<class Actual, class Expected>
-Evidence equal_evidence(Actual const& actual, Expected const& expected);
+Evidence equal_evidence(const Actual& actual, const Expected& expected);
 
 // Retain non-copyable lvalue callables by reference and own temporaries.
 // Wrapping named functions also avoids MSVC's inability to deduce a
- // decltype(auto) return directly from a function designator.
+// decltype(auto) return directly from a function designator.
 template<class Callable>
 auto capture_callable(Callable&& callable);
 
 template<class T>
-auto magnitude(T const& value);
+auto magnitude(const T& value);
 
 // Internal case-abort marker, not a user-observable test exception.
 struct AbortCase {};
@@ -112,14 +117,15 @@ class WorkerBatch;
 class Context {
   public:
     // Move-only guard: a nested diagnostic scope always restores its parent.
-/** @brief Move-only RAII guard for a nested diagnostic scope. */
+    /** @brief Move-only RAII guard for a nested diagnostic scope. */
     class Scope {
       public:
-        Scope(Scope const&) = delete;
-        Scope& operator=(Scope const&) = delete;
+        Scope(const Scope&) = delete;
+        Scope& operator=(const Scope&) = delete;
         Scope(Scope&& other) noexcept;
         Scope& operator=(Scope&&) = delete;
         ~Scope() noexcept;
+
       private:
         friend class Context;
         Scope(Context& context, std::string label, std::source_location location);
@@ -129,17 +135,17 @@ class Context {
     };
 
     explicit Context(CaseResult& result, Reporter* reporter = nullptr)
-        : _result(result), _reporter(reporter) { }
+        : _result(result), _reporter(reporter) {}
 
-    Context(Context const&) = delete;
-    Context& operator=(Context const&) = delete;
+    Context(const Context&) = delete;
+    Context& operator=(const Context&) = delete;
     ~Context() noexcept;
 
     // Lazily allocated, uniquely created directory for this case's outputs.
     /** @brief Return this case's lazily allocated private work directory.
      *  @return Owned path, unique across concurrent test processes.
      */
-    std::filesystem::path const& work_directory();
+    const std::filesystem::path& work_directory();
 
     // Attach metadata only. Never writes or regenerates a reference file.
     /** @brief Register artifact metadata without modifying the referenced file.
@@ -150,7 +156,7 @@ class Context {
                   std::string media_type = "application/octet-stream",
                   ArtifactKind kind = ArtifactKind::Output,
                   ArtifactLifetime lifetime = ArtifactLifetime::External,
-                  std::vector<std::pair<std::string,std::string>> metadata = {});
+                  std::vector<std::pair<std::string, std::string>> metadata = {});
 
     /** @brief Register immutable-oracle provenance as an external reference.
      *  @details Only metadata is recorded: the reference is never opened,
@@ -159,7 +165,7 @@ class Context {
      *  @throws std::invalid_argument for invalid identifiers or duplicate
      *  input attribute names.
      */
-    void register_oracle(OracleMetadata const& metadata);
+    void register_oracle(const OracleMetadata& metadata);
 
     /** @brief Assert complete and ordered frozen-oracle row identities.
      *  @details Invalid manifests produce Error; absent, duplicated,
@@ -167,8 +173,8 @@ class Context {
      *  The domain's reader supplies all rows; this method never filters or
      *  reseeds them. A CHECK is announced before validation.
      */
-    void expect_oracle_rows(std::span<OracleRow const> manifest,
-                            std::span<OracleRow const> observed,
+    void expect_oracle_rows(std::span<const OracleRow> manifest,
+                            std::span<const OracleRow> observed,
                             std::string_view description,
                             std::source_location location = std::source_location::current());
 
@@ -185,7 +191,7 @@ class Context {
      *  not Passed. Malformed selections produce Error. The selector is pure
      *  and never consumes or resets a shared random stream.
      */
-    void expect_oracle_replay(OracleReplayPlan const& plan,
+    void expect_oracle_replay(const OracleReplayPlan& plan,
                               std::string_view description,
                               std::source_location location = std::source_location::current());
 
@@ -198,29 +204,28 @@ class Context {
 
     // File expectations issue CHECK before inspecting the filesystem.
     /** @brief Check whether a path is an accessible regular file. */
-    void expect_file_exists(std::filesystem::path const& path,
+    void expect_file_exists(const std::filesystem::path& path,
                             std::string_view description,
                             std::source_location location = std::source_location::current());
     /** @brief Compare binary files byte for byte and record the first difference. */
-    void expect_file_equal(std::filesystem::path const& actual,
-                           std::filesystem::path const& reference,
+    void expect_file_equal(const std::filesystem::path& actual,
+                           const std::filesystem::path& reference,
                            std::string_view description,
                            std::source_location location = std::source_location::current());
     /** @brief Compare a file's initial bytes against a binary signature. */
-    void expect_file_signature(std::filesystem::path const& actual,
+    void expect_file_signature(const std::filesystem::path& actual,
                                std::string_view signature,
                                std::string_view description,
                                std::source_location location = std::source_location::current());
-
 
     Scope scope(std::string label,
                 std::source_location location = std::source_location::current());
 
     /** @brief Begin a named diagnostic scope. The returned guard restores its parent on destruction.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class T>
-    Scope scope(std::string name, T const& value,
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class T>
+    Scope scope(std::string name, const T& value,
                 std::source_location location = std::source_location::current());
 
     void note(std::string description,
@@ -229,10 +234,10 @@ template<class T>
                  std::source_location location = std::source_location::current());
 
     /** @brief Record a named value without changing the case outcome.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class T>
-    void inspect(std::string name, T const& value,
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class T>
+    void inspect(std::string name, const T& value,
                  std::source_location location = std::source_location::current());
 
     void elapsed(std::string description, std::chrono::nanoseconds duration,
@@ -241,42 +246,42 @@ template<class T>
     // For an arbitrary operation, emit its duration even if it throws.
     // A hanging operation is diagnosed by the preceding scope event.
     /** @brief Measure a void operation and emit elapsed time even if it throws; exceptions propagate.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class Callable>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class Callable>
     void measure(std::string description, Callable&& operation,
                  std::source_location location = std::source_location::current());
 
     /** @brief Record a direct mathematical proposition, retaining indeterminate evidence.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class T>
-    void prove(T const& predicate, std::string_view description,
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class T>
+    void prove(const T& predicate, std::string_view description,
                std::source_location location = std::source_location::current());
 
     // Test a specified mathematical evidence classification. A deliberately
     // expected indeterminate result is a passing test, not a proven statement.
     /** @brief Compare a deferred proposition against the specified three-valued expectation.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class PredicateFn>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class PredicateFn>
     void expect_evidence(PredicateFn&& predicate_fn, EvidenceExpectation expected,
                          std::string_view description,
                          std::source_location location = std::source_location::current());
 
     // Deferred operands: emit CHECK before evaluating each expression once.
     /** @brief Evaluate deferred operands once and compare their equality.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class ActualFn, class ExpectedFn>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class ActualFn, class ExpectedFn>
     void check_equal(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
                      std::string_view description,
                      std::source_location location = std::source_location::current());
 
     template<class ComparisonFn>
     void check_equal_snapshot(ComparisonFn&& comparison_fn,
-                     std::string_view description,
-                     std::source_location location = std::source_location::current());
+                              std::string_view description,
+                              std::source_location location = std::source_location::current());
 
     // Macro-safe comparison: produce the verdict and rendered operands while
     // both expressions' temporaries are still alive in the calling expression.
@@ -293,26 +298,26 @@ template<class ActualFn, class ExpectedFn>
     // and the comparator/path selectors are evaluated once after CHECK.
     // A non-true predicate is retained as evidence, not coerced to bool.
     /** @brief Compare input ranges, retaining first mismatch, uncertainty and element path.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class ActualFn, class ExpectedFn, class ComparatorFn, class PathFn>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class ActualFn, class ExpectedFn, class ComparatorFn, class PathFn>
     void check_ranges(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
                       ComparatorFn&& comparator_fn, PathFn&& path_fn,
                       std::string_view description,
                       std::source_location location = std::source_location::current());
 
     /** @brief Compare input ranges, retaining first mismatch, uncertainty and element path.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class ActualFn, class ExpectedFn, class ComparatorFn>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class ActualFn, class ExpectedFn, class ComparatorFn>
     void check_ranges(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
                       ComparatorFn&& comparator_fn, std::string_view description,
                       std::source_location location = std::source_location::current());
 
     /** @brief Compare input ranges, retaining first mismatch, uncertainty and element path.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class ActualFn, class ExpectedFn>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class ActualFn, class ExpectedFn>
     void check_ranges(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
                       std::string_view description,
                       std::source_location location = std::source_location::current());
@@ -320,89 +325,89 @@ template<class ActualFn, class ExpectedFn>
     // Each relation is selected at compile time and evaluates its operands once,
     // left-to-right, after the live CHECK notification.
     /** @brief Compare deferred operands with the selected compile-time relation.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<Comparison Relation, class ActualFn, class ExpectedFn>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<Comparison Relation, class ActualFn, class ExpectedFn>
     void check_compare(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
                        std::string_view description,
                        std::source_location location = std::source_location::current());
 
     /** @brief Apply a deferred unary predicate with optional evidence negation.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class Predicate, class OperandFn>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class Predicate, class OperandFn>
     void check_unary(Predicate&& predicate, OperandFn&& operand_fn,
                      std::string_view description, bool negate = false,
                      std::source_location location = std::source_location::current());
 
     /** @brief Apply a deferred binary predicate with optional evidence negation.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class Predicate, class LeftFn, class RightFn>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class Predicate, class LeftFn, class RightFn>
     void check_binary(Predicate&& predicate, LeftFn&& left_fn, RightFn&& right_fn,
                       std::string_view description, bool negate = false,
                       std::source_location location = std::source_location::current());
 
     /** @brief Convenience equality check for already-evaluated operands.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class A, class B>
-    void expect_equal(A const& actual, B const& expected,
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class A, class B>
+    void expect_equal(const A& actual, const B& expected,
                       std::string_view description = "equality",
                       std::source_location location = std::source_location::current());
 
     /** @brief Compare semantic identity through the ADL-discovered same() operation.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class ActualFn, class ExpectedFn>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class ActualFn, class ExpectedFn>
     void check_same(ActualFn&& actual_fn, ExpectedFn&& expected_fn,
                     std::string_view description,
                     std::source_location location = std::source_location::current());
 
     /** @brief Convenience semantic identity check for values.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class A, class B>
-    void expect_same(A const& actual, B const& expected,
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class A, class B>
+    void expect_same(const A& actual, const B& expected,
                      std::string_view description = "identity",
                      std::source_location location = std::source_location::current());
 
     /** @brief Compare a computed error against a tolerance.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class ActualFn, class ExpectedFn, class ToleranceFn>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class ActualFn, class ExpectedFn, class ToleranceFn>
     void check_within(ActualFn&& actual_fn, ExpectedFn&& expected_fn, ToleranceFn&& tolerance_fn,
                       std::string_view description,
                       std::source_location location = std::source_location::current());
 
     /** @brief Convenience bounded-error check for already-evaluated values.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class A, class B, class Tolerance>
-    void expect_within(A const& actual, B const& expected, Tolerance const& tolerance,
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class A, class B, class Tolerance>
+    void expect_within(const A& actual, const B& expected, const Tolerance& tolerance,
                        std::string_view description = "bounded error",
                        std::source_location location = std::source_location::current());
 
     // Stop only this case if a prerequisite is false or indeterminate.
     // The check is recorded before aborting, retaining its original outcome.
     /** @brief Record a prerequisite and abort only the current case if not Passed.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class Callable>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class Callable>
     void require(Callable&& predicate, std::string_view description,
                  std::source_location location = std::source_location::current());
 
     /** @brief Require a particular exception type from an operation.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class Exception, class Callable>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class Exception, class Callable>
     void expect_throws(Callable&& action, std::string_view description = "expected exception",
                        std::source_location location = std::source_location::current());
     // Both the exception type and the message substring must match.
     /** @brief Require an exception type and a substring in its message.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class Exception, class Callable>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class Exception, class Callable>
     void expect_throws_message(Callable&& action, std::string_view substring,
                                std::string_view description = "expected exception message",
                                std::source_location location = std::source_location::current());
@@ -411,9 +416,9 @@ template<class Exception, class Callable>
     // it with a separately evaluated expectation. Both are deferred until
     // after CHECK and the tested operation; no domain dependency is needed.
     /** @brief Project an expected exception into a value and compare its payload.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class Exception, class Action, class ProjectorFn, class ExpectedFn>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class Exception, class Action, class ProjectorFn, class ExpectedFn>
     void expect_throws_payload(Action&& action, ProjectorFn&& projector_fn,
                                ExpectedFn&& expected_fn, std::string_view description,
                                std::source_location location = std::source_location::current());
@@ -454,24 +459,24 @@ template<class Exception, class Action, class ProjectorFn, class ExpectedFn>
                             std::source_location location = std::source_location::current());
 
     /** @brief Verify that an operation throws any exception.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class Callable>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class Callable>
     void expect_exception(Callable&& action, std::string_view description = "exception expected",
                           std::source_location location = std::source_location::current());
     /** @brief Verify that an operation completes without throwing.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class Callable>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class Callable>
     void expect_no_throw(Callable&& action, std::string_view description = "no exception expected",
                          std::source_location location = std::source_location::current());
 
     // Bounded waits observe externally synchronized state; they do not
     // cancel worker threads. The caller owns the future and its lifetime.
     /** @brief Check a future's readiness within a nonnegative timeout.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class Future, class Rep, class Period>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class Future, class Rep, class Period>
     void expect_ready(Future& future, std::chrono::duration<Rep, Period> timeout,
                       std::string_view description,
                       std::source_location location = std::source_location::current());
@@ -479,9 +484,9 @@ template<class Future, class Rep, class Period>
     // Use wait_for's predicate overload to handle spurious wakeups. The
     // predicate executes while the caller's unique_lock is held.
     /** @brief Wait on a condition variable until a predicate succeeds or timeout expires.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class Lock, class Predicate, class Rep, class Period>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class Lock, class Predicate, class Rep, class Period>
     void expect_eventually(std::condition_variable_any& condition, Lock& lock,
                            Predicate&& predicate, std::chrono::duration<Rep, Period> timeout,
                            std::string_view description,
@@ -497,7 +502,7 @@ template<class Lock, class Predicate, class Rep, class Period>
      *  or joined by this API. It reports the last observed value and timeout.
      */
     template<class T, class Predicate, class Rep, class Period>
-    void expect_atomic(std::atomic<T> const& state, Predicate&& predicate,
+    void expect_atomic(const std::atomic<T>& state, Predicate&& predicate,
                        std::chrono::duration<Rep, Period> timeout,
                        std::string_view description,
                        std::source_location location = std::source_location::current());
@@ -530,16 +535,16 @@ template<class Lock, class Predicate, class Rep, class Period>
      *  deadline; it cannot establish a deadlock or identify scheduler delays.
      */
     template<class T, class Predicate>
-    void expect_atomic_until(std::atomic<T> const& state, Predicate&& predicate,
+    void expect_atomic_until(const std::atomic<T>& state, Predicate&& predicate,
                              std::chrono::steady_clock::time_point deadline,
                              std::string_view description,
                              std::source_location location = std::source_location::current());
 
     // Deferred checker: emit progress before evaluating its potentially costly predicate.
     /** @brief Record the evidence of a deferred proposition.
- *  @note Arguments supplied as callables are evaluated at check time.
- */
-template<class Callable>
+     *  @note Arguments supplied as callables are evaluated at check time.
+     */
+    template<class Callable>
     void check(Callable&& predicate, std::string_view description,
                std::source_location location = std::source_location::current());
 
@@ -549,18 +554,18 @@ template<class Callable>
   private:
     friend class WorkerBatch;
     friend /** @brief Ordered collection of cases executed with a reporter. */
-class Suite;
+        class Suite;
     static Outcome outcome(Evidence value);
     std::size_t enter_scope(std::string label, std::source_location location);
     void leave_scope(std::size_t depth, int uncaught_at_entry) noexcept;
     void emit(DiagnosticKind kind, std::string description, std::string value,
               std::chrono::nanoseconds duration, std::source_location location);
     std::size_t begin_check(std::string_view description);
-    void record_oracle_rows(std::span<OracleRow const> manifest,
-                            std::span<OracleRow const> observed,
+    void record_oracle_rows(std::span<const OracleRow> manifest,
+                            std::span<const OracleRow> observed,
                             std::string_view description,
                             std::source_location location, std::size_t index);
-    void record_oracle_replay(OracleReplayPlan const& plan,
+    void record_oracle_replay(const OracleReplayPlan& plan,
                               std::string_view description,
                               std::source_location location, std::size_t index);
     bool capture_passing_values() const noexcept;
@@ -578,7 +583,7 @@ class Suite;
 
 class Suite {
   public:
-    explicit Suite(std::string name) : _name(std::move(name)) { }
+    explicit Suite(std::string name) : _name(std::move(name)) {}
     void add(std::string name, std::function<void(Context&)> test,
              CaseMetadata metadata = {});
     /** @brief Run every registered case, retaining the historical result API. */
@@ -589,7 +594,8 @@ class Suite {
      *  detectable empty run; selection is reported before the first case.
      *  A filtered case retains its original registration index.
      */
-    SelectionResult run_selected(Reporter& reporter, CaseFilter const& filter) const;
+    SelectionResult run_selected(Reporter& reporter, const CaseFilter& filter) const;
+
   private:
     struct TestCase {
         std::string name;

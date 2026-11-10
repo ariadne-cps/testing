@@ -35,31 +35,37 @@
 #include <unistd.h>
 #endif
 
-
 namespace Ariadne::Testing {
 namespace {
 
 int priority(Outcome result) {
     switch (result) {
-        case Outcome::Passed: return 0;
-        case Outcome::Skipped: return 1;
-        case Outcome::Inconclusive: return 2;
-        case Outcome::Failed: return 3;
-        case Outcome::Error: return 4;
-        default: return 4;
+        case Outcome::Passed:
+            return 0;
+        case Outcome::Skipped:
+            return 1;
+        case Outcome::Inconclusive:
+            return 2;
+        case Outcome::Failed:
+            return 3;
+        case Outcome::Error:
+            return 4;
+        default:
+            return 4;
     }
 }
-
 
 } // namespace
 
 Context::~Context() noexcept {
-    if (!_work_directory) return;
+    if (!_work_directory)
+        return;
     bool preserve = false;
-    for (auto const& artifact : _result.artifacts) {
+    for (const auto& artifact: _result.artifacts) {
         if (artifact.lifetime == ArtifactLifetime::KeepAlways ||
             (artifact.lifetime == ArtifactLifetime::KeepOnFailure &&
-             _result.outcome != Outcome::Passed)) preserve = true;
+             _result.outcome != Outcome::Passed))
+            preserve = true;
     }
     if (!preserve) {
         std::error_code error;
@@ -67,21 +73,21 @@ Context::~Context() noexcept {
     }
 }
 
-std::filesystem::path const& Context::work_directory() {
+const std::filesystem::path& Context::work_directory() {
     if (!_work_directory) {
-        auto const base = std::filesystem::temp_directory_path();
+        const auto base = std::filesystem::temp_directory_path();
         // A stack address is reused for successive test cases. Use a new
         // candidate ID for each allocation, with create_directory as the
         // atomic uniqueness check across concurrent processes.
         // Distinct names across concurrent CTest executables.
 #if defined(_WIN32)
-        auto const process_id = std::to_string(_getpid());
+        const auto process_id = std::to_string(_getpid());
 #else
-        auto const process_id = std::to_string(getpid());
+        const auto process_id = std::to_string(getpid());
 #endif
         static std::atomic<std::uint64_t> next_id{0};
-        for (unsigned i=0; i<1000; ++i) {
-            auto const id = next_id.fetch_add(1, std::memory_order_relaxed);
+        for (unsigned i = 0; i < 1000; ++i) {
+            const auto id = next_id.fetch_add(1, std::memory_order_relaxed);
             auto candidate = base / ("ariadne-case-" + process_id + "-" + std::to_string(id));
             std::error_code error;
             if (std::filesystem::create_directory(candidate, error)) {
@@ -89,53 +95,61 @@ std::filesystem::path const& Context::work_directory() {
                 break;
             }
             if (error && error != std::errc::file_exists) {
-                throw std::filesystem::filesystem_error("create work directory",candidate,error);
+                throw std::filesystem::filesystem_error("create work directory", candidate, error);
             }
         }
-        if (!_work_directory) throw std::runtime_error("Cannot allocate isolated test directory");
+        if (!_work_directory)
+            throw std::runtime_error("Cannot allocate isolated test directory");
     }
     return *_work_directory;
 }
 
-
 namespace {
-bool valid_oracle_id(OracleRow const& row) {
+bool valid_oracle_id(const OracleRow& row) {
     return row.parsed && !row.id.key.empty();
 }
 struct OracleRowLess {
-    bool operator()(OracleRowId const& a, OracleRowId const& b) const {
+    bool operator()(const OracleRowId& a, const OracleRowId& b) const {
         return std::tie(a.key, a.iteration, a.repetition) <
                std::tie(b.key, b.iteration, b.repetition);
     }
 };
-char const* oracle_issue_name(OracleIssueKind kind) {
+const char* oracle_issue_name(OracleIssueKind kind) {
     switch (kind) {
-        case OracleIssueKind::InvalidManifest: return "invalid manifest";
-        case OracleIssueKind::Malformed: return "malformed row";
-        case OracleIssueKind::Duplicate: return "duplicate row";
-        case OracleIssueKind::Missing: return "missing row";
-        case OracleIssueKind::Extra: return "extra row";
-        case OracleIssueKind::OutOfOrder: return "out-of-order row";
-        default: return "unknown oracle issue";
+        case OracleIssueKind::InvalidManifest:
+            return "invalid manifest";
+        case OracleIssueKind::Malformed:
+            return "malformed row";
+        case OracleIssueKind::Duplicate:
+            return "duplicate row";
+        case OracleIssueKind::Missing:
+            return "missing row";
+        case OracleIssueKind::Extra:
+            return "extra row";
+        case OracleIssueKind::OutOfOrder:
+            return "out-of-order row";
+        default:
+            return "unknown oracle issue";
     }
 }
 } // namespace
 
-OracleIntegrity validate_oracle_rows(std::span<OracleRow const> manifest,
-                                    std::span<OracleRow const> observed) {
+OracleIntegrity validate_oracle_rows(std::span<const OracleRow> manifest,
+                                     std::span<const OracleRow> observed) {
     OracleIntegrity report{manifest.size(), observed.size(), {}};
     std::map<OracleRowId, std::size_t, OracleRowLess> required;
     if (manifest.empty())
         report.issues.push_back({OracleIssueKind::InvalidManifest, 0, {}});
     for (std::size_t i = 0; i < manifest.size(); ++i) {
-        auto const& row = manifest[i];
+        const auto& row = manifest[i];
         if (!valid_oracle_id(row) || !required.emplace(row.id, i).second)
             report.issues.push_back({OracleIssueKind::InvalidManifest, i, row.id});
     }
-    if (report.invalid_manifest()) return report;
+    if (report.invalid_manifest())
+        return report;
     std::map<OracleRowId, std::size_t, OracleRowLess> found;
     for (std::size_t i = 0; i < observed.size(); ++i) {
-        auto const& row = observed[i];
+        const auto& row = observed[i];
         if (!valid_oracle_id(row)) {
             report.issues.push_back({OracleIssueKind::Malformed, i, row.id});
             continue;
@@ -145,7 +159,7 @@ OracleIntegrity validate_oracle_rows(std::span<OracleRow const> manifest,
         if (!required.contains(row.id))
             report.issues.push_back({OracleIssueKind::Extra, i, row.id});
     }
-    for (auto const& [id, i] : required)
+    for (const auto& [id, i]: required)
         if (!found.contains(id))
             report.issues.push_back({OracleIssueKind::Missing, i, id});
 
@@ -163,8 +177,9 @@ OracleIntegrity validate_oracle_rows(std::span<OracleRow const> manifest,
 std::string OracleIntegrity::description() const {
     auto summary = "expected_rows=" + std::to_string(expected_rows) +
                    "; observed_rows=" + std::to_string(observed_rows);
-    if (issues.empty()) return summary + "; integrity verified";
-    auto const& first = issues.front();
+    if (issues.empty())
+        return summary + "; integrity verified";
+    const auto& first = issues.front();
     return summary + "; issues=" + std::to_string(issues.size()) +
            "; first=" + oracle_issue_name(first.kind) +
            " at index=" + std::to_string(first.index) +
@@ -173,15 +188,14 @@ std::string OracleIntegrity::description() const {
            "; repetition=" + std::to_string(first.id.repetition);
 }
 
-
-OracleReplayPlan plan_oracle_replay(std::span<OracleRow const> manifest,
-                                    std::span<OracleRowId const> requested) {
+OracleReplayPlan plan_oracle_replay(std::span<const OracleRow> manifest,
+                                    std::span<const OracleRowId> requested) {
     OracleReplayPlan plan;
     plan.total_rows = manifest.size();
 
     // The manifest must itself be a valid and complete independent frozen
     // reference. Never infer it from the observed implementation's output.
-    auto const integrity = validate_oracle_rows(manifest, manifest);
+    const auto integrity = validate_oracle_rows(manifest, manifest);
     if (!integrity.valid()) {
         plan.valid = false;
         plan.reason = "invalid frozen manifest: " + integrity.description();
@@ -200,7 +214,7 @@ OracleReplayPlan plan_oracle_replay(std::span<OracleRow const> manifest,
     }
 
     std::map<OracleRowId, bool, OracleRowLess> selected;
-    for (auto const& id : requested) {
+    for (const auto& id: requested) {
         if (id.key.empty()) {
             plan.valid = false;
             plan.reason = "selected row has an empty key";
@@ -228,35 +242,38 @@ OracleReplayPlan plan_oracle_replay(std::span<OracleRow const> manifest,
 std::string OracleReplayPlan::description() const {
     auto summary = "replay_selected=" + std::to_string(indices.size()) +
                    "; manifest_total=" + std::to_string(total_rows);
-    if (!valid) return summary + "; invalid selection: " + reason;
-    if (!structurally_valid()) return summary + "; invalid replay plan";
-    if (!complete) return summary + "; partial replay, full coverage not established";
+    if (!valid)
+        return summary + "; invalid selection: " + reason;
+    if (!structurally_valid())
+        return summary + "; invalid replay plan";
+    if (!complete)
+        return summary + "; partial replay, full coverage not established";
     return summary + "; full replay";
 }
 
-void Context::expect_oracle_replay(OracleReplayPlan const& plan,
+void Context::expect_oracle_replay(const OracleReplayPlan& plan,
                                    std::string_view description,
                                    std::source_location location) {
-    auto const index = begin_check(description);
+    const auto index = begin_check(description);
     record_oracle_replay(plan, description, location, index);
 }
 
-void Context::record_oracle_replay(OracleReplayPlan const& plan,
+void Context::record_oracle_replay(const OracleReplayPlan& plan,
                                    std::string_view description,
                                    std::source_location location,
                                    std::size_t index) {
-    auto const result = !plan.structurally_valid() ? Outcome::Error :
-                        plan.complete ? Outcome::Passed : Outcome::Inconclusive;
+    const auto result = !plan.structurally_valid() ? Outcome::Error : plan.complete ? Outcome::Passed
+                                                                                    : Outcome::Inconclusive;
     record(result, description, std::to_string(plan.indices.size()),
            std::to_string(plan.total_rows), plan.description(), location, index);
 }
 
-void Context::register_oracle(OracleMetadata const& metadata) {
+void Context::register_oracle(const OracleMetadata& metadata) {
     if (metadata.reference.empty() || metadata.label.empty() ||
         metadata.row_key_column.empty() ||
         (metadata.precision_bits.has_value() && *metadata.precision_bits == std::uint32_t{0}))
         throw std::invalid_argument("Oracle reference, label and row key must be nonempty and precision positive");
-    std::vector<std::pair<std::string,std::string>> attrs{
+    std::vector<std::pair<std::string, std::string>> attrs{
         {"oracle.row_key_column", metadata.row_key_column}
     };
     if (metadata.seed)
@@ -264,7 +281,7 @@ void Context::register_oracle(OracleMetadata const& metadata) {
     if (metadata.precision_bits)
         attrs.emplace_back("oracle.precision_bits", std::to_string(*metadata.precision_bits));
     std::map<std::string, bool> seen;
-    for (auto const& [name, value] : metadata.input_attributes) {
+    for (const auto& [name, value]: metadata.input_attributes) {
         if (name.empty() || value.empty() || !seen.emplace(name, true).second)
             throw std::invalid_argument("Oracle input attribute names/values must be nonempty and unique");
         attrs.emplace_back("input." + name, value);
@@ -273,22 +290,22 @@ void Context::register_oracle(OracleMetadata const& metadata) {
              ArtifactKind::Reference, ArtifactLifetime::External, std::move(attrs));
 }
 
-void Context::expect_oracle_rows(std::span<OracleRow const> manifest,
-                                 std::span<OracleRow const> observed,
+void Context::expect_oracle_rows(std::span<const OracleRow> manifest,
+                                 std::span<const OracleRow> observed,
                                  std::string_view description,
                                  std::source_location location) {
-    auto const index = begin_check(description);
+    const auto index = begin_check(description);
     record_oracle_rows(manifest, observed, description, location, index);
 }
 
-void Context::record_oracle_rows(std::span<OracleRow const> manifest,
-                                 std::span<OracleRow const> observed,
+void Context::record_oracle_rows(std::span<const OracleRow> manifest,
+                                 std::span<const OracleRow> observed,
                                  std::string_view description,
                                  std::source_location location,
                                  std::size_t index) {
-    auto const report = validate_oracle_rows(manifest, observed);
-    record(report.valid() ? Outcome::Passed :
-           report.invalid_manifest() ? Outcome::Error : Outcome::Failed,
+    const auto report = validate_oracle_rows(manifest, observed);
+    record(report.valid() ? Outcome::Passed : report.invalid_manifest() ? Outcome::Error
+                                                                        : Outcome::Failed,
            description, std::to_string(report.observed_rows),
            std::to_string(report.expected_rows), report.description(),
            location, index);
@@ -297,121 +314,125 @@ void Context::record_oracle_rows(std::span<OracleRow const> manifest,
 void Context::artifact(std::filesystem::path path, std::string label,
                        std::string media_type, ArtifactKind kind,
                        ArtifactLifetime lifetime,
-                       std::vector<std::pair<std::string,std::string>> metadata) {
+                       std::vector<std::pair<std::string, std::string>> metadata) {
     if (path.empty() || label.empty())
         throw std::invalid_argument("Artifact path and label must not be empty");
     // Retention applies only to outputs owned by this Context.
     if (lifetime != ArtifactLifetime::External) {
-        auto const root = std::filesystem::weakly_canonical(work_directory());
-        auto const target = std::filesystem::weakly_canonical(path);
+        const auto root = std::filesystem::weakly_canonical(work_directory());
+        const auto target = std::filesystem::weakly_canonical(path);
         auto relative = target.lexically_relative(root);
         if (relative.empty() || relative == "." ||
             *relative.begin() == "..")
             throw std::invalid_argument("Managed artifacts must be inside the case directory");
     }
-    _result.artifacts.push_back({std::move(path),std::move(label),
-        std::move(media_type),kind,lifetime,std::move(metadata)});
+    _result.artifacts.push_back({std::move(path), std::move(label),
+                                 std::move(media_type), kind, lifetime, std::move(metadata)});
 }
 
-void Context::expect_file_exists(std::filesystem::path const& path,
+void Context::expect_file_exists(const std::filesystem::path& path,
                                  std::string_view description,
                                  std::source_location location) {
-    auto const index=begin_check(description);
+    const auto index = begin_check(description);
     std::error_code error;
-    bool const exists=std::filesystem::is_regular_file(path,error);
+    const bool exists = std::filesystem::is_regular_file(path, error);
     // Some standard libraries report ENOENT/ENOTDIR as an error_code;
     // these still mean an absent regular file, not a testing infrastructure
     // error. Preserve Error for other filesystem failures.
-    bool const absent=error == std::errc::no_such_file_or_directory ||
-                      error == std::errc::not_a_directory;
-    Outcome const status=error && !absent ? Outcome::Error :
-                         exists ? Outcome::Passed : Outcome::Failed;
-    record(status,description,path.string(),"regular file",
-           error && !absent ? error.message() :
-           exists ? "" : "file absent or not regular",location,index);
+    const bool absent = error == std::errc::no_such_file_or_directory ||
+                        error == std::errc::not_a_directory;
+    const Outcome status = error && !absent ? Outcome::Error : exists ? Outcome::Passed
+                                                                      : Outcome::Failed;
+    record(status, description, path.string(), "regular file",
+           error && !absent ? error.message() : exists ? ""
+                                                       : "file absent or not regular",
+           location, index);
 }
 
-void Context::expect_file_equal(std::filesystem::path const& actual,
-                                std::filesystem::path const& reference,
+void Context::expect_file_equal(const std::filesystem::path& actual,
+                                const std::filesystem::path& reference,
                                 std::string_view description,
                                 std::source_location location) {
-    auto const index=begin_check(description);
-    std::ifstream a(actual,std::ios::binary);
-    std::ifstream b(reference,std::ios::binary);
+    const auto index = begin_check(description);
+    std::ifstream a(actual, std::ios::binary);
+    std::ifstream b(reference, std::ios::binary);
     if (!a || !b) {
-        record(Outcome::Failed,description,actual.string(),reference.string(),
-               !a ? "cannot open actual file" : "cannot open reference file",location,index);
+        record(Outcome::Failed, description, actual.string(), reference.string(),
+               !a ? "cannot open actual file" : "cannot open reference file", location, index);
         return;
     }
     // Opening a directory as an input stream succeeds on some platforms.
     // It must not be mistaken for an empty regular file.
-    bool const actual_regular = std::filesystem::is_regular_file(actual);
-    bool const reference_regular = std::filesystem::is_regular_file(reference);
+    const bool actual_regular = std::filesystem::is_regular_file(actual);
+    const bool reference_regular = std::filesystem::is_regular_file(reference);
     if (!actual_regular || !reference_regular) {
-        record(Outcome::Failed,description,actual.string(),reference.string(),
+        record(Outcome::Failed, description, actual.string(), reference.string(),
                !actual_regular ? "actual path is not a regular file"
-                               : "reference path is not a regular file",location,index);
+                               : "reference path is not a regular file",
+               location, index);
         return;
     }
-    std::size_t offset=0;
+    std::size_t offset = 0;
     for (;;) {
-        int const x=a.get(),y=b.get();
+        const int x = a.get(), y = b.get();
         if (a.bad() || b.bad()) {
-            record(Outcome::Error,description,actual.string(),reference.string(),
+            record(Outcome::Error, description, actual.string(), reference.string(),
                    a.bad() ? "error reading actual file" : "error reading reference file",
-                   location,index);
+                   location, index);
             return;
         }
-        if (x!=y) {
-            record(Outcome::Failed,description,actual.string(),reference.string(),
-                   "first differing byte offset="+std::to_string(offset),location,index);
+        if (x != y) {
+            record(Outcome::Failed, description, actual.string(), reference.string(),
+                   "first differing byte offset=" + std::to_string(offset), location, index);
             return;
         }
-        if (x==std::char_traits<char>::eof()) break;
+        if (x == std::char_traits<char>::eof())
+            break;
         ++offset;
     }
-    record(Outcome::Passed,description,actual.string(),reference.string(),{},location,index);
+    record(Outcome::Passed, description, actual.string(), reference.string(), {}, location, index);
 }
 
-void Context::expect_file_signature(std::filesystem::path const& actual,
+void Context::expect_file_signature(const std::filesystem::path& actual,
                                     std::string_view signature,
                                     std::string_view description,
                                     std::source_location location) {
-    auto const index=begin_check(description);
-    std::ifstream stream(actual,std::ios::binary);
+    const auto index = begin_check(description);
+    std::ifstream stream(actual, std::ios::binary);
     if (!stream) {
-        record(Outcome::Failed,description,actual.string(),std::string(signature),
-               "cannot open actual file",location,index);
+        record(Outcome::Failed, description, actual.string(), std::string(signature),
+               "cannot open actual file", location, index);
         return;
     }
     if (!std::filesystem::is_regular_file(actual)) {
-        record(Outcome::Failed,description,actual.string(),std::string(signature),
-               "actual path is not a regular file",location,index);
+        record(Outcome::Failed, description, actual.string(), std::string(signature),
+               "actual path is not a regular file", location, index);
         return;
     }
-    std::string found(signature.size(),'\0');
-    stream.read(found.data(),static_cast<std::streamsize>(found.size()));
+    std::string found(signature.size(), '\0');
+    stream.read(found.data(), static_cast<std::streamsize>(found.size()));
     if (stream.bad()) {
-        record(Outcome::Error,description,actual.string(),std::string(signature),
-               "error reading actual file",location,index);
+        record(Outcome::Error, description, actual.string(), std::string(signature),
+               "error reading actual file", location, index);
         return;
     }
     found.resize(static_cast<std::size_t>(stream.gcount()));
-    bool const equal=found==signature;
-    record(equal ? Outcome::Passed : Outcome::Failed,description,actual.string(),
-           "binary signature",equal ? "" : "signature mismatch",location,index);
+    const bool equal = found == signature;
+    record(equal ? Outcome::Passed : Outcome::Failed, description, actual.string(),
+           "binary signature", equal ? "" : "signature mismatch", location, index);
 }
 
 Context::Scope::Scope(Context& context, std::string label, std::source_location location)
     : _context(&context), _depth(context.enter_scope(std::move(label), location)),
-      _uncaught(std::uncaught_exceptions()) { }
+      _uncaught(std::uncaught_exceptions()) {}
 
 Context::Scope::Scope(Scope&& other) noexcept
     : _context(std::exchange(other._context, nullptr)),
-      _depth(other._depth), _uncaught(other._uncaught) { }
+      _depth(other._depth), _uncaught(other._uncaught) {}
 
 Context::Scope::~Scope() noexcept {
-    if (_context) _context->leave_scope(_depth, _uncaught);
+    if (_context)
+        _context->leave_scope(_depth, _uncaught);
 }
 
 Context::Scope Context::scope(std::string label, std::source_location location) {
@@ -419,8 +440,9 @@ Context::Scope Context::scope(std::string label, std::source_location location) 
 }
 
 std::size_t Context::enter_scope(std::string label, std::source_location location) {
-    if (label.empty()) throw std::invalid_argument("Diagnostic scope name must be nonempty");
-    auto const depth = _scopes.size();
+    if (label.empty())
+        throw std::invalid_argument("Diagnostic scope name must be nonempty");
+    const auto depth = _scopes.size();
     _scopes.push_back(std::move(label));
     emit(DiagnosticKind::Scope, _scopes.back(), {}, {}, location);
     return depth;
@@ -429,10 +451,13 @@ std::size_t Context::enter_scope(std::string label, std::source_location locatio
 void Context::leave_scope(std::size_t depth, int uncaught_at_entry) noexcept {
     if (std::uncaught_exceptions() > uncaught_at_entry &&
         _scopes.size() > _unwinding_scopes.size()) {
-        try { _unwinding_scopes = _scopes; }
-        catch (...) { } // RAII destructor must never throw.
+        try {
+            _unwinding_scopes = _scopes;
+        } catch (...) {
+        } // RAII destructor must never throw.
     }
-    if (depth <= _scopes.size()) _scopes.resize(depth);
+    if (depth <= _scopes.size())
+        _scopes.resize(depth);
 }
 
 void Context::emit(DiagnosticKind kind, std::string description, std::string value,
@@ -440,7 +465,8 @@ void Context::emit(DiagnosticKind kind, std::string description, std::string val
     DiagnosticEvent event{kind, std::move(description), std::move(value),
                           _scopes, duration, location.file_name(), location.line()};
     _result.diagnostics.push_back(std::move(event));
-    if (_reporter) _reporter->diagnostic_emitted(_result, _result.diagnostics.back());
+    if (_reporter)
+        _reporter->diagnostic_emitted(_result, _result.diagnostics.back());
 }
 
 bool Context::capture_passing_values() const noexcept {
@@ -463,17 +489,22 @@ void Context::elapsed(std::string description, std::chrono::nanoseconds duration
 
 Outcome Context::outcome(Evidence value) {
     switch (value) {
-        case Evidence::True: return Outcome::Passed;
-        case Evidence::False: return Outcome::Failed;
-        case Evidence::Indeterminate: return Outcome::Inconclusive;
-        default: return Outcome::Error;
+        case Evidence::True:
+            return Outcome::Passed;
+        case Evidence::False:
+            return Outcome::Failed;
+        case Evidence::Indeterminate:
+            return Outcome::Inconclusive;
+        default:
+            return Outcome::Error;
     }
 }
 
 std::size_t Context::begin_check(std::string_view description) {
-    auto const index = ++_check_count;
+    const auto index = ++_check_count;
     _unwinding_scopes.clear(); // A new check supersedes any recovered exception context.
-    if (_reporter) _reporter->check_started(_result, index, description);
+    if (_reporter)
+        _reporter->check_started(_result, index, description);
     return index;
 }
 
@@ -482,13 +513,14 @@ void Context::record(Outcome status, std::string_view description,
                      std::source_location location, std::size_t index,
                      std::optional<WaitObservation> wait) {
     _result.assertions.push_back({status, std::string(description), std::move(actual),
-        std::move(expected), std::move(detail), location.file_name(), location.line(),
-        index, !_scopes.empty() ? _scopes : _unwinding_scopes, std::move(wait)});
-    if (priority(status) > priority(_result.outcome)) _result.outcome = status;
+                                  std::move(expected), std::move(detail), location.file_name(), location.line(),
+                                  index, !_scopes.empty() ? _scopes : _unwinding_scopes, std::move(wait)});
+    if (priority(status) > priority(_result.outcome))
+        _result.outcome = status;
 }
 
 void Context::skip(std::string_view reason, std::source_location location) {
-    auto const index = begin_check(reason);
+    const auto index = begin_check(reason);
     record(Outcome::Skipped, reason, {}, {}, {}, location, index);
 }
 
@@ -510,35 +542,42 @@ Summary Suite::run(Reporter& reporter) const {
     return run_selected(reporter, {}).summary;
 }
 
-SelectionResult Suite::run_selected(Reporter& reporter, CaseFilter const& filter) const {
-    for (auto const& tag : filter.any_tags)
-        if (tag.empty()) throw std::invalid_argument("Filter tags must be nonempty");
+SelectionResult Suite::run_selected(Reporter& reporter, const CaseFilter& filter) const {
+    for (const auto& tag: filter.any_tags)
+        if (tag.empty())
+            throw std::invalid_argument("Filter tags must be nonempty");
     SelectionResult output;
     output.selection.registered = _tests.size();
     output.selection.filter = filter;
 
-    auto matches = [&](TestCase const& test) {
+    auto matches = [&](const TestCase& test) {
         if (!filter.name_contains.empty() &&
-            test.name.find(filter.name_contains) == std::string::npos) return false;
+            test.name.find(filter.name_contains) == std::string::npos)
+            return false;
         if (!filter.implementation.empty() &&
-            test.metadata.implementation != filter.implementation) return false;
+            test.metadata.implementation != filter.implementation)
+            return false;
         if (!filter.any_tags.empty()) {
             bool matched = false;
-            for (auto const& tag : filter.any_tags)
-                if (std::find(test.metadata.tags.begin(), test.metadata.tags.end(), tag)
-                    != test.metadata.tags.end()) matched = true;
-            if (!matched) return false;
+            for (const auto& tag: filter.any_tags)
+                if (std::find(test.metadata.tags.begin(), test.metadata.tags.end(), tag) != test.metadata.tags.end())
+                    matched = true;
+            if (!matched)
+                return false;
         }
         return true;
     };
-    for (auto const& test : _tests)
-        if (matches(test)) ++output.selection.selected;
+    for (const auto& test: _tests)
+        if (matches(test))
+            ++output.selection.selected;
 
     // Filter notices are streamed before any selected body, never after.
-    if (filter.active()) reporter.selection_started(output.selection);
+    if (filter.active())
+        reporter.selection_started(output.selection);
     for (std::size_t i = 0; i < _tests.size(); ++i) {
-        auto const& test = _tests[i];
-        if (!matches(test)) continue;
+        const auto& test = _tests[i];
+        if (!matches(test))
+            continue;
         CaseResult result;
         result.name = test.name;
         result.suite_name = _name;
@@ -548,12 +587,12 @@ SelectionResult Suite::run_selected(Reporter& reporter, CaseFilter const& filter
         result.implementation = test.metadata.implementation;
         Context context(result, &reporter);
         reporter.case_started(result);
-        auto const started = std::chrono::steady_clock::now();
+        const auto started = std::chrono::steady_clock::now();
         try {
             test.run(context);
-        } catch (Detail::AbortCase const&) {
+        } catch (const Detail::AbortCase&) {
             // A failed requirement is already represented by its assertion.
-        } catch (std::exception const& exception) {
+        } catch (const std::exception& exception) {
             context.record(Outcome::Error, "Unhandled std::exception", {}, {}, exception.what(),
                            std::source_location::current(), 0);
         } catch (...) {
@@ -566,11 +605,21 @@ SelectionResult Suite::run_selected(Reporter& reporter, CaseFilter const& filter
                            std::source_location::current(), 0);
         }
         switch (result.outcome) {
-            case Outcome::Passed: ++output.summary.passed; break;
-            case Outcome::Failed: ++output.summary.failed; break;
-            case Outcome::Inconclusive: ++output.summary.inconclusive; break;
-            case Outcome::Skipped: ++output.summary.skipped; break;
-            case Outcome::Error: ++output.summary.errors; break;
+            case Outcome::Passed:
+                ++output.summary.passed;
+                break;
+            case Outcome::Failed:
+                ++output.summary.failed;
+                break;
+            case Outcome::Inconclusive:
+                ++output.summary.inconclusive;
+                break;
+            case Outcome::Skipped:
+                ++output.summary.skipped;
+                break;
+            case Outcome::Error:
+                ++output.summary.errors;
+                break;
             default:
                 ++output.summary.errors;
                 result.outcome = Outcome::Error;

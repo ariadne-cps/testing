@@ -42,21 +42,38 @@
 namespace Ariadne::Testing {
 
 /** @brief Three-valued mathematical evidence; Indeterminate is not a boolean pass. */
-enum class Evidence { False, True, Indeterminate };
+enum class Evidence { False,
+                      True,
+                      Indeterminate };
 /** @brief Operational classification of a case or assertion. */
-enum class Outcome { Passed, Failed, Inconclusive, Skipped, Error };
+enum class Outcome { Passed,
+                     Failed,
+                     Inconclusive,
+                     Skipped,
+                     Error };
 
 // The relation is selected at compile time; predicate evidence stays three-valued.
 /** @brief Compile-time selection of a binary comparison relation. */
-enum class Comparison { NotEqual, Less, LessEqual, Greater, GreaterEqual };
+enum class Comparison { NotEqual,
+                        Less,
+                        LessEqual,
+                        Greater,
+                        GreaterEqual };
 
 // Desired evidence, not an algorithm's return code or an operational outcome.
 /** @brief Expectation for a three-valued logical result. */
-enum class EvidenceExpectation { DefinitelyTrue, PossiblyTrue, NotPossibly, Indeterminate };
+enum class EvidenceExpectation { DefinitelyTrue,
+                                 PossiblyTrue,
+                                 NotPossibly,
+                                 Indeterminate };
 
 // Diagnostic events are not assertions and cannot change the test outcome.
 /** @brief Kind of non-asserting diagnostic notification. */
-enum class DiagnosticKind { Scope, Note, Warning, Value, Elapsed };
+enum class DiagnosticKind { Scope,
+                            Note,
+                            Warning,
+                            Value,
+                            Elapsed };
 
 /** @brief Diagnostic event emitted during case execution; it does not change the outcome. */
 struct DiagnosticEvent {
@@ -70,7 +87,11 @@ struct DiagnosticEvent {
 };
 
 /** @brief Observed end state of a bounded wait, without diagnosing its cause. */
-enum class WaitStatus { Ready, Timeout, Deferred, InvalidTimeout, Unexpected };
+enum class WaitStatus { Ready,
+                        Timeout,
+                        Deferred,
+                        InvalidTimeout,
+                        Unexpected };
 
 /** @brief Structured observation for a bounded wait assertion.
  *  @details `elapsed` is measured waiting time, not a benchmark.
@@ -102,9 +123,14 @@ struct AssertionRecord {
 
 // The framework only records these references; adapters decide file formats.
 /** @brief Role of a registered artifact, independent of its retention policy. */
-enum class ArtifactKind { Output, Reference, Difference };
+enum class ArtifactKind { Output,
+                          Reference,
+                          Difference };
 /** @brief Ownership and retention policy for an artifact's path. */
-enum class ArtifactLifetime { External, Temporary, KeepOnFailure, KeepAlways };
+enum class ArtifactLifetime { External,
+                              Temporary,
+                              KeepOnFailure,
+                              KeepAlways };
 
 /** @brief Metadata reference for an output, reference or difference artifact. */
 struct ArtifactRecord {
@@ -134,9 +160,11 @@ struct CaseResult {
 
 // Exit-gate policy only: assertion outcomes and summary counts never change.
 /** @brief Whether an inconclusive case blocks overall acceptance. */
-enum class InconclusivePolicy { Blocking, NonBlocking };
+enum class InconclusivePolicy { Blocking,
+                                NonBlocking };
 /** @brief Whether a skipped case blocks overall acceptance. */
-enum class SkippedPolicy { NonBlocking, Blocking };
+enum class SkippedPolicy { NonBlocking,
+                           Blocking };
 
 /** @brief Exit-gate policy; does not rewrite assertion classifications. */
 struct AcceptancePolicy {
@@ -154,9 +182,7 @@ struct Summary {
 
     // Even an opt-in permissive exit gate requires at least one actual pass.
     bool acceptable(AcceptancePolicy policy) const {
-        return passed > 0 && failed == 0 && errors == 0
-            && (inconclusive == 0 || policy.inconclusive == InconclusivePolicy::NonBlocking)
-            && (skipped == 0 || policy.skipped == SkippedPolicy::NonBlocking);
+        return passed > 0 && failed == 0 && errors == 0 && (inconclusive == 0 || policy.inconclusive == InconclusivePolicy::NonBlocking) && (skipped == 0 || policy.skipped == SkippedPolicy::NonBlocking);
     }
     bool successful() const { return acceptable({}); }
 };

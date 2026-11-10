@@ -47,7 +47,7 @@ struct OracleRowId {
     std::string key;
     std::uint64_t iteration = 0;
     std::uint64_t repetition = 0;
-    bool operator==(OracleRowId const&) const = default;
+    bool operator==(const OracleRowId &) const = default;
 };
 
 /** @brief Result of a consumer-owned reader; parsed=false marks a bad row.
@@ -60,7 +60,12 @@ struct OracleRow {
 };
 
 enum class OracleIssueKind {
-    InvalidManifest, Malformed, Duplicate, Missing, Extra, OutOfOrder
+    InvalidManifest,
+    Malformed,
+    Duplicate,
+    Missing,
+    Extra,
+    OutOfOrder
 };
 
 /** @brief One specific integrity defect; index refers to the affected list. */
@@ -78,8 +83,9 @@ struct OracleIntegrity {
 
     bool valid() const noexcept { return issues.empty(); }
     bool invalid_manifest() const noexcept {
-        for (auto const& issue : issues)
-            if (issue.kind == OracleIssueKind::InvalidManifest) return true;
+        for (const auto &issue: issues)
+            if (issue.kind == OracleIssueKind::InvalidManifest)
+                return true;
         return false;
     }
     /** @brief Human-readable first issue and counts for assertion diagnostics. */
@@ -93,8 +99,8 @@ struct OracleIntegrity {
  *  There is NO implicit row selection, iteration reduction or RNG mutation.
  *  A domain reader is responsible for faithfully reporting malformed rows.
  */
-OracleIntegrity validate_oracle_rows(std::span<OracleRow const> manifest,
-                                    std::span<OracleRow const> observed);
+OracleIntegrity validate_oracle_rows(std::span<const OracleRow> manifest,
+                                     std::span<const OracleRow> observed);
 
 /** @brief Explicit replay selection, never an assertion of full coverage.
  *  @details Empty requested list means full replay. Nonempty requests are
@@ -113,10 +119,12 @@ struct OracleReplayPlan {
     /** @brief Reject fabricated, empty, repeated, unordered or incomplete plans. */
     bool structurally_valid() const noexcept {
         if (!valid || total_rows == 0 || indices.empty() ||
-            indices.size() > total_rows) return false;
+            indices.size() > total_rows)
+            return false;
         for (std::size_t i = 0; i < indices.size(); ++i)
             if (indices[i] >= total_rows ||
-                (i != 0 && indices[i - 1] >= indices[i])) return false;
+                (i != 0 && indices[i - 1] >= indices[i]))
+                return false;
         return complete == (indices.size() == total_rows);
     }
 
@@ -125,9 +133,11 @@ struct OracleReplayPlan {
      *  original order BEFORE deciding whether to assert a selected row.
      */
     bool includes(std::size_t index) const noexcept {
-        if (!structurally_valid()) return false;
-        for (auto const selected : indices)
-            if (selected == index) return true;
+        if (!structurally_valid())
+            return false;
+        for (const auto selected: indices)
+            if (selected == index)
+                return true;
         return false;
     }
 
@@ -141,8 +151,8 @@ struct OracleReplayPlan {
  *  requests. Valid partial replay still explicitly reports incomplete
  *  coverage; by default it must NOT count as a passing full-suite check.
  */
-OracleReplayPlan plan_oracle_replay(std::span<OracleRow const> manifest,
-                                   std::span<OracleRowId const> requested = {});
+OracleReplayPlan plan_oracle_replay(std::span<const OracleRow> manifest,
+                                    std::span<const OracleRowId> requested = {});
 
 } // namespace Ariadne::Testing
 #endif // ARIADNE_TESTING_ORACLE_HPP

@@ -54,9 +54,9 @@ void fixture_tear_down(Fixture& fixture) {
 inline std::string fixture_failure_description(std::exception_ptr failure) {
     try {
         std::rethrow_exception(failure);
-    } catch (AbortCase const&) {
+    } catch (const AbortCase&) {
         return "failed prerequisite";
-    } catch (std::exception const& e) {
+    } catch (const std::exception& e) {
         return e.what();
     } catch (...) {
         return "non-standard exception";
@@ -85,7 +85,8 @@ void run_fixture_lifecycle(Fixture& fixture, Operation&& operation) {
         }
         std::rethrow_exception(teardown_failure);
     }
-    if (body_failure) std::rethrow_exception(body_failure);
+    if (body_failure)
+        std::rethrow_exception(body_failure);
 }
 } // namespace Detail
 
@@ -96,7 +97,8 @@ void add_fixture_test(Suite& suite, std::string_view method_name,
                   "Fixture must be constructible from Ariadne::Testing::Context&");
     static_assert(std::is_invocable_r_v<void, decltype(Method), Fixture&>,
                   "Method must be a callable fixture member");
-    if (method_name.starts_with("test_")) method_name.remove_prefix(5);
+    if (method_name.starts_with("test_"))
+        method_name.remove_prefix(5);
     suite.add(std::string(method_name), [check](Context& context) {
         Fixture fixture(context);
         Detail::run_fixture_lifecycle(fixture, [&](Fixture& instance) {
@@ -117,7 +119,8 @@ void add_fixture_test(Suite& suite, std::string_view method_name,
     static_assert(std::is_constructible_v<Fixture, Context&>,
                   "Fixture must be constructible from Ariadne::Testing::Context&");
     // Display "map_get" for a method named "test_map_get".
-    if (method_name.starts_with("test_")) method_name.remove_prefix(5);
+    if (method_name.starts_with("test_"))
+        method_name.remove_prefix(5);
     suite.add(std::string(method_name), [method, check](Context& context) {
         Fixture fixture(context);
         Detail::run_fixture_lifecycle(fixture, [&](Fixture& instance) {

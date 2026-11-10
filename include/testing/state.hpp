@@ -40,12 +40,13 @@ namespace Ariadne::Testing {
 template<class State, class Restorer>
 /** @brief Non-copyable and non-movable RAII snapshot guard. */
 class [[nodiscard]] ScopedState {
-    static_assert(std::is_nothrow_invocable_v<Restorer&, State const&>,
+    static_assert(std::is_nothrow_invocable_v<Restorer&, const State&>,
                   "State restoration must be noexcept and accept const State&");
+
   public:
     ScopedState(State original, Restorer restorer);
-    ScopedState(ScopedState const&) = delete;
-    ScopedState& operator=(ScopedState const&) = delete;
+    ScopedState(const ScopedState&) = delete;
+    ScopedState& operator=(const ScopedState&) = delete;
     ScopedState(ScopedState&&) = delete;
     ScopedState& operator=(ScopedState&&) = delete;
     ~ScopedState() noexcept;

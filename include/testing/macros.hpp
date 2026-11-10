@@ -29,11 +29,12 @@
 #ifndef ARIADNE_TESTING_MACROS_HPP
 #define ARIADNE_TESTING_MACROS_HPP
 
-#include "testing/testing.hpp"
+#include <sstream>
+#include <type_traits>
+
 #include "testing/fixture.hpp"
 #include "testing/parameterized.hpp"
-#include <type_traits>
-#include <sstream>
+#include "testing/testing.hpp"
 
 // Compile-time constraints; these produce static_assert diagnostics.
 /** @def ARIADNE_TESTING_COMPILE_CONCEPT
@@ -52,20 +53,18 @@
  *  @brief Require exact type identity rather than convertibility.
  */
 #define ARIADNE_TESTING_COMPILE_SAME_TYPE(first, second) \
-    static_assert(std::is_same_v<first, second>, \
+    static_assert(std::is_same_v<first, second>,         \
                   "ARIADNE compile-time type identity failed: " #first " vs " #second)
-
-
 
 /** @brief Capture an informative stream expression in the active test context.
  *  @details Information is available to all reporters and does not count as a check.
  *  Concise console output replays it only for problematic cases.
  */
 #define ARIADNE_TESTING_NOTE_CTX(context, stream_expression) \
-    do { \
-        std::ostringstream ariadne_testing_note_stream; \
-        ariadne_testing_note_stream << stream_expression; \
-        (context).note(ariadne_testing_note_stream.str()); \
+    do {                                                     \
+        std::ostringstream ariadne_testing_note_stream;      \
+        ariadne_testing_note_stream << stream_expression;    \
+        (context).note(ariadne_testing_note_stream.str());   \
     } while (false)
 
 /** @brief Fixture shorthand for an informative stream expression. */
@@ -79,7 +78,6 @@
 /** @brief Fixture shorthand for a named typed diagnostic value. */
 #define ARIADNE_TESTING_INSPECT(name, value) \
     ARIADNE_TESTING_INSPECT_CTX(this->ctx(), name, value)
-
 
 // Runtime assertions; explicit Context forms and fixture shorthands.
 /** @name Explicit-context assertion macros
@@ -103,80 +101,80 @@
 /** @def ARIADNE_TESTING_EXPECT_EQUAL_CTX
  *  @brief Compare two expressions once using evidence-preserving equality.
  */
-#define ARIADNE_TESTING_EXPECT_EQUAL_CTX(context, actual, expected) \
-    (context).check_equal_snapshot( \
-        [&](bool capture_passing_values) { \
-            return ([&](auto const& observed_actual) { \
+#define ARIADNE_TESTING_EXPECT_EQUAL_CTX(context, actual, expected)                                                    \
+    (context).check_equal_snapshot(                                                                                    \
+        [&](bool capture_passing_values) {                                                                             \
+            return ([&](auto const& observed_actual) {                                                                 \
                 return ::Ariadne::Testing::Detail::observe_equal(observed_actual, (expected), capture_passing_values); \
-            }((actual))); \
-        }, \
+            }((actual)));                                                                                              \
+        },                                                                                                             \
         #actual " == " #expected)
 
 /** @def ARIADNE_TESTING_EXPECT_RANGES_CTX
  *  @brief Compare two ranges, preserving the first mismatch and unknown element.
  */
-#define ARIADNE_TESTING_EXPECT_RANGES_CTX(context, actual, expected) \
+#define ARIADNE_TESTING_EXPECT_RANGES_CTX(context, actual, expected)     \
     (context).check_ranges([&]() -> decltype(auto) { return (actual); }, \
-        [&]() -> decltype(auto) { return (expected); }, #actual " ranges equal " #expected)
+                           [&]() -> decltype(auto) { return (expected); }, #actual " ranges equal " #expected)
 
 /** @def ARIADNE_TESTING_EXPECT_RANGES_BY_CTX
  *  @brief Compare ranges with a caller-provided element comparator.
  */
 #define ARIADNE_TESTING_EXPECT_RANGES_BY_CTX(context, actual, expected, comparator) \
-    (context).check_ranges([&]() -> decltype(auto) { return (actual); }, \
-        [&]() -> decltype(auto) { return (expected); }, \
-        [&]() { return ::Ariadne::Testing::Detail::capture_callable(comparator); }, #actual " ranges by " #expected)
+    (context).check_ranges([&]() -> decltype(auto) { return (actual); },            \
+                           [&]() -> decltype(auto) { return (expected); },          \
+                           [&]() { return ::Ariadne::Testing::Detail::capture_callable(comparator); }, #actual " ranges by " #expected)
 
 /** @def ARIADNE_TESTING_EXPECT_RANGES_AT_CTX
  *  @brief Compare ranges using a comparator and a mismatch-path formatter.
  */
-#define ARIADNE_TESTING_EXPECT_RANGES_AT_CTX(context, actual, expected, comparator, path) \
-    (context).check_ranges([&]() -> decltype(auto) { return (actual); }, \
-        [&]() -> decltype(auto) { return (expected); }, \
-        [&]() { return ::Ariadne::Testing::Detail::capture_callable(comparator); }, \
-        [&]() { return ::Ariadne::Testing::Detail::capture_callable(path); }, #actual " ranges at " #expected)
+#define ARIADNE_TESTING_EXPECT_RANGES_AT_CTX(context, actual, expected, comparator, path)              \
+    (context).check_ranges([&]() -> decltype(auto) { return (actual); },                               \
+                           [&]() -> decltype(auto) { return (expected); },                             \
+                           [&]() { return ::Ariadne::Testing::Detail::capture_callable(comparator); }, \
+                           [&]() { return ::Ariadne::Testing::Detail::capture_callable(path); }, #actual " ranges at " #expected)
 
 /** @def ARIADNE_TESTING_EXPECT_SAME_CTX
  *  @brief Check semantic identity using the available same() relation.
  */
 #define ARIADNE_TESTING_EXPECT_SAME_CTX(context, actual, expected) \
-    (context).check_same( \
-        [&]() -> decltype(auto) { return (actual); }, \
-        [&]() -> decltype(auto) { return (expected); }, \
+    (context).check_same(                                          \
+        [&]() -> decltype(auto) { return (actual); },              \
+        [&]() -> decltype(auto) { return (expected); },            \
         #actual " same " #expected)
 
 /** @def ARIADNE_TESTING_EXPECT_WITHIN_CTX
  *  @brief Check that the absolute or domain-specific difference is within a tolerance.
  */
 #define ARIADNE_TESTING_EXPECT_WITHIN_CTX(context, actual, expected, tolerance) \
-    (context).check_within( \
-        [&]() -> decltype(auto) { return (actual); }, \
-        [&]() -> decltype(auto) { return (expected); }, \
-        [&]() -> decltype(auto) { return (tolerance); }, \
+    (context).check_within(                                                     \
+        [&]() -> decltype(auto) { return (actual); },                           \
+        [&]() -> decltype(auto) { return (expected); },                         \
+        [&]() -> decltype(auto) { return (tolerance); },                        \
         #actual " within " #tolerance " of " #expected)
 
 /** @def ARIADNE_TESTING_EXPECT_THROWS_CTX
  *  @brief Require the specified exception type from the statement.
  */
 #define ARIADNE_TESTING_EXPECT_THROWS_CTX(context, exception_type, statement) \
-    (context).template expect_throws<exception_type>([&] { statement; }, \
-        #statement " throws " #exception_type)
+    (context).template expect_throws<exception_type>([&] { statement; },      \
+                                                     #statement " throws " #exception_type)
 
 /** @def ARIADNE_TESTING_EXPECT_THROWS_MESSAGE_CTX
  *  @brief Require the specified exception type and a message substring.
  */
 #define ARIADNE_TESTING_EXPECT_THROWS_MESSAGE_CTX(context, exception_type, statement, substring) \
-    (context).template expect_throws_message<exception_type>([&] { statement; }, (substring), \
-        #statement " throws " #exception_type " containing " #substring)
+    (context).template expect_throws_message<exception_type>([&] { statement; }, (substring),    \
+                                                             #statement " throws " #exception_type " containing " #substring)
 
 /** @def ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX
  *  @brief Require an exception type and check a projected payload against an expected value.
  */
-#define ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX(context, exception_type, statement, projector, expected) \
-    (context).template expect_throws_payload<exception_type>([&] { statement; }, \
-        [&]() -> decltype(auto) { return (projector); }, \
-        [&]() -> decltype(auto) { return (expected); }, \
-        #statement " throws " #exception_type " with " #projector " == " #expected)
+#define ARIADNE_TESTING_EXPECT_THROWS_PAYLOAD_CTX(context, exception_type, statement, projector, expected)    \
+    (context).template expect_throws_payload<exception_type>([&] { statement; },                              \
+                                                             [&]() -> decltype(auto) { return (projector); }, \
+                                                             [&]() -> decltype(auto) { return (expected); },  \
+                                                             #statement " throws " #exception_type " with " #projector " == " #expected)
 
 /** @def ARIADNE_TESTING_EXPECT_EXCEPTION_CTX
  *  @brief Verify that the statement throws an exception.
@@ -190,7 +188,6 @@
 #define ARIADNE_TESTING_EXPECT_NO_THROW_CTX(context, statement) \
     (context).expect_no_throw([&] { statement; }, #statement " does not throw")
 
-
 /** @} */
 
 /** @name Status, alternative and concurrency expectations
@@ -203,7 +200,7 @@
  *  Parenthesize initializer lists containing commas, e.g.
  *  (std::initializer_list<Status>{Status::Sat, Status::Unknown}).
  *  @{ */
- 
+
 /** @def ARIADNE_TESTING_EXPECT_STATUS_CTX
  *  @brief Check a deferred result's permitted typed status and postcondition.
  *  @param operation Result-producing expression evaluated once after CHECK.
@@ -212,24 +209,27 @@
  *  @param verifier Callable checking the result only when status is permitted.
  */
 #define ARIADNE_TESTING_EXPECT_STATUS_CTX(context, operation, selector, permitted, verifier) \
-    (context).expect_status( \
-        [&]() -> decltype(auto) { return (operation); }, \
-        [&](auto const& ariadne_result) -> decltype(auto) { \
-            return std::invoke((selector), ariadne_result); \
-        }, (permitted), \
-        [&](auto const& ariadne_result) -> decltype(auto) { \
-            return std::invoke((verifier), ariadne_result); \
-        }, #operation " status in " #permitted)
+    (context).expect_status(                                                                 \
+        [&]() -> decltype(auto) { return (operation); },                                     \
+        [&](auto const& ariadne_result) -> decltype(auto) {                                  \
+            return std::invoke((selector), ariadne_result);                                  \
+        },                                                                                   \
+        (permitted),                                                                         \
+        [&](auto const& ariadne_result) -> decltype(auto) {                                  \
+            return std::invoke((verifier), ariadne_result);                                  \
+        },                                                                                   \
+        #operation " status in " #permitted)
 
 /** @def ARIADNE_TESTING_EXPECT_STATUS_ONLY_CTX
  *  @brief Check a deferred result's typed status without a postcondition.
  */
 #define ARIADNE_TESTING_EXPECT_STATUS_ONLY_CTX(context, operation, selector, permitted) \
-    (context).expect_status( \
-        [&]() -> decltype(auto) { return (operation); }, \
-        [&](auto const& ariadne_result) -> decltype(auto) { \
-            return std::invoke((selector), ariadne_result); \
-        }, (permitted), #operation " status in " #permitted)
+    (context).expect_status(                                                            \
+        [&]() -> decltype(auto) { return (operation); },                                \
+        [&](auto const& ariadne_result) -> decltype(auto) {                             \
+            return std::invoke((selector), ariadne_result);                             \
+        },                                                                              \
+        (permitted), #operation " status in " #permitted)
 
 /** @def ARIADNE_TESTING_EXPECT_ALTERNATIVE_CTX
  *  @brief Verify either a completed result or a permitted exception alternative.
@@ -238,25 +238,27 @@
  *  For void operations the result validator receives std::monostate.
  */
 #define ARIADNE_TESTING_EXPECT_ALTERNATIVE_CTX(context, operation, verify_result, verify_exception) \
-    (context).expect_alternative( \
-        [&]() -> decltype(auto) { return (operation); }, \
-        [&](auto const& ariadne_result) -> decltype(auto) { \
-            return std::invoke((verify_result), ariadne_result); \
-        }, \
-        [&](std::exception const& ariadne_error) -> decltype(auto) { \
-            return std::invoke((verify_exception), ariadne_error); \
-        }, #operation " result or exception")
+    (context).expect_alternative(                                                                   \
+        [&]() -> decltype(auto) { return (operation); },                                            \
+        [&](auto const& ariadne_result) -> decltype(auto) {                                         \
+            return std::invoke((verify_result), ariadne_result);                                    \
+        },                                                                                          \
+        [&](std::exception const& ariadne_error) -> decltype(auto) {                                \
+            return std::invoke((verify_exception), ariadne_error);                                  \
+        },                                                                                          \
+        #operation " result or exception")
 
 /** @def ARIADNE_TESTING_EXPECT_ATOMIC_CTX
  *  @brief Wait for a predicate on atomic state, retaining last observation.
  *  @note The atomic object must remain alive during the bounded wait;
  *  predicate is called by the case thread, never by the producer.
  */
-#define ARIADNE_TESTING_EXPECT_ATOMIC_CTX(context, state, predicate, timeout) \
-    (context).expect_atomic((state), \
-        [&](auto const& ariadne_observed) -> decltype(auto) { \
-            return std::invoke((predicate), ariadne_observed); \
-        }, (timeout), #state " satisfies " #predicate)
+#define ARIADNE_TESTING_EXPECT_ATOMIC_CTX(context, state, predicate, timeout)      \
+    (context).expect_atomic((state),                                               \
+                            [&](auto const& ariadne_observed) -> decltype(auto) {  \
+                                return std::invoke((predicate), ariadne_observed); \
+                            },                                                     \
+                            (timeout), #state " satisfies " #predicate)
 
 /** @def ARIADNE_TESTING_EXPECT_READY_CTX
  *  @brief Check a future's readiness within a duration (without consuming it).
@@ -268,10 +270,10 @@
  *  @brief Check a condition-variable predicate with a caller-owned lock.
  *  @note The condition variable and unique_lock must outlive the check.
  */
-#define ARIADNE_TESTING_EXPECT_EVENTUALLY_CTX(context, condition, lock, predicate, timeout) \
-    (context).expect_eventually((condition), (lock), \
-        [&]() -> decltype(auto) { return std::invoke((predicate)); }, \
-        (timeout), #predicate " eventually holds")
+#define ARIADNE_TESTING_EXPECT_EVENTUALLY_CTX(context, condition, lock, predicate, timeout)   \
+    (context).expect_eventually((condition), (lock),                                          \
+                                [&]() -> decltype(auto) { return std::invoke((predicate)); }, \
+                                (timeout), #predicate " eventually holds")
 
 /** @} */
 
@@ -292,20 +294,21 @@
  *  @brief Check a condition variable with a shared deadline.
  *  @note The predicate is deferred until after CHECK.
  */
-#define ARIADNE_TESTING_EXPECT_EVENTUALLY_UNTIL_CTX(context, condition, lock, predicate, deadline) \
-    (context).expect_eventually_until((condition), (lock), \
-        [&]() -> decltype(auto) { return std::invoke((predicate)); }, \
-        (deadline), #predicate " holds by " #deadline)
+#define ARIADNE_TESTING_EXPECT_EVENTUALLY_UNTIL_CTX(context, condition, lock, predicate, deadline)  \
+    (context).expect_eventually_until((condition), (lock),                                          \
+                                      [&]() -> decltype(auto) { return std::invoke((predicate)); }, \
+                                      (deadline), #predicate " holds by " #deadline)
 
 /** @def ARIADNE_TESTING_EXPECT_ATOMIC_UNTIL_CTX
  *  @brief Check atomic progress against a reusable absolute deadline.
  *  @note The predicate executes on the owning case thread after CHECK.
  */
-#define ARIADNE_TESTING_EXPECT_ATOMIC_UNTIL_CTX(context, state, predicate, deadline) \
-    (context).expect_atomic_until((state), \
-        [&](auto const& ariadne_observed) -> decltype(auto) { \
-            return std::invoke((predicate), ariadne_observed); \
-        }, (deadline), #state " satisfies " #predicate " by " #deadline)
+#define ARIADNE_TESTING_EXPECT_ATOMIC_UNTIL_CTX(context, state, predicate, deadline)     \
+    (context).expect_atomic_until((state),                                               \
+                                  [&](auto const& ariadne_observed) -> decltype(auto) {  \
+                                      return std::invoke((predicate), ariadne_observed); \
+                                  },                                                     \
+                                  (deadline), #state " satisfies " #predicate " by " #deadline)
 
 /** @} */
 
@@ -316,9 +319,9 @@
  *  This is a complete integrity check, not an expected-value generator.
  */
 #define ARIADNE_TESTING_EXPECT_ORACLE_ROWS_CTX(context, manifest, observed) \
-    (context).check_oracle_rows( \
-        [&]() -> decltype(auto) { return (manifest); }, \
-        [&]() -> decltype(auto) { return (observed); }, \
+    (context).check_oracle_rows(                                            \
+        [&]() -> decltype(auto) { return (manifest); },                     \
+        [&]() -> decltype(auto) { return (observed); },                     \
         #observed " matches " #manifest)
 
 /** @def ARIADNE_TESTING_EXPECT_ORACLE_REPLAY_CTX
@@ -326,8 +329,8 @@
  *  @details A partial selection remains Inconclusive, not a vacuous pass.
  */
 #define ARIADNE_TESTING_EXPECT_ORACLE_REPLAY_CTX(context, plan) \
-    (context).check_oracle_replay( \
-        [&]() -> decltype(auto) { return (plan); }, \
+    (context).check_oracle_replay(                              \
+        [&]() -> decltype(auto) { return (plan); },             \
         #plan " covers the complete oracle")
 
 /** @name Relational checks
@@ -336,62 +339,67 @@
 /** @def ARIADNE_TESTING_EXPECT_NOT_EQUAL_CTX
  *  @brief Check inequality, handling signed and unsigned integral operands correctly.
  */
-#define ARIADNE_TESTING_EXPECT_NOT_EQUAL_CTX(context, actual, expected) \
-    (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::NotEqual>( \
-        [&](bool capture_passing_values) { \
-            return ([&](auto const& observed_actual) { \
-                return ::Ariadne::Testing::Detail::observe_compare< \
+#define ARIADNE_TESTING_EXPECT_NOT_EQUAL_CTX(context, actual, expected)                                             \
+    (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::NotEqual>(                            \
+        [&](bool capture_passing_values) {                                                                          \
+            return ([&](auto const& observed_actual) {                                                              \
+                return ::Ariadne::Testing::Detail::observe_compare<                                                 \
                     ::Ariadne::Testing::Comparison::NotEqual>(observed_actual, (expected), capture_passing_values); \
-            }((actual))); \
-        }, #actual " != " #expected)
+            }((actual)));                                                                                           \
+        },                                                                                                          \
+        #actual " != " #expected)
 
 /** @def ARIADNE_TESTING_EXPECT_LESS_CTX
  *  @brief Check strict less-than ordering of two deferred operands.
  */
-#define ARIADNE_TESTING_EXPECT_LESS_CTX(context, actual, expected) \
-    (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::Less>( \
-        [&](bool capture_passing_values) { \
-            return ([&](auto const& observed_actual) { \
-                return ::Ariadne::Testing::Detail::observe_compare< \
+#define ARIADNE_TESTING_EXPECT_LESS_CTX(context, actual, expected)                                              \
+    (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::Less>(                            \
+        [&](bool capture_passing_values) {                                                                      \
+            return ([&](auto const& observed_actual) {                                                          \
+                return ::Ariadne::Testing::Detail::observe_compare<                                             \
                     ::Ariadne::Testing::Comparison::Less>(observed_actual, (expected), capture_passing_values); \
-            }((actual))); \
-        }, #actual " < " #expected)
+            }((actual)));                                                                                       \
+        },                                                                                                      \
+        #actual " < " #expected)
 
 /** @def ARIADNE_TESTING_EXPECT_LESS_EQUAL_CTX
  *  @brief Check less-than-or-equal ordering of two deferred operands.
  */
-#define ARIADNE_TESTING_EXPECT_LESS_EQUAL_CTX(context, actual, expected) \
-    (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::LessEqual>( \
-        [&](bool capture_passing_values) { \
-            return ([&](auto const& observed_actual) { \
-                return ::Ariadne::Testing::Detail::observe_compare< \
+#define ARIADNE_TESTING_EXPECT_LESS_EQUAL_CTX(context, actual, expected)                                             \
+    (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::LessEqual>(                            \
+        [&](bool capture_passing_values) {                                                                           \
+            return ([&](auto const& observed_actual) {                                                               \
+                return ::Ariadne::Testing::Detail::observe_compare<                                                  \
                     ::Ariadne::Testing::Comparison::LessEqual>(observed_actual, (expected), capture_passing_values); \
-            }((actual))); \
-        }, #actual " <= " #expected)
+            }((actual)));                                                                                            \
+        },                                                                                                           \
+        #actual " <= " #expected)
 
 /** @def ARIADNE_TESTING_EXPECT_GREATER_CTX
  *  @brief Check strict greater-than ordering of two deferred operands.
  */
-#define ARIADNE_TESTING_EXPECT_GREATER_CTX(context, actual, expected) \
-    (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::Greater>( \
-        [&](bool capture_passing_values) { \
-            return ([&](auto const& observed_actual) { \
-                return ::Ariadne::Testing::Detail::observe_compare< \
+#define ARIADNE_TESTING_EXPECT_GREATER_CTX(context, actual, expected)                                              \
+    (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::Greater>(                            \
+        [&](bool capture_passing_values) {                                                                         \
+            return ([&](auto const& observed_actual) {                                                             \
+                return ::Ariadne::Testing::Detail::observe_compare<                                                \
                     ::Ariadne::Testing::Comparison::Greater>(observed_actual, (expected), capture_passing_values); \
-            }((actual))); \
-        }, #actual " > " #expected)
+            }((actual)));                                                                                          \
+        },                                                                                                         \
+        #actual " > " #expected)
 
 /** @def ARIADNE_TESTING_EXPECT_GREATER_EQUAL_CTX
  *  @brief Check greater-than-or-equal ordering of two deferred operands.
  */
-#define ARIADNE_TESTING_EXPECT_GREATER_EQUAL_CTX(context, actual, expected) \
-    (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::GreaterEqual>( \
-        [&](bool capture_passing_values) { \
-            return ([&](auto const& observed_actual) { \
-                return ::Ariadne::Testing::Detail::observe_compare< \
+#define ARIADNE_TESTING_EXPECT_GREATER_EQUAL_CTX(context, actual, expected)                                             \
+    (context).template check_compare_snapshot<::Ariadne::Testing::Comparison::GreaterEqual>(                            \
+        [&](bool capture_passing_values) {                                                                              \
+            return ([&](auto const& observed_actual) {                                                                  \
+                return ::Ariadne::Testing::Detail::observe_compare<                                                     \
                     ::Ariadne::Testing::Comparison::GreaterEqual>(observed_actual, (expected), capture_passing_values); \
-            }((actual))); \
-        }, #actual " >= " #expected)
+            }((actual)));                                                                                               \
+        },                                                                                                              \
+        #actual " >= " #expected)
 
 /** @} */
 
@@ -402,40 +410,39 @@
  *  @brief Evaluate a named unary predicate; preserve three-valued evidence.
  */
 #define ARIADNE_TESTING_EXPECT_UNARY_PREDICATE_CTX(context, predicate, operand) \
-    (context).check_unary( \
-        [](auto const& value) -> decltype(auto) { return predicate(value); }, \
-        [&]() -> decltype(auto) { return (operand); }, \
+    (context).check_unary(                                                      \
+        [](auto const& value) -> decltype(auto) { return predicate(value); },   \
+        [&]() -> decltype(auto) { return (operand); },                          \
         #predicate "(" #operand ")")
 
 /** @def ARIADNE_TESTING_EXPECT_NOT_UNARY_PREDICATE_CTX
  *  @brief Negate the evidence of a unary predicate without turning unknown into true.
  */
 #define ARIADNE_TESTING_EXPECT_NOT_UNARY_PREDICATE_CTX(context, predicate, operand) \
-    (context).check_unary( \
-        [](auto const& value) -> decltype(auto) { return predicate(value); }, \
-        [&]() -> decltype(auto) { return (operand); }, \
+    (context).check_unary(                                                          \
+        [](auto const& value) -> decltype(auto) { return predicate(value); },       \
+        [&]() -> decltype(auto) { return (operand); },                              \
         "not " #predicate "(" #operand ")", true)
 
 /** @def ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX
  *  @brief Evaluate a named binary predicate with deferred left/right operands.
  */
-#define ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(context, predicate, left, right) \
-    (context).check_binary( \
+#define ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(context, predicate, left, right)            \
+    (context).check_binary(                                                                     \
         [](auto const& lhs, auto const& rhs) -> decltype(auto) { return predicate(lhs, rhs); }, \
-        [&]() -> decltype(auto) { return (left); }, \
-        [&]() -> decltype(auto) { return (right); }, \
+        [&]() -> decltype(auto) { return (left); },                                             \
+        [&]() -> decltype(auto) { return (right); },                                            \
         #predicate "(" #left ", " #right ")")
 
 /** @def ARIADNE_TESTING_EXPECT_NOT_BINARY_PREDICATE_CTX
  *  @brief Negate binary predicate evidence while preserving indeterminate results.
  */
-#define ARIADNE_TESTING_EXPECT_NOT_BINARY_PREDICATE_CTX(context, predicate, left, right) \
-    (context).check_binary( \
+#define ARIADNE_TESTING_EXPECT_NOT_BINARY_PREDICATE_CTX(context, predicate, left, right)        \
+    (context).check_binary(                                                                     \
         [](auto const& lhs, auto const& rhs) -> decltype(auto) { return predicate(lhs, rhs); }, \
-        [&]() -> decltype(auto) { return (left); }, \
-        [&]() -> decltype(auto) { return (right); }, \
+        [&]() -> decltype(auto) { return (left); },                                             \
+        [&]() -> decltype(auto) { return (right); },                                            \
         "not " #predicate "(" #left ", " #right ")", true)
-
 
 /** @} */
 
@@ -446,38 +453,37 @@
  *  @brief Require definite proof of a proposition; unknown is Inconclusive.
  */
 #define ARIADNE_TESTING_EXPECT_DEFINITELY_CTX(context, expression) \
-    (context).expect_evidence( \
-        [&]() -> decltype(auto) { return (expression); }, \
-        ::Ariadne::Testing::EvidenceExpectation::DefinitelyTrue, \
+    (context).expect_evidence(                                     \
+        [&]() -> decltype(auto) { return (expression); },          \
+        ::Ariadne::Testing::EvidenceExpectation::DefinitelyTrue,   \
         "definitely(" #expression ")")
 
 /** @def ARIADNE_TESTING_EXPECT_POSSIBLY_CTX
  *  @brief Accept true or indeterminate evidence; reject definite falsehood.
  */
 #define ARIADNE_TESTING_EXPECT_POSSIBLY_CTX(context, expression) \
-    (context).expect_evidence( \
-        [&]() -> decltype(auto) { return (expression); }, \
-        ::Ariadne::Testing::EvidenceExpectation::PossiblyTrue, \
+    (context).expect_evidence(                                   \
+        [&]() -> decltype(auto) { return (expression); },        \
+        ::Ariadne::Testing::EvidenceExpectation::PossiblyTrue,   \
         "possibly(" #expression ")")
 
 /** @def ARIADNE_TESTING_EXPECT_NOT_POSSIBLY_CTX
  *  @brief Require impossibility; unknown is Inconclusive, not a pass.
  */
 #define ARIADNE_TESTING_EXPECT_NOT_POSSIBLY_CTX(context, expression) \
-    (context).expect_evidence( \
-        [&]() -> decltype(auto) { return (expression); }, \
-        ::Ariadne::Testing::EvidenceExpectation::NotPossibly, \
+    (context).expect_evidence(                                       \
+        [&]() -> decltype(auto) { return (expression); },            \
+        ::Ariadne::Testing::EvidenceExpectation::NotPossibly,        \
         "not possibly(" #expression ")")
 
 /** @def ARIADNE_TESTING_EXPECT_INDETERMINATE_CTX
  *  @brief Pass only when mathematical evidence is genuinely indeterminate.
  */
 #define ARIADNE_TESTING_EXPECT_INDETERMINATE_CTX(context, expression) \
-    (context).expect_evidence( \
-        [&]() -> decltype(auto) { return (expression); }, \
-        ::Ariadne::Testing::EvidenceExpectation::Indeterminate, \
+    (context).expect_evidence(                                        \
+        [&]() -> decltype(auto) { return (expression); },             \
+        ::Ariadne::Testing::EvidenceExpectation::Indeterminate,       \
         "indeterminate(" #expression ")")
-
 
 /** @} */
 
@@ -711,7 +717,6 @@
 
 /** @} */
 
-
 /** @def ARIADNE_TESTING_EXPECT_ORACLE_ROWS
  *  @brief Fixture shorthand for full frozen-oracle row integrity.
  */
@@ -724,16 +729,14 @@
 #define ARIADNE_TESTING_EXPECT_ORACLE_REPLAY(plan) \
     ARIADNE_TESTING_EXPECT_ORACLE_REPLAY_CTX(this->ctx(), plan)
 
-
-
 // Fixture and suite registration helpers.
 // Only the name/stringification is a macro; semantics are type-checked C++.
 #define ARIADNE_TESTING_ADD_TEST_TO(suite, Fixture, method) \
     ::Ariadne::Testing::add_fixture_test<Fixture, &Fixture::method>((suite), #method)
 
-#define ARIADNE_TESTING_ADD_TEST_NO_THROW_TO(suite, Fixture, method) \
+#define ARIADNE_TESTING_ADD_TEST_NO_THROW_TO(suite, Fixture, method)                  \
     ::Ariadne::Testing::add_fixture_test<Fixture, &Fixture::method>((suite), #method, \
-        ::Ariadne::Testing::FixtureCheck::NoThrow)
+                                                                    ::Ariadne::Testing::FixtureCheck::NoThrow)
 
 // Conventional single-suite main; explicit *_TO supports multiple suites.
 #define ARIADNE_TESTING_SUITE(name) ::Ariadne::Testing::Suite ariadne_test_suite(name)
@@ -748,8 +751,6 @@
 #define ARIADNE_TESTING_RUN_TESTS_WITH_ARGS(argc, argv) \
     ::Ariadne::Testing::run_suite(ariadne_test_suite, argc, argv)
 
-
-
 // Parameterized/variant registration helpers.
 // Only stringify the method name; member access is checked by the compiler.
 // The variant group already knows the fixture type, so it is not repeated.
@@ -757,8 +758,6 @@
     (group).add(#method, [](auto& fixture) { fixture.method(); })
 
 #define ARIADNE_TESTING_ADD_VARIANT_TEST_NO_THROW(group, method) \
-    (group).add(#method, [](auto& fixture) { fixture.method(); }, \
-                ::Ariadne::Testing::FixtureCheck::NoThrow)
-
+    (group).add(#method, [](auto& fixture) { fixture.method(); }, ::Ariadne::Testing::FixtureCheck::NoThrow)
 
 #endif // ARIADNE_TESTING_MACROS_HPP

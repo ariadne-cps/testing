@@ -13,8 +13,9 @@
 #ifndef ARIADNE_TESTING_WORKER_HPP
 #define ARIADNE_TESTING_WORKER_HPP
 
-#include "testing/testing.hpp"
 #include <mutex>
+
+#include "testing/testing.hpp"
 
 namespace Ariadne::Testing {
 
@@ -56,12 +57,21 @@ class WorkerBatch {
             std::string detail;
             try {
                 switch (Detail::evidence(std::invoke(std::forward<Predicate>(predicate)))) {
-                    case Evidence::True: status = Outcome::Passed; break;
-                    case Evidence::False: status = Outcome::Failed; break;
-                    case Evidence::Indeterminate: status = Outcome::Inconclusive; break;
-                    default: status = Outcome::Error; detail = "invalid evidence"; break;
+                    case Evidence::True:
+                        status = Outcome::Passed;
+                        break;
+                    case Evidence::False:
+                        status = Outcome::Failed;
+                        break;
+                    case Evidence::Indeterminate:
+                        status = Outcome::Inconclusive;
+                        break;
+                    default:
+                        status = Outcome::Error;
+                        detail = "invalid evidence";
+                        break;
                 }
-            } catch (std::exception const& error) {
+            } catch (const std::exception& error) {
                 status = Outcome::Error;
                 detail = error.what();
             } catch (...) {
@@ -71,18 +81,20 @@ class WorkerBatch {
             _owner.add(_slot, {status, std::move(description), std::move(detail),
                                location.file_name(), location.line()});
         }
+
       private:
         friend class WorkerBatch;
-        Worker(WorkerBatch& owner, std::size_t slot) : _owner(owner), _slot(slot) { }
+        Worker(WorkerBatch& owner, std::size_t slot) : _owner(owner), _slot(slot) {}
         WorkerBatch& _owner;
         std::size_t _slot;
     };
 
     explicit WorkerBatch(std::size_t count) : _slots(count) {
-        if (count == 0) throw std::invalid_argument("WorkerBatch needs a nonzero slot count");
+        if (count == 0)
+            throw std::invalid_argument("WorkerBatch needs a nonzero slot count");
     }
-    WorkerBatch(WorkerBatch const&) = delete;
-    WorkerBatch& operator=(WorkerBatch const&) = delete;
+    WorkerBatch(const WorkerBatch&) = delete;
+    WorkerBatch& operator=(const WorkerBatch&) = delete;
 
     /** @brief Execute one numbered worker and capture unhandled exceptions.
      *  @note The Worker reference must not escape the callback. Caller joins
@@ -100,7 +112,7 @@ class WorkerBatch {
         Worker worker(*this, slot);
         try {
             std::invoke(std::forward<Callback>(callback), worker);
-        } catch (std::exception const& error) {
+        } catch (const std::exception& error) {
             add(slot, {Outcome::Error, "uncaught worker exception", error.what(),
                        location.file_name(), location.line()});
         } catch (...) {
@@ -112,8 +124,8 @@ class WorkerBatch {
             std::lock_guard<std::mutex> lock(_mutex);
             if (_slots[slot].entries.empty())
                 _slots[slot].entries.push_back({Outcome::Error, "no worker checks",
-                    "worker completed without recording checks",
-                    location.file_name(), location.line()});
+                                                "worker completed without recording checks",
+                                                location.file_name(), location.line()});
             _slots[slot].completed = true;
         }
     }
@@ -125,11 +137,13 @@ class WorkerBatch {
         std::vector<Entry> ordered;
         {
             std::lock_guard<std::mutex> lock(_mutex);
-            if (_flushed) throw std::logic_error("worker batch already flushed");
-            for (auto const& slot : _slots)
-                if (!slot.completed) throw std::logic_error("worker batch incomplete");
+            if (_flushed)
+                throw std::logic_error("worker batch already flushed");
+            for (const auto& slot: _slots)
+                if (!slot.completed)
+                    throw std::logic_error("worker batch incomplete");
             for (std::size_t i = 0; i < _slots.size(); ++i) {
-                for (auto const& entry : _slots[i].entries) {
+                for (const auto& entry: _slots[i].entries) {
                     auto record = entry;
                     record.description = "worker[" + std::to_string(i) + "]: " + record.description;
                     ordered.push_back(std::move(record));
@@ -137,8 +151,8 @@ class WorkerBatch {
             }
             _flushed = true;
         }
-        for (auto const& entry : ordered) {
-            auto const check_index = context.begin_check(entry.description);
+        for (const auto& entry: ordered) {
+            const auto check_index = context.begin_check(entry.description);
             context.record(entry.outcome, entry.description, {}, "proved",
                            entry.detail, std::source_location::current(), check_index);
             // Copy back the worker's origin, not the flush implementation.

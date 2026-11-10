@@ -27,17 +27,19 @@
 #ifndef ARIADNE_TESTING_REPORTERS_HPP
 #define ARIADNE_TESTING_REPORTERS_HPP
 
-#include "testing/results.hpp"
 #include <functional>
 #include <initializer_list>
 #include <iosfwd>
 #include <optional>
 #include <vector>
 
+#include "testing/results.hpp"
+
 namespace Ariadne::Testing {
 
 /** @brief All streams full diagnostics; Concise emits final summaries and crash-only breadcrumbs. */
-enum class ConsoleDetail { All, Concise };
+enum class ConsoleDetail { All,
+                           Concise };
 
 /** @brief Callback interface for live case and diagnostic reporting. */
 class Reporter {
@@ -51,12 +53,12 @@ class Reporter {
     virtual bool capture_passing_values() const noexcept { return true; }
     // Optional lifecycle notifications, compatible with existing reporters.
     /** @brief Called before any selected case, only for active filters. */
-    virtual void selection_started(SelectionInfo const&) { }
-    virtual void case_started(CaseResult const&) { }
-    virtual void check_started(CaseResult const&, std::size_t, std::string_view) { }
-    virtual void diagnostic_emitted(CaseResult const&, DiagnosticEvent const&) { }
-    virtual void case_finished(CaseResult const& result) = 0;
-    virtual void suite_finished(std::string_view name, Summary const& summary) = 0;
+    virtual void selection_started(const SelectionInfo&) {}
+    virtual void case_started(const CaseResult&) {}
+    virtual void check_started(const CaseResult&, std::size_t, std::string_view) {}
+    virtual void diagnostic_emitted(const CaseResult&, const DiagnosticEvent&) {}
+    virtual void case_finished(const CaseResult& result) = 0;
+    virtual void suite_finished(std::string_view name, const Summary& summary) = 0;
 };
 
 /** @brief Scope a crash-only stderr breadcrumb for an argc/argv --concise run.
@@ -69,8 +71,9 @@ class CrashDiagnostics final {
   public:
     CrashDiagnostics();
     ~CrashDiagnostics();
-    CrashDiagnostics(CrashDiagnostics const&) = delete;
-    CrashDiagnostics& operator=(CrashDiagnostics const&) = delete;
+    CrashDiagnostics(const CrashDiagnostics&) = delete;
+    CrashDiagnostics& operator=(const CrashDiagnostics&) = delete;
+
   private:
     struct Impl;
     Impl* _impl;
@@ -81,13 +84,14 @@ class ConsoleReporter final : public Reporter {
   public:
     explicit ConsoleReporter(std::ostream& output, ConsoleDetail detail = ConsoleDetail::All);
     bool capture_passing_values() const noexcept override { return false; }
-    void selection_started(SelectionInfo const& info) override;
-    void diagnostic_emitted(CaseResult const& result, DiagnosticEvent const& event) override;
-    void case_started(CaseResult const& result) override;
-    void check_started(CaseResult const& result, std::size_t index,
+    void selection_started(const SelectionInfo& info) override;
+    void diagnostic_emitted(const CaseResult& result, const DiagnosticEvent& event) override;
+    void case_started(const CaseResult& result) override;
+    void check_started(const CaseResult& result, std::size_t index,
                        std::string_view description) override;
-    void case_finished(CaseResult const& result) override;
-    void suite_finished(std::string_view name, Summary const& summary) override;
+    void case_finished(const CaseResult& result) override;
+    void suite_finished(std::string_view name, const Summary& summary) override;
+
   private:
     struct ProblemCase {
         Outcome outcome;
@@ -113,8 +117,6 @@ class ConsoleReporter final : public Reporter {
     std::string _last_check;
 };
 
-
-
 /** @brief One JSON document per completed suite, with full result fidelity.
  *  @details All five outcomes, ordered assertions, nested contexts, wait
  *  observations, nonasserting diagnostics, durations and artifacts are
@@ -124,9 +126,10 @@ class ConsoleReporter final : public Reporter {
 class JsonReporter final : public Reporter {
   public:
     explicit JsonReporter(std::ostream& output) : _output(output) {}
-    void selection_started(SelectionInfo const& info) override;
-    void case_finished(CaseResult const& result) override;
-    void suite_finished(std::string_view name, Summary const& summary) override;
+    void selection_started(const SelectionInfo& info) override;
+    void case_finished(const CaseResult& result) override;
+    void suite_finished(std::string_view name, const Summary& summary) override;
+
   private:
     std::ostream& _output;
     std::vector<CaseResult> _cases;
@@ -146,9 +149,10 @@ class JsonReporter final : public Reporter {
 class JUnitReporter final : public Reporter {
   public:
     explicit JUnitReporter(std::ostream& output) : _output(output) {}
-    void selection_started(SelectionInfo const& info) override;
-    void case_finished(CaseResult const& result) override;
-    void suite_finished(std::string_view name, Summary const& summary) override;
+    void selection_started(const SelectionInfo& info) override;
+    void case_finished(const CaseResult& result) override;
+    void suite_finished(std::string_view name, const Summary& summary) override;
+
   private:
     std::ostream& _output;
     std::vector<CaseResult> _cases;
@@ -164,13 +168,14 @@ class ReporterFanout final : public Reporter {
   public:
     explicit ReporterFanout(std::initializer_list<std::reference_wrapper<Reporter>> targets);
     bool capture_passing_values() const noexcept override;
-    void selection_started(SelectionInfo const& info) override;
-    void case_started(CaseResult const& result) override;
-    void check_started(CaseResult const& result, std::size_t index,
+    void selection_started(const SelectionInfo& info) override;
+    void case_started(const CaseResult& result) override;
+    void check_started(const CaseResult& result, std::size_t index,
                        std::string_view description) override;
-    void diagnostic_emitted(CaseResult const& result, DiagnosticEvent const& event) override;
-    void case_finished(CaseResult const& result) override;
-    void suite_finished(std::string_view name, Summary const& summary) override;
+    void diagnostic_emitted(const CaseResult& result, const DiagnosticEvent& event) override;
+    void case_finished(const CaseResult& result) override;
+    void suite_finished(std::string_view name, const Summary& summary) override;
+
   private:
     std::vector<std::reference_wrapper<Reporter>> _targets;
 };

@@ -34,13 +34,12 @@ namespace Ariadne::Testing {
 
 template<class State, class Restorer>
 ScopedState<State, Restorer>::ScopedState(State original, Restorer restorer)
-        : _original(std::move(original)), _restorer(std::move(restorer)) { }
+    : _original(std::move(original)), _restorer(std::move(restorer)) {}
 
 template<class State, class Restorer>
 ScopedState<State, Restorer>::~ScopedState() noexcept {
-        std::invoke(_restorer, std::as_const(_original));
-    }
-
+    std::invoke(_restorer, std::as_const(_original));
+}
 
 template<class Getter, class Restorer>
 [[nodiscard]] auto preserve_state(Getter&& getter, Restorer&& restorer) {
@@ -59,7 +58,7 @@ template<class State>
     static_assert(std::is_nothrow_copy_assignable_v<State>,
                   "preserve_value needs noexcept copy assignment; use preserve_state");
     return preserve_state([&value] { return State(value); },
-                          [&value](State const& original) noexcept { value = original; });
+                          [&value](const State& original) noexcept { value = original; });
 }
 
 } // namespace Ariadne::Testing

@@ -28,13 +28,13 @@
 #ifndef ARIADNE_TESTING_FIXTURE_HPP
 #define ARIADNE_TESTING_FIXTURE_HPP
 
-#include "testing/testing.hpp"
-
 #include <iostream>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <type_traits>
+
+#include "testing/testing.hpp"
 
 namespace Ariadne::Testing {
 
@@ -42,18 +42,19 @@ namespace Ariadne::Testing {
 /** @brief Fixture base exposing its case-local Context to checks. */
 class ContextFixture {
   public:
-    explicit ContextFixture(Context& context) noexcept : _context(context) { }
+    explicit ContextFixture(Context& context) noexcept : _context(context) {}
 
   protected:
     Context& ctx() noexcept { return _context; }
-    Context const& ctx() const noexcept { return _context; }
+    const Context& ctx() const noexcept { return _context; }
 
   private:
     Context& _context;
 };
 
 /** @brief How exceptions from a fixture operation are classified. */
-enum class FixtureCheck { Direct, NoThrow };
+enum class FixtureCheck { Direct,
+                          NoThrow };
 
 /** @brief Register a fixture method as a separate case.
  *  @tparam Fixture Type constructible from Context&.
@@ -82,7 +83,7 @@ template<class Fixture, auto Method>
 void add_fixture_test(Suite& suite, std::string_view method_name,
                       FixtureCheck check = FixtureCheck::Direct);
 
-inline int run_suite(Suite const& suite, std::ostream& output = std::cout) {
+inline int run_suite(const Suite& suite, std::ostream& output = std::cout) {
     ConsoleReporter reporter(output, ConsoleDetail::All);
     return suite.run(reporter).successful() ? 0 : 1;
 }
@@ -92,12 +93,12 @@ inline int run_suite(Suite const& suite, std::ostream& output = std::cout) {
  *  The caller (e.g. CTest) may pass --concise without altering results.
  *  Invalid or conflicting flags return 2 before any test executes.
  */
-inline int run_suite(Suite const& suite, int argc, char const* const* argv,
+inline int run_suite(const Suite& suite, int argc, const char* const* argv,
                      std::ostream& output = std::cout) {
     ConsoleDetail detail = ConsoleDetail::All;
     bool selected = false;
     for (int i = 1; i < argc; ++i) {
-        std::string_view const arg = argv[i] ? std::string_view(argv[i]) : std::string_view();
+        const std::string_view arg = argv[i] ? std::string_view(argv[i]) : std::string_view();
         if (arg == "--help") {
             output << "Usage: " << (argv[0] ? argv[0] : "test")
                    << " [--full | --concise]" << '\n';
@@ -108,7 +109,7 @@ inline int run_suite(Suite const& suite, int argc, char const* const* argv,
                    << " (expected --full or --concise)" << '\n';
             return 2;
         }
-        auto const requested = arg == "--full" ? ConsoleDetail::All : ConsoleDetail::Concise;
+        const auto requested = arg == "--full" ? ConsoleDetail::All : ConsoleDetail::Concise;
         if (selected && requested != detail) {
             output << "Conflicting test options: --full and --concise" << '\n';
             return 2;
@@ -119,7 +120,8 @@ inline int run_suite(Suite const& suite, int argc, char const* const* argv,
     // A fatal signal bypasses suite_finished(): preserve the latest CHECK
     // only in a crash handler, without printing normal concise progress.
     std::unique_ptr<CrashDiagnostics> crash;
-    if (detail == ConsoleDetail::Concise) crash = std::make_unique<CrashDiagnostics>();
+    if (detail == ConsoleDetail::Concise)
+        crash = std::make_unique<CrashDiagnostics>();
     ConsoleReporter reporter(output, detail);
     return suite.run(reporter).successful() ? 0 : 1;
 }
@@ -127,6 +129,5 @@ inline int run_suite(Suite const& suite, int argc, char const* const* argv,
 } // namespace Ariadne::Testing
 
 #include "testing/fixture.tpl.hpp"
-
 
 #endif // ARIADNE_TESTING_FIXTURE_HPP
