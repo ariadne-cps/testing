@@ -42,10 +42,13 @@ namespace Ariadne::Testing {
 /** @brief Fixture base exposing its case-local Context to checks. */
 class ContextFixture {
   public:
+    /** @brief Construct a \c ContextFixture from context. */
     explicit ContextFixture(Context& context) noexcept : _context(context) {}
 
   protected:
+    /** @brief Return the context belonging to this fixture case. */
     Context& ctx() noexcept { return _context; }
+    /** @brief Return the context belonging to this fixture case. */
     const Context& ctx() const noexcept { return _context; }
 
   private:
@@ -83,6 +86,7 @@ template<class Fixture, auto Method>
 void add_fixture_test(Suite& suite, std::string_view method_name,
                       FixtureCheck check = FixtureCheck::Direct);
 
+/** @brief Run the suite with a console reporter and return zero on success, one on failure. */
 inline int run_suite(const Suite& suite, std::ostream& output = std::cout) {
     ConsoleReporter reporter(output, ConsoleDetail::All);
     return suite.run(reporter).successful() ? 0 : 1;

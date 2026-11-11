@@ -59,6 +59,7 @@ struct OracleRowId {
     std::string key;
     std::uint64_t iteration = 0;
     std::uint64_t repetition = 0;
+    /** @brief Test equality of the operands. */
     bool operator==(const OracleRowId &) const = default;
 };
 
@@ -93,7 +94,9 @@ struct OracleIntegrity {
     std::size_t observed_rows = 0;
     std::vector<OracleIssue> issues;
 
+    /** @brief Test whether oracle integrity checks succeeded. */
     bool valid() const noexcept { return issues.empty(); }
+    /** @brief Test whether the expected oracle manifest is invalid. */
     bool invalid_manifest() const noexcept {
         for (const auto &issue: issues)
             if (issue.kind == OracleIssueKind::InvalidManifest)
@@ -153,6 +156,7 @@ struct OracleReplayPlan {
         return false;
     }
 
+    /** @brief Return a human-readable description. */
     std::string description() const;
 };
 

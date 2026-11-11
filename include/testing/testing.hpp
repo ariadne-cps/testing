@@ -114,31 +114,42 @@ struct AbortCase {};
 /** @brief Per-case context for assertions, diagnostics, files and fatal prerequisites. */
 class WorkerBatch;
 
+/** @brief Per-case assertion context recording outcomes, scopes, and diagnostics. */
 class Context {
   public:
     // Move-only guard: a nested diagnostic scope always restores its parent.
     /** @brief Move-only RAII guard for a nested diagnostic scope. */
     class Scope {
       public:
+        /** @brief Disallow this construction to preserve the ownership contract. */
         Scope(const Scope&) = delete;
+        /** @brief Disallow assignment to preserve the ownership contract. */
         Scope& operator=(const Scope&) = delete;
+        /** @brief Move-construct the object from the supplied instance. */
         Scope(Scope&& other) noexcept;
+        /** @brief Disallow assignment to preserve the ownership contract. */
         Scope& operator=(Scope&&) = delete;
+        /** @brief Close the diagnostic scope, including during exception unwinding. */
         ~Scope() noexcept;
 
       private:
         friend class Context;
+        /** @brief Construct a \c Scope from context, label, location. */
         Scope(Context& context, std::string label, std::source_location location);
         Context* _context;
         std::size_t _depth;
         int _uncaught;
     };
 
+    /** @brief Construct a \c Context from result, reporter. */
     explicit Context(CaseResult& result, Reporter* reporter = nullptr)
         : _result(result), _reporter(reporter) {}
 
+    /** @brief Disallow this construction to preserve the ownership contract. */
     Context(const Context&) = delete;
+    /** @brief Disallow assignment to preserve the ownership contract. */
     Context& operator=(const Context&) = delete;
+    /** @brief Finish the case context and close outstanding diagnostic scopes. */
     ~Context() noexcept;
 
     // Lazily allocated, uniquely created directory for this case's outputs.
@@ -218,6 +229,7 @@ class Context {
                                std::string_view description,
                                std::source_location location = std::source_location::current());
 
+    /** @brief Open a diagnostic scope whose lifetime is managed by the returned guard. */
     Scope scope(std::string label,
                 std::source_location location = std::source_location::current());
 
@@ -228,8 +240,10 @@ class Context {
     Scope scope(std::string name, const T& value,
                 std::source_location location = std::source_location::current());
 
+    /** @brief Record an informational diagnostic at the source location. */
     void note(std::string description,
               std::source_location location = std::source_location::current());
+    /** @brief Record a warning diagnostic at the source location. */
     void warning(std::string description,
                  std::source_location location = std::source_location::current());
 
@@ -240,6 +254,7 @@ class Context {
     void inspect(std::string name, const T& value,
                  std::source_location location = std::source_location::current());
 
+    /** @brief Record a duration diagnostic at the source location. */
     void elapsed(std::string description, std::chrono::nanoseconds duration,
                  std::source_location location = std::source_location::current());
 
@@ -278,6 +293,7 @@ class Context {
                      std::string_view description,
                      std::source_location location = std::source_location::current());
 
+    /** @brief Observe a comparison once and record its snapshot as an equality check. */
     template<class ComparisonFn>
     void check_equal_snapshot(ComparisonFn&& comparison_fn,
                               std::string_view description,
@@ -548,6 +564,7 @@ class Context {
     void check(Callable&& predicate, std::string_view description,
                std::source_location location = std::source_location::current());
 
+    /** @brief Mark the current case as skipped with the supplied reason. */
     void skip(std::string_view reason,
               std::source_location location = std::source_location::current());
 
@@ -555,20 +572,29 @@ class Context {
     friend class WorkerBatch;
     friend /** @brief Ordered collection of cases executed with a reporter. */
         class Suite;
+    /** @brief Map check evidence to the corresponding test outcome. */
     static Outcome outcome(Evidence value);
+    /** @brief Push a diagnostic scope and return its depth. */
     std::size_t enter_scope(std::string label, std::source_location location);
+    /** @brief Close scopes down to the supplied depth, accounting for exception unwinding. */
     void leave_scope(std::size_t depth, int uncaught_at_entry) noexcept;
+    /** @brief Send a diagnostic event to the case result and reporter. */
     void emit(DiagnosticKind kind, std::string description, std::string value,
               std::chrono::nanoseconds duration, std::source_location location);
+    /** @brief Start a check and return its sequence index. */
     std::size_t begin_check(std::string_view description);
+    /** @brief Record integrity and coverage evidence for the observed oracle rows. */
     void record_oracle_rows(std::span<const OracleRow> manifest,
                             std::span<const OracleRow> observed,
                             std::string_view description,
                             std::source_location location, std::size_t index);
+    /** @brief Record the oracle replay plan as check evidence. */
     void record_oracle_replay(const OracleReplayPlan& plan,
                               std::string_view description,
                               std::source_location location, std::size_t index);
+    /** @brief Test whether values of successful checks should be retained. */
     bool capture_passing_values() const noexcept;
+    /** @brief Record an assertion outcome with its evidence and source location. */
     void record(Outcome outcome, std::string_view description, std::string actual,
                 std::string expected, std::string detail, std::source_location location,
                 std::size_t index,
@@ -581,9 +607,12 @@ class Context {
     std::optional<std::filesystem::path> _work_directory;
 };
 
+/** @brief Collection of named test cases with selection and reporting support. */
 class Suite {
   public:
+    /** @brief Construct a \c Suite from name. */
     explicit Suite(std::string name) : _name(std::move(name)) {}
+    /** @brief Register a named test case in the suite. */
     void add(std::string name, std::function<void(Context&)> test,
              CaseMetadata metadata = {});
     /** @brief Run every registered case, retaining the historical result API. */
@@ -597,6 +626,7 @@ class Suite {
     SelectionResult run_selected(Reporter& reporter, const CaseFilter& filter) const;
 
   private:
+    /** @brief Registered case body with its name and selection tags. */
     struct TestCase {
         std::string name;
         std::function<void(Context&)> run;

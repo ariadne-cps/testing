@@ -45,6 +45,7 @@ enum class ConsoleDetail { All,
 /** @brief Callback interface for live case and diagnostic reporting. */
 class Reporter {
   public:
+    /** @brief Destroy the object and release its owned resources. */
     virtual ~Reporter() = default;
     /** @brief Whether passing comparisons need their rendered operand values.
      *  @details Structured and custom reporters retain historical full payloads
@@ -55,10 +56,15 @@ class Reporter {
     // Optional lifecycle notifications, compatible with existing reporters.
     /** @brief Called before any selected case, only for active filters. */
     virtual void selection_started(const SelectionInfo&) {}
+    /** @brief Handle notification that a test case has started. */
     virtual void case_started(const CaseResult&) {}
+    /** @brief Handle notification that an assertion check has started. */
     virtual void check_started(const CaseResult&, std::size_t, std::string_view) {}
+    /** @brief Handle a diagnostic event for the current case. */
     virtual void diagnostic_emitted(const CaseResult&, const DiagnosticEvent&) {}
+    /** @brief Handle the completed test-case result. */
     virtual void case_finished(const CaseResult& result) = 0;
+    /** @brief Handle the final suite summary. */
     virtual void suite_finished(std::string_view name, const Summary& summary) = 0;
 };
 
@@ -70,9 +76,13 @@ class Reporter {
  */
 class CrashDiagnostics final {
   public:
+    /** @brief Construct a \c CrashDiagnostics with the specified characteristics. */
     CrashDiagnostics();
+    /** @brief Restore the previous crash-diagnostic handlers. */
     ~CrashDiagnostics();
+    /** @brief Disallow this construction to preserve the ownership contract. */
     CrashDiagnostics(const CrashDiagnostics&) = delete;
+    /** @brief Disallow assignment to preserve the ownership contract. */
     CrashDiagnostics& operator=(const CrashDiagnostics&) = delete;
 
   private:
@@ -83,17 +93,24 @@ class CrashDiagnostics final {
 /** @brief Human-readable reporter with configurable diagnostic verbosity. */
 class ConsoleReporter final : public Reporter {
   public:
+    /** @brief Construct a \c ConsoleReporter from output, detail. */
     explicit ConsoleReporter(std::ostream& output, ConsoleDetail detail = ConsoleDetail::All);
     bool capture_passing_values() const noexcept override { return false; }
     void selection_started(const SelectionInfo& info) override;
+    /** @brief Handle a diagnostic event for the current case. */
     void diagnostic_emitted(const CaseResult& result, const DiagnosticEvent& event) override;
+    /** @brief Handle notification that a test case has started. */
     void case_started(const CaseResult& result) override;
+    /** @brief Handle notification that an assertion check has started. */
     void check_started(const CaseResult& result, std::size_t index,
                        std::string_view description) override;
+    /** @brief Handle the completed test-case result. */
     void case_finished(const CaseResult& result) override;
+    /** @brief Handle the final suite summary. */
     void suite_finished(std::string_view name, const Summary& summary) override;
 
   private:
+    /** @brief Retained failed-case diagnostics for the console summary. */
     struct ProblemCase {
         Outcome outcome;
         std::string name;
@@ -126,9 +143,12 @@ class ConsoleReporter final : public Reporter {
  */
 class JsonReporter final : public Reporter {
   public:
+    /** @brief Construct a \c JsonReporter from output. */
     explicit JsonReporter(std::ostream& output) : _output(output) {}
     void selection_started(const SelectionInfo& info) override;
+    /** @brief Handle the completed test-case result. */
     void case_finished(const CaseResult& result) override;
+    /** @brief Handle the final suite summary. */
     void suite_finished(std::string_view name, const Summary& summary) override;
 
   private:
@@ -149,9 +169,12 @@ class JsonReporter final : public Reporter {
  */
 class JUnitReporter final : public Reporter {
   public:
+    /** @brief Construct a \c JUnitReporter from output. */
     explicit JUnitReporter(std::ostream& output) : _output(output) {}
     void selection_started(const SelectionInfo& info) override;
+    /** @brief Handle the completed test-case result. */
     void case_finished(const CaseResult& result) override;
+    /** @brief Handle the final suite summary. */
     void suite_finished(std::string_view name, const Summary& summary) override;
 
   private:
@@ -167,14 +190,20 @@ class JUnitReporter final : public Reporter {
  */
 class ReporterFanout final : public Reporter {
   public:
+    /** @brief Construct a \c ReporterFanout from targets. */
     explicit ReporterFanout(std::initializer_list<std::reference_wrapper<Reporter>> targets);
     bool capture_passing_values() const noexcept override;
     void selection_started(const SelectionInfo& info) override;
+    /** @brief Handle notification that a test case has started. */
     void case_started(const CaseResult& result) override;
+    /** @brief Handle notification that an assertion check has started. */
     void check_started(const CaseResult& result, std::size_t index,
                        std::string_view description) override;
+    /** @brief Handle a diagnostic event for the current case. */
     void diagnostic_emitted(const CaseResult& result, const DiagnosticEvent& event) override;
+    /** @brief Handle the completed test-case result. */
     void case_finished(const CaseResult& result) override;
+    /** @brief Handle the final suite summary. */
     void suite_finished(std::string_view name, const Summary& summary) override;
 
   private:

@@ -45,6 +45,7 @@ namespace Ariadne::Testing {
  * owns worker lifetime and must retain CTest's deadlock watchdog.
  */
 class WorkerBatch {
+    /** @brief Pending worker diagnostic or assertion entry. */
     struct Entry {
         Outcome outcome;
         std::string description;
@@ -52,6 +53,7 @@ class WorkerBatch {
         std::string file;
         std::uint_least32_t line;
     };
+    /** @brief Result and synchronization state for one worker. */
     struct Slot {
         bool started = false;
         bool completed = false;
@@ -59,6 +61,7 @@ class WorkerBatch {
     };
 
   public:
+    /** @brief Slot-bound interface for recording checks from one worker thread. */
     class Worker {
       public:
         /** @brief Buffer one mathematical-evidence check on the worker thread.
@@ -99,16 +102,20 @@ class WorkerBatch {
 
       private:
         friend class WorkerBatch;
+        /** @brief Construct a \c Worker from owner, slot. */
         Worker(WorkerBatch& owner, std::size_t slot) : _owner(owner), _slot(slot) {}
         WorkerBatch& _owner;
         std::size_t _slot;
     };
 
+    /** @brief Construct a \c WorkerBatch from count. */
     explicit WorkerBatch(std::size_t count) : _slots(count) {
         if (count == 0)
             throw std::invalid_argument("WorkerBatch needs a nonzero slot count");
     }
+    /** @brief Disallow this construction to preserve the ownership contract. */
     WorkerBatch(const WorkerBatch&) = delete;
+    /** @brief Disallow assignment to preserve the ownership contract. */
     WorkerBatch& operator=(const WorkerBatch&) = delete;
 
     /** @brief Execute one numbered worker and capture unhandled exceptions.
@@ -178,6 +185,7 @@ class WorkerBatch {
     }
 
   private:
+    /** @brief Append the worker entry to the selected result slot. */
     void add(std::size_t slot, Entry entry) {
         std::lock_guard<std::mutex> lock(_mutex);
         _slots[slot].entries.push_back(std::move(entry));

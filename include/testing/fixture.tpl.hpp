@@ -35,6 +35,7 @@ namespace Ariadne::Testing {
 namespace Detail {
 
 // Do not silently ignore status-returning setup or teardown hooks.
+/** @brief Invoke the optional fixture setup hook. */
 template<class Fixture>
 void fixture_set_up(Fixture& fixture) {
     if constexpr (requires(Fixture& value) { value.set_up(); }) {
@@ -43,6 +44,7 @@ void fixture_set_up(Fixture& fixture) {
         fixture.set_up();
     }
 }
+/** @brief Invoke the optional fixture teardown hook. */
 template<class Fixture>
 void fixture_tear_down(Fixture& fixture) {
     if constexpr (requires(Fixture& value) { value.tear_down(); }) {
@@ -51,6 +53,7 @@ void fixture_tear_down(Fixture& fixture) {
         fixture.tear_down();
     }
 }
+/** @brief Describe the captured fixture exception. */
 inline std::string fixture_failure_description(std::exception_ptr failure) {
     try {
         std::rethrow_exception(failure);
@@ -62,6 +65,7 @@ inline std::string fixture_failure_description(std::exception_ptr failure) {
         return "non-standard exception";
     }
 }
+/** @brief Run setup, the test operation, and teardown while retaining lifecycle failures. */
 template<class Fixture, class Operation>
 void run_fixture_lifecycle(Fixture& fixture, Operation&& operation) {
     fixture_set_up(fixture); // No teardown if setup itself fails.

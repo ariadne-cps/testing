@@ -44,11 +44,17 @@ class [[nodiscard]] ScopedState {
                   "State restoration must be noexcept and accept const State&");
 
   public:
+    /** @brief Construct a \c ScopedState from original, restorer. */
     ScopedState(State original, Restorer restorer);
+    /** @brief Disallow this construction to preserve the ownership contract. */
     ScopedState(const ScopedState&) = delete;
+    /** @brief Disallow assignment to preserve the ownership contract. */
     ScopedState& operator=(const ScopedState&) = delete;
+    /** @brief Disallow this construction to preserve the ownership contract. */
     ScopedState(ScopedState&&) = delete;
+    /** @brief Disallow assignment to preserve the ownership contract. */
     ScopedState& operator=(ScopedState&&) = delete;
+    /** @brief Restore the saved state when the guard leaves scope. */
     ~ScopedState() noexcept;
 
   private:

@@ -46,17 +46,20 @@ namespace Ariadne::Testing {
 /** @brief Named collection of cases sharing a display-name prefix. */
 class SuiteVariant {
   public:
+    /** @brief Construct a \c SuiteVariant from suite, name. */
     SuiteVariant(Suite& suite, std::string name)
         : _suite(&suite), _name(std::move(name)) {
         if (_name.empty())
             throw std::invalid_argument("Suite variant name must be nonempty");
     }
 
+    /** @brief Register a named test case in the suite. */
     template<class Callable>
     void add(std::string name, Callable&& body,
              std::vector<std::string> tags = {}) const;
 
     // One generic callable can be registered for multiple compile-time tags.
+    /** @brief Register a case invoking the callable with the selected type. */
     template<class Tag, class Callable>
     void add_typed(std::string name, Callable&& body,
                    std::vector<std::string> tags = {}) const;
@@ -66,6 +69,7 @@ class SuiteVariant {
     std::string _name;
 };
 
+/** @brief Create a named registration view of the suite. */
 inline SuiteVariant suite_variant(Suite& suite, std::string name) {
     return SuiteVariant(suite, std::move(name));
 }
@@ -80,6 +84,7 @@ class FixtureVariant {
     /** @brief Create a named variant whose factory supplies fresh fixtures per case. */
     FixtureVariant(Suite& suite, std::string name, Factory factory);
 
+    /** @brief Register a named test case in the suite. */
     template<class Method>
     void add(std::string method_name, Method&& method,
              FixtureCheck check = FixtureCheck::Direct,

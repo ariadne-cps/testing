@@ -181,9 +181,11 @@ struct Summary {
     std::size_t errors = 0;
 
     // Even an opt-in permissive exit gate requires at least one actual pass.
+    /** @brief Test whether the summary satisfies the requested acceptance policy. */
     bool acceptable(AcceptancePolicy policy) const {
         return passed > 0 && failed == 0 && errors == 0 && (inconclusive == 0 || policy.inconclusive == InconclusivePolicy::NonBlocking) && (skipped == 0 || policy.skipped == SkippedPolicy::NonBlocking);
     }
+    /** @brief Test whether the result satisfies the success policy. */
     bool successful() const { return acceptable({}); }
 };
 
@@ -203,6 +205,7 @@ struct CaseFilter {
     std::vector<std::string> any_tags;
     std::string implementation;
 
+    /** @brief Test whether any case-selection rule is enabled. */
     bool active() const noexcept {
         return !name_contains.empty() || !any_tags.empty() || !implementation.empty();
     }
@@ -214,6 +217,7 @@ struct SelectionInfo {
     std::size_t selected = 0;
     CaseFilter filter;
 
+    /** @brief Test whether selection covers the complete suite. */
     bool complete() const noexcept { return registered == selected; }
 };
 
@@ -222,8 +226,10 @@ struct SelectionResult {
     Summary summary;
     SelectionInfo selection;
     // This is the only API that can claim a complete successful regression.
+    /** @brief Test whether the result satisfies the success policy. */
     bool successful() const { return selection.complete() && summary.successful(); }
     // Explicit opt-in for callers that intentionally only test a subset.
+    /** @brief Test whether the selected cases succeeded. */
     bool selected_successful() const { return summary.successful(); }
 };
 

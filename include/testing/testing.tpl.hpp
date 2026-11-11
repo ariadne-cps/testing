@@ -34,6 +34,7 @@ namespace Ariadne::Testing {
 
 namespace Detail {
 
+/** @brief Classify the supplied predicate result as assertion evidence. */
 template<class T>
 Evidence evidence(const T& value) {
     if constexpr (std::is_same_v<std::remove_cvref_t<T>, Evidence>) {
@@ -54,6 +55,7 @@ Evidence evidence(const T& value) {
     }
 }
 
+/** @brief Render an assertion operand as diagnostic text. */
 template<class T>
 std::string render(const T& value) {
     if constexpr (requires(std::ostream& os) { os << value; }) {
@@ -65,6 +67,7 @@ std::string render(const T& value) {
     }
 }
 
+/** @brief Normalize an integer for comparison without losing its sign. */
 template<class T>
 constexpr auto comparable_integer(T value) {
     using V = std::remove_cvref_t<T>;
@@ -80,6 +83,7 @@ constexpr auto comparable_integer(T value) {
     }
 }
 
+/** @brief Extract equality evidence from a comparison result. */
 template<class Actual, class Expected>
 Evidence equal_evidence(const Actual& actual, const Expected& expected) {
     using A = std::remove_cvref_t<Actual>;
@@ -91,12 +95,14 @@ Evidence equal_evidence(const Actual& actual, const Expected& expected) {
     }
 }
 
+/** @brief Single comparison observation with evidence and printable operand snapshots. */
 struct EqualityObservation {
     Evidence verdict;
     std::string actual;
     std::string expected;
 };
 
+/** @brief Capture equality evidence and printable operand snapshots. */
 template<class A, class B>
 EqualityObservation observe_equal(const A& actual, const B& expected,
                                   bool capture_passing_values = true) {
@@ -106,6 +112,7 @@ EqualityObservation observe_equal(const A& actual, const B& expected,
     return {verdict, render(actual), render(expected)};
 }
 
+/** @brief Observe the comparison and retain evidence and operand snapshots. */
 template<Comparison Relation, class A, class B>
 EqualityObservation observe_compare(const A& actual, const B& expected,
                                     bool capture_passing_values = true) {
@@ -162,6 +169,7 @@ EqualityObservation observe_compare(const A& actual, const B& expected,
     return {verdict, render(actual), render(expected)};
 }
 
+/** @brief Capture a test callable with the required ownership. */
 template<class Callable>
 auto capture_callable(Callable&& callable) {
     if constexpr (std::is_lvalue_reference_v<Callable>)
@@ -170,6 +178,7 @@ auto capture_callable(Callable&& callable) {
         return std::forward<Callable>(callable);
 }
 
+/** @brief Return the nonnegative magnitude of the value. */
 template<class T>
 auto magnitude(const T& value) {
     if constexpr (requires { mag(value); }) {
@@ -798,17 +807,20 @@ void Context::expect_no_throw(Callable&& action, std::string_view description,
 }
 
 namespace Detail {
+/** @brief Construct a wait request with the supplied timing policy. */
 inline WaitObservation make_wait(WaitStatus status,
                                  std::chrono::steady_clock::duration elapsed,
                                  std::chrono::steady_clock::duration budget, bool absolute) {
     return {status, std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed),
             std::chrono::duration_cast<std::chrono::nanoseconds>(budget), absolute};
 }
+/** @brief Return the remaining wait budget at the supplied time. */
 inline std::chrono::steady_clock::duration budget_at(
     std::chrono::steady_clock::time_point start,
     std::chrono::steady_clock::time_point deadline) {
     return deadline > start ? deadline - start : std::chrono::steady_clock::duration::zero();
 }
+/** @brief Classify the future status for the current wait. */
 inline WaitStatus future_wait_status(std::future_status value) {
     switch (value) {
         case std::future_status::ready:
@@ -955,6 +967,7 @@ namespace Detail {
 // For absolute waits the original deadline is not restarted at each check.
 // The measured overrun is diagnostic, not proof of worker failure or a
 // benchmark of the operation's execution time.
+/** @brief Describe the wait timing relative to the absolute deadline. */
 inline std::string absolute_wait_detail(std::chrono::steady_clock::time_point started,
                                         std::chrono::steady_clock::time_point deadline,
                                         std::chrono::steady_clock::time_point finished) {
