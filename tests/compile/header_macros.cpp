@@ -1,6 +1,7 @@
-#include "testing/macros.hpp"
 #include <concepts>
 #include <type_traits>
+
+#include "testing/macros.hpp"
 ARIADNE_TESTING_COMPILE_CONCEPT(std::integral<int>);
 ARIADNE_TESTING_COMPILE_TRAIT(std::is_trivially_copyable_v<int>);
 ARIADNE_TESTING_COMPILE_SAME_TYPE(int, int);

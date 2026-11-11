@@ -1,5 +1,3 @@
-#include "ariadne-testing.hpp"
-
 #include <atomic>
 #include <chrono>
 #include <future>
@@ -10,17 +8,19 @@
 #include <thread>
 #include <vector>
 
+#include "ariadne-testing.hpp"
+
 using namespace Ariadne::Testing;
 using namespace std::chrono_literals;
 
 struct Capture final : Reporter {
     std::vector<CaseResult> cases;
     int checks = 0;
-    void check_started(CaseResult const&, std::size_t, std::string_view) override {
+    void check_started(const CaseResult&, std::size_t, std::string_view) override {
         ++checks;
     }
-    void case_finished(CaseResult const& result) override { cases.push_back(result); }
-    void suite_finished(std::string_view, Summary const&) override {}
+    void case_finished(const CaseResult& result) override { cases.push_back(result); }
+    void suite_finished(std::string_view, const Summary&) override {}
 };
 
 int main() {
@@ -31,8 +31,7 @@ int main() {
         std::atomic<int> state{4};
         c.expect_atomic(state, [&](int observed) {
             ++predicate_calls;
-            return capture.checks == 1 && observed >= 3;
-        }, 0ms, "already ready");
+            return capture.checks == 1 && observed >= 3; }, 0ms, "already ready");
     });
     suite.add("cross-thread release/acquire progress", [&](Context& c) {
         std::atomic<int> state{0};
@@ -48,54 +47,48 @@ int main() {
         allow_update.set_value();
         c.expect_atomic(state, [&](int observed) {
             ++predicate_calls;
-            return capture.checks == 2 && observed >= 5;
-        }, 5s, "worker progress");
+            return capture.checks == 2 && observed >= 5; }, 5s, "worker progress");
     });
     suite.add("zero timeout reports last state", [](Context& c) {
         std::atomic<int> state{2};
-        c.expect_atomic(state, [](int observed) { return observed >= 3; },
-                        0ms, "not yet ready");
+        c.expect_atomic(state, [](int observed) { return observed >= 3; }, 0ms, "not yet ready");
     });
     suite.add("positive timeout reports last state", [](Context& c) {
         std::atomic<int> state{7};
-        c.expect_atomic(state, [](int observed) { return observed == 9; },
-                        3ms, "bounded timeout");
+        c.expect_atomic(state, [](int observed) { return observed == 9; }, 3ms, "bounded timeout");
     });
     suite.add("negative timeout never invokes predicate", [&](Context& c) {
         std::atomic<int> state{1};
         c.expect_atomic(state, [&](int) {
             ++predicate_calls;
-            return true;
-        }, -1ms, "invalid deadline");
+            return true; }, -1ms, "invalid deadline");
     });
     suite.add("predicate exception is Error", [](Context& c) {
         std::atomic<int> state{1};
-        c.expect_atomic(state, [](int) -> bool {
-            throw std::logic_error("invalid progress predicate");
-        }, 0ms, "predicate throws");
+        c.expect_atomic(state, [](int) -> bool { throw std::logic_error("invalid progress predicate"); }, 0ms, "predicate throws");
     });
     suite.add("later case remains unaffected", [](Context& c) {
         c.prove(true, "case thread can still issue checks");
     });
 
-    auto const summary = suite.run(capture);
+    const auto summary = suite.run(capture);
     bool ok = true;
-    auto verify = [&](bool condition, std::string const& description) {
+    auto verify = [&](bool condition, const std::string& description) {
         if (!condition) {
             std::cerr << description << '\n';
             ok = false;
         }
     };
     verify(summary.passed == 3 && summary.failed == 2 &&
-           summary.errors == 2 && summary.skipped == 0 &&
-           summary.inconclusive == 0 && capture.cases.size() == 7 &&
-           capture.checks == 7, "atomic progress summary or CHECK count");
+               summary.errors == 2 && summary.skipped == 0 &&
+               summary.inconclusive == 0 && capture.cases.size() == 7 &&
+               capture.checks == 7,
+           "atomic progress summary or CHECK count");
     verify(predicate_calls >= 2, "atomic predicates not exercised");
     if (capture.cases.size() == 7) {
-        std::vector<Outcome> const outcomes{
+        const std::vector<Outcome> outcomes{
             Outcome::Passed, Outcome::Passed, Outcome::Failed, Outcome::Failed,
-            Outcome::Error, Outcome::Error, Outcome::Passed
-        };
+            Outcome::Error, Outcome::Error, Outcome::Passed};
         for (std::size_t i = 0; i < outcomes.size(); ++i) {
             verify(capture.cases[i].outcome == outcomes[i],
                    "wrong atomic progress outcome " + std::to_string(i));
@@ -104,11 +97,11 @@ int main() {
         }
         if (capture.cases[2].assertions.size() == 1)
             verify(capture.cases[2].assertions[0].actual == "2" &&
-                   capture.cases[2].assertions[0].detail.find("timeout; waited=") == 0,
+                       capture.cases[2].assertions[0].detail.find("timeout; waited=") == 0,
                    "zero timeout must report observed atomic value");
         if (capture.cases[3].assertions.size() == 1)
             verify(capture.cases[3].assertions[0].actual == "7" &&
-                   capture.cases[3].assertions[0].detail.find("limit=3ms") != std::string::npos,
+                       capture.cases[3].assertions[0].detail.find("limit=3ms") != std::string::npos,
                    "positive timeout must preserve limit and state");
         if (capture.cases[4].assertions.size() == 1)
             verify(capture.cases[4].assertions[0].detail == "negative timeout",

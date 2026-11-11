@@ -1,15 +1,17 @@
-#include "ariadne-testing.hpp"
-#include <csignal>
-#include <string>
 #include <chrono>
-#include <sstream>
-#include <thread>
+#include <csignal>
 #include <iostream>
+#include <sstream>
+#include <string>
+#include <thread>
+
+#include "ariadne-testing.hpp"
 
 #ifndef _WIN32
+#include <cerrno>
+
 #include <sys/wait.h>
 #include <unistd.h>
-#include <cerrno>
 #endif
 
 using namespace Ariadne::Testing;
@@ -18,10 +20,12 @@ using namespace Ariadne::Testing;
 // Exercise the async-signal-safe best-effort paths without a signal matrix.
 // Every crashing child is reaped under a deadline to prevent CI hangs.
 bool exercise_crash_boundary(bool with_checkpoint) {
-    pid_t const child = ::fork();
-    if (child < 0) return false;
+    const pid_t child = ::fork();
+    if (child < 0)
+        return false;
     if (child == 0) {
-        if (with_checkpoint) (void)::close(STDERR_FILENO);
+        if (with_checkpoint)
+            (void)::close(STDERR_FILENO);
         CrashDiagnostics diagnostics;
         if (with_checkpoint) {
             std::ostringstream ignored_console;
@@ -38,10 +42,11 @@ bool exercise_crash_boundary(bool with_checkpoint) {
         _exit(10); // Signal propagation is mandatory.
     }
     int status = 0;
-    auto const deadline = std::chrono::steady_clock::now() + std::chrono::seconds{4};
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{4};
     for (;;) {
-        pid_t const finished = ::waitpid(child, &status, WNOHANG);
-        if (finished == child) break;
+        const pid_t finished = ::waitpid(child, &status, WNOHANG);
+        if (finished == child)
+            break;
         if (finished < 0 && errno != EINTR) {
             (void)::kill(child, SIGKILL);
             (void)::waitpid(child, &status, 0);
@@ -58,29 +63,32 @@ bool exercise_crash_boundary(bool with_checkpoint) {
 }
 #endif
 
-
 int main() {
 #ifndef _WIN32
     int fds[2];
-    if (pipe(fds) != 0) return 1;
+    if (pipe(fds) != 0)
+        return 1;
     pid_t child = fork();
-    if (child < 0) return 2;
+    if (child < 0)
+        return 2;
     if (child == 0) {
         close(fds[0]);
-        if (dup2(fds[1], STDERR_FILENO) < 0) _exit(3);
+        if (dup2(fds[1], STDERR_FILENO) < 0)
+            _exit(3);
         close(fds[1]);
         Suite suite("crash probe");
         suite.add("before failure", [](Context& c) {
-            c.prove(true,"first check");
+            c.prove(true, "first check");
         });
         suite.add("fatal case", [](Context& c) {
-            c.prove(true,"finished check");
+            c.prove(true, "finished check");
             c.check([] {
                 std::raise(SIGABRT);
                 return true;
-            }, "fatal check");
+            },
+                    "fatal check");
         });
-        char const* const args[] = {"test_crash_diagnostics","--concise"};
+        const char* const args[] = {"test_crash_diagnostics", "--concise"};
         (void)run_suite(suite, 2, args);
         _exit(4);
     }
@@ -89,13 +97,16 @@ int main() {
     char buffer[1024];
     for (;;) {
         ssize_t n = read(fds[0], buffer, sizeof(buffer));
-        if (n < 0 && errno == EINTR) continue;
-        if (n <= 0) break;
+        if (n < 0 && errno == EINTR)
+            continue;
+        if (n <= 0)
+            break;
         output.append(buffer, static_cast<std::size_t>(n));
     }
     close(fds[0]);
     int status = 0;
-    if (waitpid(child, &status, 0) != child) return 5;
+    if (waitpid(child, &status, 0) != child)
+        return 5;
     if (!WIFSIGNALED(status) || WTERMSIG(status) != SIGABRT) {
         std::cerr << "Child did not terminate by SIGABRT: status=" << status << '\n';
         return 6;

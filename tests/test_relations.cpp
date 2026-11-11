@@ -1,91 +1,103 @@
 
-#include "ariadne-testing.hpp"
 #include <array>
 #include <cstdint>
-#include <array>
 #include <cstdlib>
+#include <iostream>
 #include <limits>
 #include <memory>
-#include <iostream>
 #include <ostream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "ariadne-testing.hpp"
+
 using namespace Ariadne::Testing;
 
 namespace Demo {
-struct Value { int identity; int center; int radius; };
+struct Value {
+    int identity;
+    int center;
+    int radius;
+};
 
-struct TernaryNumber { int value; bool known; };
-std::ostream& operator<<(std::ostream& output, TernaryNumber const& number) {
+struct TernaryNumber {
+    int value;
+    bool known;
+};
+std::ostream& operator<<(std::ostream& output, const TernaryNumber& number) {
     return output << "ternary(" << number.value << ','
                   << (number.known ? "known" : "unknown") << ')';
 }
 Evidence ternary_relation(bool operands_known, bool truth) {
     return !operands_known ? Evidence::Indeterminate
-         : truth ? Evidence::True : Evidence::False;
+         : truth           ? Evidence::True
+                           : Evidence::False;
 }
-Evidence operator!=(TernaryNumber const& lhs, TernaryNumber const& rhs) {
+Evidence operator!=(const TernaryNumber& lhs, const TernaryNumber& rhs) {
     return ternary_relation(lhs.known && rhs.known, lhs.value != rhs.value);
 }
-Evidence operator<(TernaryNumber const& lhs, TernaryNumber const& rhs) {
+Evidence operator<(const TernaryNumber& lhs, const TernaryNumber& rhs) {
     return ternary_relation(lhs.known && rhs.known, lhs.value < rhs.value);
 }
-Evidence operator<=(TernaryNumber const& lhs, TernaryNumber const& rhs) {
+Evidence operator<=(const TernaryNumber& lhs, const TernaryNumber& rhs) {
     return ternary_relation(lhs.known && rhs.known, lhs.value <= rhs.value);
 }
-Evidence operator>(TernaryNumber const& lhs, TernaryNumber const& rhs) {
+Evidence operator>(const TernaryNumber& lhs, const TernaryNumber& rhs) {
     return ternary_relation(lhs.known && rhs.known, lhs.value > rhs.value);
 }
-Evidence operator>=(TernaryNumber const& lhs, TernaryNumber const& rhs) {
+Evidence operator>=(const TernaryNumber& lhs, const TernaryNumber& rhs) {
     return ternary_relation(lhs.known && rhs.known, lhs.value >= rhs.value);
 }
 
-std::ostream& operator<<(std::ostream& os, Value const& v) {
+std::ostream& operator<<(std::ostream& os, const Value& v) {
     return os << "value(" << v.identity << ',' << v.center << ',' << v.radius << ')';
 }
-bool operator==(Value const& a, Value const& b) {
+bool operator==(const Value& a, const Value& b) {
     return a.center == b.center && a.radius == b.radius;
 }
-bool same(Value const& a, Value const& b) {
+bool same(const Value& a, const Value& b) {
     return a.identity == b.identity;
 }
-Evidence equal(Value const& a, Value const& b) {
-    if (a.radius == 0 && b.radius == 0 && a.center == b.center) return Evidence::True;
-    if (std::abs(a.center - b.center) > a.radius + b.radius) return Evidence::False;
+Evidence equal(const Value& a, const Value& b) {
+    if (a.radius == 0 && b.radius == 0 && a.center == b.center)
+        return Evidence::True;
+    if (std::abs(a.center - b.center) > a.radius + b.radius)
+        return Evidence::False;
     return Evidence::Indeterminate;
 }
-bool intersect(Value const& a, Value const& b) {
+bool intersect(const Value& a, const Value& b) {
     return std::abs(a.center - b.center) <= a.radius + b.radius;
 }
-bool disjoint(Value const& a, Value const& b) { return !intersect(a,b); }
-bool contains(Value const& a, Value const& b) {
+bool disjoint(const Value& a, const Value& b) { return !intersect(a, b); }
+bool contains(const Value& a, const Value& b) {
     return std::abs(a.center - b.center) + b.radius <= a.radius;
 }
-Evidence refines(Value const& a, Value const& b) {
-    if (contains(b,a)) return Evidence::True;
-    if (intersect(a,b)) return Evidence::Indeterminate;
+Evidence refines(const Value& a, const Value& b) {
+    if (contains(b, a))
+        return Evidence::True;
+    if (intersect(a, b))
+        return Evidence::Indeterminate;
     return Evidence::False;
 }
-bool consistent(Value const& v) { return v.radius >= 0; }
+bool consistent(const Value& v) { return v.radius >= 0; }
 } // namespace Demo
 
 struct TransientReference {
     int* target;
     ~TransientReference() { *target = -99; }
-    int const& raw() const { return *target; }
+    const int& raw() const { return *target; }
 };
 
 struct Capture : Reporter {
     std::vector<CaseResult> cases;
     std::string last_started;
-    void check_started(CaseResult const&, std::size_t, std::string_view name) override {
+    void check_started(const CaseResult&, std::size_t, std::string_view name) override {
         last_started = name;
     }
-    void case_finished(CaseResult const& result) override { cases.push_back(result); }
-    void suite_finished(std::string_view, Summary const&) override {}
+    void case_finished(const CaseResult& result) override { cases.push_back(result); }
+    void suite_finished(std::string_view, const Summary&) override {}
 };
 
 int main() {
@@ -94,125 +106,128 @@ int main() {
     Capture capture;
 
     suite.add("exact equality need not imply identity", [](Context& c) {
-        Value a{1,10,0}, b{2,10,0};
-        ARIADNE_TESTING_EXPECT_EQUAL_CTX(c,a,b);
+        Value a{1, 10, 0}, b{2, 10, 0};
+        ARIADNE_TESTING_EXPECT_EQUAL_CTX(c, a, b);
     });
     suite.add("identity does not imply exact equality", [](Context& c) {
-        Value a{7,10,0}, b{7,11,0};
-        ARIADNE_TESTING_EXPECT_SAME_CTX(c,a,b);
-        ARIADNE_TESTING_EXPECT_EQUAL_CTX(c,a,b);
+        Value a{7, 10, 0}, b{7, 11, 0};
+        ARIADNE_TESTING_EXPECT_SAME_CTX(c, a, b);
+        ARIADNE_TESTING_EXPECT_EQUAL_CTX(c, a, b);
     });
     suite.add("exact equality does not imply identity", [](Context& c) {
-        Value a{1,10,0}, b{2,10,0};
-        ARIADNE_TESTING_EXPECT_EQUAL_CTX(c,a,b);
-        ARIADNE_TESTING_EXPECT_SAME_CTX(c,a,b);
+        Value a{1, 10, 0}, b{2, 10, 0};
+        ARIADNE_TESTING_EXPECT_EQUAL_CTX(c, a, b);
+        ARIADNE_TESTING_EXPECT_SAME_CTX(c, a, b);
     });
     suite.add("mathematical equality can be uncertain", [](Context& c) {
-        Value a{1,10,1}, b{2,11,1};
-        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c,equal,a,b);
+        Value a{1, 10, 1}, b{2, 11, 1};
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c, equal, a, b);
     });
     suite.add("mathematical inequality can be proven", [](Context& c) {
-        Value a{1,10,0}, b{2,20,0};
-        ARIADNE_TESTING_EXPECT_NOT_BINARY_PREDICATE_CTX(c,equal,a,b);
+        Value a{1, 10, 0}, b{2, 20, 0};
+        ARIADNE_TESTING_EXPECT_NOT_BINARY_PREDICATE_CTX(c, equal, a, b);
     });
     suite.add("intersection and disjointness", [](Context& c) {
-        Value a{1,10,1}, near{2,12,1}, far{3,20,1};
-        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c,intersect,a,near);
-        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c,disjoint,a,far);
+        Value a{1, 10, 1}, near{2, 12, 1}, far{3, 20, 1};
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c, intersect, a, near);
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c, disjoint, a, far);
     });
     suite.add("directional containment", [](Context& c) {
-        Value outer{1,10,5}, inner{2,11,1};
-        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c,contains,outer,inner);
-        ARIADNE_TESTING_EXPECT_NOT_BINARY_PREDICATE_CTX(c,contains,inner,outer);
+        Value outer{1, 10, 5}, inner{2, 11, 1};
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c, contains, outer, inner);
+        ARIADNE_TESTING_EXPECT_NOT_BINARY_PREDICATE_CTX(c, contains, inner, outer);
     });
     suite.add("proven refinement", [](Context& c) {
-        Value inner{1,11,1}, outer{2,10,5};
-        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c,refines,inner,outer);
+        Value inner{1, 11, 1}, outer{2, 10, 5};
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c, refines, inner, outer);
     });
     suite.add("uncertain refinement", [](Context& c) {
-        Value a{1,10,2}, b{2,12,2};
-        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c,refines,a,b);
+        Value a{1, 10, 2}, b{2, 12, 2};
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c, refines, a, b);
     });
     suite.add("consistency and its negation", [](Context& c) {
-        Value good{1,10,0}, bad{2,10,-1};
-        ARIADNE_TESTING_EXPECT_UNARY_PREDICATE_CTX(c,consistent,good);
-        ARIADNE_TESTING_EXPECT_NOT_UNARY_PREDICATE_CTX(c,consistent,bad);
+        Value good{1, 10, 0}, bad{2, 10, -1};
+        ARIADNE_TESTING_EXPECT_UNARY_PREDICATE_CTX(c, consistent, good);
+        ARIADNE_TESTING_EXPECT_NOT_UNARY_PREDICATE_CTX(c, consistent, bad);
     });
     suite.add("numerical tolerance is separate", [](Context& c) {
-        ARIADNE_TESTING_EXPECT_WITHIN_CTX(c,11,10,1);
+        ARIADNE_TESTING_EXPECT_WITHIN_CTX(c, 11, 10, 1);
     });
     suite.add("exact numerical equality rejects discrepancy", [](Context& c) {
-        ARIADNE_TESTING_EXPECT_EQUAL_CTX(c,11,10);
+        ARIADNE_TESTING_EXPECT_EQUAL_CTX(c, 11, 10);
     });
-    int left_calls=0, right_calls=0;
+    int left_calls = 0, right_calls = 0;
     suite.add("ADL relations evaluate once after CHECK", [&](Context& c) {
-        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c,intersect,
-            ([&] {
-                if (capture.last_started.find("intersect(") == std::string::npos)
-                    throw std::logic_error("CHECK event not published");
-                ++left_calls;
-                return Value{1,10,1};
-            })(),
-            ([&] {
-                if (left_calls != 1) throw std::logic_error("operand order changed");
-                ++right_calls;
-                return Value{2,11,1};
-            })());
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c, intersect,
+                                                    ([&] {
+                                                        if (capture.last_started.find("intersect(") == std::string::npos)
+                                                            throw std::logic_error("CHECK event not published");
+                                                        ++left_calls;
+                                                        return Value{1, 10, 1};
+                                                    })(),
+                                                    ([&] {
+                                                        if (left_calls != 1)
+                                                            throw std::logic_error("operand order changed");
+                                                        ++right_calls;
+                                                        return Value{2, 11, 1};
+                                                    })());
     });
     suite.add("disjoint refinement must be rejected", [](Context& c) {
-        Value a{1,10,1}, b{2,30,1};
-        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c,refines,a,b);
+        Value a{1, 10, 1}, b{2, 30, 1};
+        ARIADNE_TESTING_EXPECT_BINARY_PREDICATE_CTX(c, refines, a, b);
     });
 
-    auto const summary=suite.run(capture);
-    bool ok=true;
-    auto verify=[&](bool condition, std::string const& message) {
-        if (!condition) { std::cerr << message << '\n'; ok=false; }
+    const auto summary = suite.run(capture);
+    bool ok = true;
+    auto verify = [&](bool condition, const std::string& message) {
+        if (!condition) {
+            std::cerr << message << '\n';
+            ok = false;
+        }
     };
     verify(summary.passed == 8 && summary.failed == 4 &&
-           summary.inconclusive == 2 && summary.errors == 0 &&
-           summary.skipped == 0 && capture.cases.size() == 14,
+               summary.inconclusive == 2 && summary.errors == 0 &&
+               summary.skipped == 0 && capture.cases.size() == 14,
            "relation summary mismatch: passed=" + std::to_string(summary.passed) +
-           " failed=" + std::to_string(summary.failed) +
-           " inconclusive=" + std::to_string(summary.inconclusive) +
-           " errors=" + std::to_string(summary.errors));
+               " failed=" + std::to_string(summary.failed) +
+               " inconclusive=" + std::to_string(summary.inconclusive) +
+               " errors=" + std::to_string(summary.errors));
     verify(left_calls == 1 && right_calls == 1, "operands not evaluated once");
     if (capture.cases.size() == 14) {
-        std::vector<Outcome> const outcomes{
+        const std::vector<Outcome> outcomes{
             Outcome::Passed, Outcome::Failed, Outcome::Failed,
             Outcome::Inconclusive, Outcome::Passed, Outcome::Passed,
             Outcome::Passed, Outcome::Passed, Outcome::Inconclusive,
             Outcome::Passed, Outcome::Passed, Outcome::Failed,
-            Outcome::Passed, Outcome::Failed
-        };
-        for(std::size_t i=0;i<outcomes.size();++i)
+            Outcome::Passed, Outcome::Failed};
+        for (std::size_t i = 0; i < outcomes.size(); ++i)
             verify(capture.cases[i].outcome == outcomes[i],
                    "unexpected relation outcome " + std::to_string(i));
-        auto const& identity=capture.cases[1].assertions;
-        verify(identity.size()==2 &&
-               identity[0].outcome==Outcome::Passed &&
-               identity[1].outcome==Outcome::Failed,
+        const auto& identity = capture.cases[1].assertions;
+        verify(identity.size() == 2 &&
+                   identity[0].outcome == Outcome::Passed &&
+                   identity[1].outcome == Outcome::Failed,
                "identity must not be conflated with equality");
-        auto const& equality=capture.cases[2].assertions;
-        verify(equality.size()==2 &&
-               equality[0].outcome==Outcome::Passed &&
-               equality[1].outcome==Outcome::Failed,
+        const auto& equality = capture.cases[2].assertions;
+        verify(equality.size() == 2 &&
+                   equality[0].outcome == Outcome::Passed &&
+                   equality[1].outcome == Outcome::Failed,
                "equality must not be conflated with identity");
-        auto const& uncertain=capture.cases[3].assertions;
-        verify(uncertain.size()==1 &&
-               uncertain[0].outcome==Outcome::Inconclusive &&
-               uncertain[0].description.find("equal(")!=std::string::npos,
+        const auto& uncertain = capture.cases[3].assertions;
+        verify(uncertain.size() == 1 &&
+                   uncertain[0].outcome == Outcome::Inconclusive &&
+                   uncertain[0].description.find("equal(") != std::string::npos,
                "mathematical equality lost evidence or relation name");
-        auto const& tolerance=capture.cases[10].assertions;
-        verify(tolerance.size()==1 &&
-               tolerance[0].outcome==Outcome::Passed &&
-               tolerance[0].detail.find("tolerance=")!=std::string::npos,
+        const auto& tolerance = capture.cases[10].assertions;
+        verify(tolerance.size() == 1 &&
+                   tolerance[0].outcome == Outcome::Passed &&
+                   tolerance[0].detail.find("tolerance=") != std::string::npos,
                "tolerance diagnostic changed");
-        auto const& operands=capture.cases[12].assertions;
-        verify(operands.size()==1 &&
-               operands[0].outcome==Outcome::Passed &&
-               operands[0].actual.find("value(")!=std::string::npos &&
-               operands[0].expected.find("value(")!=std::string::npos,
+        const auto& operands = capture.cases[12].assertions;
+        verify(operands.size() == 1 &&
+                   operands[0].outcome == Outcome::Passed &&
+                   operands[0].actual.find("value(") != std::string::npos &&
+                   operands[0].expected.find("value(") != std::string::npos,
                "rendered operands or relation check missing");
     }
     // The .raw() method returns a reference to a member-style value owned
@@ -226,45 +241,50 @@ int main() {
     temporaries.add("greater equal from temporary", [&](Context& c) {
         int state = 7;
         ARIADNE_TESTING_EXPECT_GREATER_EQUAL_CTX(c,
-            TransientReference{&state}.raw(), 7);
-        if (state == -99) ++comparisons;
+                                                 TransientReference{&state}.raw(), 7);
+        if (state == -99)
+            ++comparisons;
     });
     temporaries.add("less equal from temporary", [&](Context& c) {
         int state = 4;
         ARIADNE_TESTING_EXPECT_LESS_EQUAL_CTX(c,
-            TransientReference{&state}.raw(), 4);
-        if (state == -99) ++comparisons;
+                                              TransientReference{&state}.raw(), 4);
+        if (state == -99)
+            ++comparisons;
     });
     temporaries.add("less with deferred operand order", [&](Context& c) {
         int state = 3;
         ARIADNE_TESTING_EXPECT_LESS_CTX(c,
-            ([&] { ++lhs_evaluations; return TransientReference{&state}; }()).raw(),
-            ([&] { ++rhs_evaluations; return 6; }()));
-        if (state == -99) ++comparisons;
+                                        ([&] { ++lhs_evaluations; return TransientReference{&state}; }()).raw(),
+                                        ([&] { ++rhs_evaluations; return 6; }()));
+        if (state == -99)
+            ++comparisons;
     });
     temporaries.add("greater from temporary", [&](Context& c) {
         int state = 9;
         ARIADNE_TESTING_EXPECT_GREATER_CTX(c,
-            TransientReference{&state}.raw(), 8);
-        if (state == -99) ++comparisons;
+                                           TransientReference{&state}.raw(), 8);
+        if (state == -99)
+            ++comparisons;
     });
     temporaries.add("not equal from temporary", [&](Context& c) {
         int state = 9;
         ARIADNE_TESTING_EXPECT_NOT_EQUAL_CTX(c,
-            TransientReference{&state}.raw(), 8);
-        if (state == -99) ++comparisons;
+                                             TransientReference{&state}.raw(), 8);
+        if (state == -99)
+            ++comparisons;
     });
     const auto temporary_summary = temporaries.run(observed);
     verify(temporary_summary.passed == 5 && temporary_summary.errors == 0 &&
-           temporary_summary.failed == 0 && observed.cases.size() == 5 &&
-           comparisons == 5 && lhs_evaluations == 1 && rhs_evaluations == 1,
+               temporary_summary.failed == 0 && observed.cases.size() == 5 &&
+               comparisons == 5 && lhs_evaluations == 1 && rhs_evaluations == 1,
            "relational macro temporary lifetime or operand evaluation changed");
     if (observed.cases.size() == 5) {
         const std::string expected_actuals[] = {"7", "4", "3", "9", "9"};
-        for (std::size_t i=0; i<5; ++i)
+        for (std::size_t i = 0; i < 5; ++i)
             verify(observed.cases[i].assertions.size() == 1 &&
-                   observed.cases[i].assertions[0].outcome == Outcome::Passed &&
-                   observed.cases[i].assertions[0].actual == expected_actuals[i],
+                       observed.cases[i].assertions[0].outcome == Outcome::Passed &&
+                       observed.cases[i].assertions[0].actual == expected_actuals[i],
                    "relational temporary observation was poisoned at case " +
                        std::to_string(i));
     }
@@ -304,26 +324,28 @@ int main() {
                   std::numeric_limits<std::uint64_t>::max(),
                   {true, true, true, false, false});
     Capture arithmetic_capture;
-    auto const arithmetic_summary = arithmetic_matrix.run(arithmetic_capture);
+    const auto arithmetic_summary = arithmetic_matrix.run(arithmetic_capture);
     verify(arithmetic_summary.failed == expected_cases.size() &&
-           arithmetic_summary.passed == 0 && arithmetic_summary.errors == 0 &&
-           arithmetic_summary.inconclusive == 0 &&
-           arithmetic_capture.cases.size() == expected_cases.size(),
+               arithmetic_summary.passed == 0 && arithmetic_summary.errors == 0 &&
+               arithmetic_summary.inconclusive == 0 &&
+               arithmetic_capture.cases.size() == expected_cases.size(),
            "mixed arithmetic relations changed the suite summary");
     if (arithmetic_capture.cases.size() == expected_cases.size()) {
         for (std::size_t i = 0; i < expected_cases.size(); ++i) {
-            auto const& assertions = arithmetic_capture.cases[i].assertions;
+            const auto& assertions = arithmetic_capture.cases[i].assertions;
             verify(assertions.size() == 10,
                    "missing mixed relational assertions at case " + std::to_string(i));
-            if (assertions.size() != 10) continue;
+            if (assertions.size() != 10)
+                continue;
             for (std::size_t j = 0; j < assertions.size(); ++j) {
-                auto const expected = expected_cases[i][j % 5]
-                    ? Outcome::Passed : Outcome::Failed;
+                const auto expected = expected_cases[i][j % 5]
+                                        ? Outcome::Passed
+                                        : Outcome::Failed;
                 verify(assertions[j].outcome == expected &&
-                       !assertions[j].actual.empty() &&
-                       !assertions[j].expected.empty(),
+                           !assertions[j].actual.empty() &&
+                           !assertions[j].expected.empty(),
                        "mixed relation mismatch at case " + std::to_string(i) +
-                       " check " + std::to_string(j));
+                           " check " + std::to_string(j));
             }
         }
     }
@@ -332,58 +354,59 @@ int main() {
     // domain-defined three-valued comparisons, not only built-in integers.
     // Exercise uncertainty, equality and both strict ordering directions.
     Suite ternary_suite("shared domain comparison semantics");
-    std::array<std::array<Outcome, 5>, 4> const ternary_expected{{
-        {Outcome::Inconclusive, Outcome::Inconclusive, Outcome::Inconclusive,
-         Outcome::Inconclusive, Outcome::Inconclusive},
-        {Outcome::Failed, Outcome::Failed, Outcome::Passed,
-         Outcome::Failed, Outcome::Passed},
-        {Outcome::Passed, Outcome::Passed, Outcome::Passed,
-         Outcome::Failed, Outcome::Failed},
-        {Outcome::Passed, Outcome::Failed, Outcome::Failed,
-         Outcome::Passed, Outcome::Passed}
-    }};
+    const std::array<std::array<Outcome, 5>, 4> ternary_expected{
+        {{Outcome::Inconclusive, Outcome::Inconclusive, Outcome::Inconclusive,
+          Outcome::Inconclusive, Outcome::Inconclusive},
+         {Outcome::Failed, Outcome::Failed, Outcome::Passed,
+          Outcome::Failed, Outcome::Passed},
+         {Outcome::Passed, Outcome::Passed, Outcome::Passed,
+          Outcome::Failed, Outcome::Failed},
+         {Outcome::Passed, Outcome::Failed, Outcome::Failed,
+          Outcome::Passed, Outcome::Passed}}
+    };
     for (int mode = 0; mode < 4; ++mode) {
         ternary_suite.add("ternary relation " + std::to_string(mode),
                           [mode](Context& c) {
-            Demo::TernaryNumber lhs{mode == 3 ? 2 : 1, mode != 0};
-            Demo::TernaryNumber rhs{mode == 2 ? 2 : 1, true};
-            c.check_compare<Comparison::NotEqual>([&] { return lhs; },
-                                                  [&] { return rhs; }, "direct !=");
-            c.check_compare<Comparison::Less>([&] { return lhs; },
-                                              [&] { return rhs; }, "direct <");
-            c.check_compare<Comparison::LessEqual>([&] { return lhs; },
-                                                   [&] { return rhs; }, "direct <=");
-            c.check_compare<Comparison::Greater>([&] { return lhs; },
-                                                 [&] { return rhs; }, "direct >");
-            c.check_compare<Comparison::GreaterEqual>([&] { return lhs; },
-                                                      [&] { return rhs; }, "direct >=");
-            ARIADNE_TESTING_EXPECT_NOT_EQUAL_CTX(c, lhs, rhs);
-            ARIADNE_TESTING_EXPECT_LESS_CTX(c, lhs, rhs);
-            ARIADNE_TESTING_EXPECT_LESS_EQUAL_CTX(c, lhs, rhs);
-            ARIADNE_TESTING_EXPECT_GREATER_CTX(c, lhs, rhs);
-            ARIADNE_TESTING_EXPECT_GREATER_EQUAL_CTX(c, lhs, rhs);
-        });
+                              Demo::TernaryNumber lhs{mode == 3 ? 2 : 1, mode != 0};
+                              Demo::TernaryNumber rhs{mode == 2 ? 2 : 1, true};
+                              c.check_compare<Comparison::NotEqual>([&] { return lhs; },
+                                                                    [&] { return rhs; }, "direct !=");
+                              c.check_compare<Comparison::Less>([&] { return lhs; },
+                                                                [&] { return rhs; }, "direct <");
+                              c.check_compare<Comparison::LessEqual>([&] { return lhs; },
+                                                                     [&] { return rhs; }, "direct <=");
+                              c.check_compare<Comparison::Greater>([&] { return lhs; },
+                                                                   [&] { return rhs; }, "direct >");
+                              c.check_compare<Comparison::GreaterEqual>([&] { return lhs; },
+                                                                        [&] { return rhs; }, "direct >=");
+                              ARIADNE_TESTING_EXPECT_NOT_EQUAL_CTX(c, lhs, rhs);
+                              ARIADNE_TESTING_EXPECT_LESS_CTX(c, lhs, rhs);
+                              ARIADNE_TESTING_EXPECT_LESS_EQUAL_CTX(c, lhs, rhs);
+                              ARIADNE_TESTING_EXPECT_GREATER_CTX(c, lhs, rhs);
+                              ARIADNE_TESTING_EXPECT_GREATER_EQUAL_CTX(c, lhs, rhs);
+                          });
     }
     Capture ternary_capture;
-    auto const ternary_summary = ternary_suite.run(ternary_capture);
+    const auto ternary_summary = ternary_suite.run(ternary_capture);
     verify(ternary_summary.failed == 3 && ternary_summary.inconclusive == 1 &&
-           ternary_summary.passed == 0 && ternary_summary.errors == 0 &&
-           ternary_capture.cases.size() == ternary_expected.size(),
+               ternary_summary.passed == 0 && ternary_summary.errors == 0 &&
+               ternary_capture.cases.size() == ternary_expected.size(),
            "domain comparison matrix summary changed");
     if (ternary_capture.cases.size() == ternary_expected.size()) {
         for (std::size_t i = 0; i < ternary_capture.cases.size(); ++i) {
-            auto const& assertions = ternary_capture.cases[i].assertions;
+            const auto& assertions = ternary_capture.cases[i].assertions;
             verify(assertions.size() == 10,
                    "missing domain comparisons at case " + std::to_string(i));
-            if (assertions.size() != 10) continue;
+            if (assertions.size() != 10)
+                continue;
             for (std::size_t j = 0; j < assertions.size(); ++j) {
                 verify(assertions[j].outcome == ternary_expected[i][j % 5] &&
-                       assertions[j].actual.find("ternary(") != std::string::npos &&
-                       assertions[j].expected.find("ternary(") != std::string::npos,
+                           assertions[j].actual.find("ternary(") != std::string::npos &&
+                           assertions[j].expected.find("ternary(") != std::string::npos,
                        "direct and macro domain relations differ at case " +
-                       std::to_string(i) + " check " + std::to_string(j));
+                           std::to_string(i) + " check " + std::to_string(j));
             }
         }
     }
-    return ok?0:1;
+    return ok ? 0 : 1;
 }

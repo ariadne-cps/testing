@@ -1,10 +1,11 @@
-#include "testing/testing.hpp"
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <system_error>
 #include <vector>
+
+#include "testing/testing.hpp"
 #if defined(_WIN32)
 #include <process.h>
 #else
@@ -18,11 +19,11 @@ int main() {
     // A single test executable starts with the per-process work-directory
     // counter at zero; the public API must reject an exhausted namespace.
 #if defined(_WIN32)
-    auto const pid = std::to_string(_getpid());
+    const auto pid = std::to_string(_getpid());
 #else
-    auto const pid = std::to_string(getpid());
+    const auto pid = std::to_string(getpid());
 #endif
-    auto const root = std::filesystem::temp_directory_path();
+    const auto root = std::filesystem::temp_directory_path();
     struct CreatedDirectories {
         std::vector<std::filesystem::path> paths;
         ~CreatedDirectories() {
@@ -33,7 +34,7 @@ int main() {
         }
     } created;
     for (unsigned i = 0; i != 1000; ++i) {
-        auto const candidate = root / ("ariadne-case-" + pid + "-" + std::to_string(i));
+        const auto candidate = root / ("ariadne-case-" + pid + "-" + std::to_string(i));
         std::error_code error;
         if (std::filesystem::create_directory(candidate, error)) {
             created.paths.push_back(candidate);
@@ -47,7 +48,7 @@ int main() {
     bool rejected = false;
     try {
         (void)context.work_directory();
-    } catch (std::runtime_error const& e) {
+    } catch (const std::runtime_error& e) {
         rejected = std::string(e.what()) == "Cannot allocate isolated test directory";
     }
     if (!rejected) {

@@ -1,7 +1,5 @@
-#include "ariadne-testing.hpp"
-
-#include <atomic>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <future>
@@ -13,15 +11,17 @@
 #include <thread>
 #include <vector>
 
+#include "ariadne-testing.hpp"
+
 using namespace Ariadne::Testing;
 using namespace std::chrono_literals;
 
 struct Capture final : Reporter {
     std::vector<CaseResult> results;
     int checks = 0;
-    void check_started(CaseResult const&, std::size_t, std::string_view) override { ++checks; }
-    void case_finished(CaseResult const& result) override { results.push_back(result); }
-    void suite_finished(std::string_view, Summary const&) override { }
+    void check_started(const CaseResult&, std::size_t, std::string_view) override { ++checks; }
+    void case_finished(const CaseResult& result) override { results.push_back(result); }
+    void suite_finished(std::string_view, const Summary&) override {}
 };
 
 struct DeadlineFixture : ContextFixture {
@@ -64,12 +64,10 @@ int main() {
         std::condition_variable_any cv;
         std::mutex mutex;
         std::unique_lock<std::mutex> lock(mutex);
-        c.expect_eventually_until(cv, lock, [&] { ++condition_calls[0]; return true; },
-                                  deadline, "already-met condition");
+        c.expect_eventually_until(cv, lock, [&] { ++condition_calls[0]; return true; }, deadline, "already-met condition");
         std::atomic<int> state{4};
         c.expect_atomic_until(state, [&](int value) {
-            ++atomic_calls; return value == 4;
-        }, deadline, "already-met atomic");
+            ++atomic_calls; return value == 4; }, deadline, "already-met atomic");
     });
     suite.add("expired deadline rejects unsatisfied state", [&](Context& c) {
         auto deadline = std::chrono::steady_clock::now() - 1ms;
@@ -79,12 +77,10 @@ int main() {
         std::condition_variable_any cv;
         std::mutex mutex;
         std::unique_lock<std::mutex> lock(mutex);
-        c.expect_eventually_until(cv, lock, [&] { ++condition_calls[1]; return false; },
-                                  deadline, "unmet condition");
+        c.expect_eventually_until(cv, lock, [&] { ++condition_calls[1]; return false; }, deadline, "unmet condition");
         std::atomic<int> state{2};
         c.expect_atomic_until(state, [&](int value) {
-            ++atomic_calls; return value == 3;
-        }, deadline, "unmet atomic");
+            ++atomic_calls; return value == 3; }, deadline, "unmet atomic");
     });
     suite.add("deferred future does not execute", [](Context& c) {
         auto deferred = std::async(std::launch::deferred, [] { return 9; });
@@ -99,9 +95,10 @@ int main() {
         std::promise<void> finished_promise;
         auto completed_future = finished_promise.get_future();
         std::jthread worker([&] {
-            { std::lock_guard<std::mutex> guard(mutex);
-              completed = true;
-              state.store(11, std::memory_order_release);
+            {
+                std::lock_guard<std::mutex> guard(mutex);
+                completed = true;
+                state.store(11, std::memory_order_release);
             }
             cv.notify_all();
             finished_promise.set_value();
@@ -109,11 +106,9 @@ int main() {
         auto deadline = std::chrono::steady_clock::now() + 5s;
         c.expect_ready_until(completed_future, deadline, "worker finished");
         std::unique_lock<std::mutex> lock(mutex);
-        c.expect_eventually_until(cv, lock, [&] { return completed; },
-                                  deadline, "worker notified");
+        c.expect_eventually_until(cv, lock, [&] { return completed; }, deadline, "worker notified");
         lock.unlock();
-        c.expect_atomic_until(state, [](int value) { return value == 11; },
-                              deadline, "worker published");
+        c.expect_atomic_until(state, [](int value) { return value == 11; }, deadline, "worker published");
         worker.join();
     });
     suite.add("future times out without resetting deadline", [](Context& c) {
@@ -125,9 +120,7 @@ int main() {
     suite.add("predicate exception is Error", [](Context& c) {
         std::atomic<int> state{1};
         auto deadline = std::chrono::steady_clock::now() - 1ms;
-        c.expect_atomic_until(state, [](int) -> bool {
-            throw std::runtime_error("absolute predicate failure");
-        }, deadline, "broken predicate");
+        c.expect_atomic_until(state, [](int) -> bool { throw std::runtime_error("absolute predicate failure"); }, deadline, "broken predicate");
     });
     suite.add("explicit-context deadline macros", [&](Context& c) {
         auto deadline = std::chrono::steady_clock::now() - 1ms;
@@ -138,24 +131,25 @@ int main() {
         std::condition_variable_any cv;
         std::mutex mutex;
         std::unique_lock<std::mutex> lock(mutex);
-        ARIADNE_TESTING_EXPECT_EVENTUALLY_UNTIL_CTX(c, cv, lock,
-            [&] { ++condition_calls[2]; return true; }, deadline);
+        ARIADNE_TESTING_EXPECT_EVENTUALLY_UNTIL_CTX(c, cv, lock, [&] { ++condition_calls[2]; return true; }, deadline);
         std::atomic<int> state{5};
-        ARIADNE_TESTING_EXPECT_ATOMIC_UNTIL_CTX(c, state,
-            [&](int value) { ++atomic_calls; return value == 5; }, deadline);
+        ARIADNE_TESTING_EXPECT_ATOMIC_UNTIL_CTX(c, state, [&](int value) { ++atomic_calls; return value == 5; }, deadline);
     });
     ARIADNE_TESTING_ADD_TEST_TO(suite, DeadlineFixture, test_future);
     ARIADNE_TESTING_ADD_TEST_TO(suite, DeadlineFixture, test_condition);
     ARIADNE_TESTING_ADD_TEST_TO(suite, DeadlineFixture, test_atomic);
 
-    auto const summary = suite.run(capture);
+    const auto summary = suite.run(capture);
     bool ok = true;
-    auto verify = [&](bool result, std::string const& description) {
-        if (!result) { std::cerr << description << '\n'; ok = false; }
+    auto verify = [&](bool result, const std::string& description) {
+        if (!result) {
+            std::cerr << description << '\n';
+            ok = false;
+        }
     };
     verify(summary.passed == 6 && summary.failed == 3 && summary.errors == 1 &&
-           summary.inconclusive == 0 && summary.skipped == 0 &&
-           capture.results.size() == 10 && capture.checks == 18,
+               summary.inconclusive == 0 && summary.skipped == 0 &&
+               capture.results.size() == 10 && capture.checks == 18,
            "shared deadline summary or CHECK count: passed=" +
                std::to_string(summary.passed) + ", failed=" +
                std::to_string(summary.failed) + ", errors=" +
@@ -165,8 +159,8 @@ int main() {
     // on a deadline already in the past. They promise no exact call count.
     // Every expected path must nevertheless exercise its predicate.
     verify(condition_calls[0] >= 1 &&
-           condition_calls[1] >= 1 &&
-           condition_calls[2] >= 1,
+               condition_calls[1] >= 1 &&
+               condition_calls[2] >= 1,
            "condition predicates not exercised: " +
                std::to_string(condition_calls[0]) + "/" +
                std::to_string(condition_calls[1]) + "/" +
@@ -177,36 +171,35 @@ int main() {
            "atomic predicates unexpectedly evaluated " +
                std::to_string(atomic_calls) + " times");
     if (capture.results.size() == 10) {
-        std::vector<Outcome> const expected{
+        const std::vector<Outcome> expected{
             Outcome::Passed, Outcome::Failed, Outcome::Failed,
             Outcome::Passed, Outcome::Failed, Outcome::Error,
-            Outcome::Passed, Outcome::Passed, Outcome::Passed, Outcome::Passed
-        };
+            Outcome::Passed, Outcome::Passed, Outcome::Passed, Outcome::Passed};
         for (std::size_t i = 0; i < expected.size(); ++i) {
             verify(capture.results[i].outcome == expected[i],
                    "deadline case outcome mismatch: " + std::to_string(i));
         }
-        auto const& initial = capture.results[0].assertions;
+        const auto& initial = capture.results[0].assertions;
         verify(initial.size() == 3, "missing initially-satisfied checks");
         if (initial.size() == 3)
-            for (auto const& assertion : initial)
+            for (const auto& assertion: initial)
                 verify(assertion.detail.find("remaining_at_start=0ms") != std::string::npos,
                        "expired deadline must not be restarted");
 
-        auto const& expired = capture.results[1].assertions;
+        const auto& expired = capture.results[1].assertions;
         verify(expired.size() == 3, "missing expired checks");
         if (expired.size() == 3) {
             verify(expired[0].actual == "timeout" &&
-                   expired[1].actual == "timeout" &&
-                   expired[2].actual == "2" &&
-                   expired[2].detail.find("timeout; ") == 0,
+                       expired[1].actual == "timeout" &&
+                       expired[2].actual == "2" &&
+                       expired[2].detail.find("timeout; ") == 0,
                    "expired states not reported faithfully");
         }
-        auto const& deferred = capture.results[2].assertions;
+        const auto& deferred = capture.results[2].assertions;
         if (deferred.size() == 1)
             verify(deferred[0].actual == "deferred",
                    "deferred future must not execute on wait");
-        auto const& broken = capture.results[5].assertions;
+        const auto& broken = capture.results[5].assertions;
         if (broken.size() == 1)
             verify(broken[0].detail == "absolute predicate failure",
                    "predicate exception detail lost");
@@ -222,7 +215,8 @@ int main() {
         auto observed = first_observed.get_future();
         bool notified = false;
         std::jthread producer([&] {
-            if (observed.wait_for(2s) != std::future_status::ready) return;
+            if (observed.wait_for(2s) != std::future_status::ready)
+                return;
             std::this_thread::sleep_for(2ms);
             state.store(1, std::memory_order_release);
         });
@@ -233,27 +227,25 @@ int main() {
                 notified = true;
                 first_observed.set_value();
             }
-            return value == 1;
-        }, std::chrono::steady_clock::now() + 3s,
-        "updated atomic state becomes ready");
+            return value == 1; }, std::chrono::steady_clock::now() + 3s, "updated atomic state becomes ready");
         producer.join();
         c.prove(inspections >= 2,
                 "predicate observed an initial mismatch and the updated state");
     });
     Capture transition_capture;
-    auto const transition_summary = atomic_transition.run(transition_capture);
+    const auto transition_summary = atomic_transition.run(transition_capture);
     verify(transition_summary.passed == 1 && transition_summary.failed == 0 &&
-           transition_summary.errors == 0 && transition_capture.checks == 2 &&
-           transition_capture.results.size() == 1,
+               transition_summary.errors == 0 && transition_capture.checks == 2 &&
+               transition_capture.results.size() == 1,
            "atomic transition must complete successfully within its deadline");
     if (transition_capture.results.size() == 1) {
-        auto const& assertions = transition_capture.results[0].assertions;
+        const auto& assertions = transition_capture.results[0].assertions;
         verify(assertions.size() == 2 &&
-               assertions[0].outcome == Outcome::Passed &&
-               assertions[0].actual == "1" &&
-               assertions[0].wait.has_value() &&
-               assertions[0].wait->status == WaitStatus::Ready &&
-               assertions[0].wait->absolute_deadline,
+                   assertions[0].outcome == Outcome::Passed &&
+                   assertions[0].actual == "1" &&
+                   assertions[0].wait.has_value() &&
+                   assertions[0].wait->status == WaitStatus::Ready &&
+                   assertions[0].wait->absolute_deadline,
                "atomic transition must preserve ready status and deadline");
     }
     return ok ? 0 : 1;

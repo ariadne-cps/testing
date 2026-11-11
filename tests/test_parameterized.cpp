@@ -22,8 +22,6 @@
  *  along with Ariadne Testing. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "ariadne-testing.hpp"
-
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -32,13 +30,15 @@
 #include <utility>
 #include <vector>
 
+#include "ariadne-testing.hpp"
+
 using namespace Ariadne::Testing;
 
 struct CaptureReporter final : Reporter {
     std::vector<CaseResult> results;
     Summary summary;
-    void case_finished(CaseResult const& r) override { results.push_back(r); }
-    void suite_finished(std::string_view, Summary const& s) override { summary = s; }
+    void case_finished(const CaseResult& r) override { results.push_back(r); }
+    void suite_finished(std::string_view, const Summary& s) override { summary = s; }
 };
 
 struct Interface {
@@ -79,13 +79,19 @@ struct PrecisionFixture : ContextFixture {
     void test_precision() { ARIADNE_TESTING_EXPECT_GREATER(bits, 32); }
 };
 
-struct ApproximateTag { static constexpr int value = 1; };
-struct ValidatedTag { static constexpr int value = 2; };
-struct EffectiveTag { static constexpr int value = 3; };
+struct ApproximateTag {
+    static constexpr int value = 1;
+};
+struct ValidatedTag {
+    static constexpr int value = 2;
+};
+struct EffectiveTag {
+    static constexpr int value = 3;
+};
 
 struct NotMovableFixture : ContextFixture {
     using ContextFixture::ContextFixture;
-    NotMovableFixture(NotMovableFixture const&) = delete;
+    NotMovableFixture(const NotMovableFixture&) = delete;
     NotMovableFixture(NotMovableFixture&&) = delete;
     void test_exists() { ctx().prove(true, "non-movable construction"); }
 };
@@ -108,7 +114,8 @@ int main() {
         return InterfaceFixture(context, std::make_unique<SecondImplementation>(), executions);
     });
     ARIADNE_TESTING_ADD_VARIANT_TEST(subset, test_value);
-    if (first_factories != 0 || second_factories != 0 || executions != 0) return 1;
+    if (first_factories != 0 || second_factories != 0 || executions != 0)
+        return 1;
 
     // A move-only factory is supported, because Suite stores a copyable
     // wrapper around its owned factory rather than copying the factory itself.
@@ -140,52 +147,64 @@ int main() {
     });
 
     CaptureReporter capture;
-    auto const sum = suite.run(capture);
+    const auto sum = suite.run(capture);
     if (sum.passed != 10 || sum.errors != 1 || sum.failed != 0 ||
-        sum.skipped != 0 || sum.inconclusive != 0) return 2;
+        sum.skipped != 0 || sum.inconclusive != 0)
+        return 2;
     if (capture.results.size() != 11 ||
-        first_factories != 3 || second_factories != 1 || executions != 4) return 3;
+        first_factories != 3 || second_factories != 1 || executions != 4)
+        return 3;
     if (capture.results[0].name != "TaylorPicard / value" ||
         capture.results[1].name != "TaylorPicard / other" ||
         capture.results[2].name != "TaylorPicard / demonstration" ||
         capture.results[3].name != "Affine / value" ||
         capture.results[4].name != "FloatMP/64 / precision" ||
         capture.results[6].name != "Approximate / api" ||
-        capture.results[8].name != "Effective / api") return 4;
+        capture.results[8].name != "Effective / api")
+        return 4;
     if (capture.results[0].assertions[0].check_index != 1 ||
         capture.results[1].assertions[0].check_index != 1 ||
         capture.results[3].case_index != 4 ||
-        capture.results[3].case_total != 11) return 5;
+        capture.results[3].case_total != 11)
+        return 5;
     if (capture.results[9].outcome != Outcome::Error ||
         capture.results[9].assertions.empty() ||
-        capture.results[9].assertions[0].detail != "factory failure") return 6;
-    if (capture.results[10].outcome != Outcome::Passed) return 7;
+        capture.results[9].assertions[0].detail != "factory failure")
+        return 6;
+    if (capture.results[10].outcome != Outcome::Passed)
+        return 7;
     if (capture.results[2].assertions.size() != 1 ||
-        capture.results[2].assertions[0].description != "operation completes") return 8;
+        capture.results[2].assertions[0].description != "operation completes")
+        return 8;
 
     // Reports of variant cases must be flushed before the factory starts.
     Suite live("live");
     std::ostringstream streamed;
     auto live_variant = fixture_variant<PrecisionFixture>(live, "FloatMP/192",
-        [&](Context& context) {
-            if (streamed.str().find("[RUN 1/1] live / FloatMP/192 / precision") ==
-                std::string::npos) throw std::runtime_error("RUN was not flushed");
-            return PrecisionFixture(context, 192);
-        });
+                                                          [&](Context& context) {
+                                                              if (streamed.str().find("[RUN 1/1] live / FloatMP/192 / precision") ==
+                                                                  std::string::npos)
+                                                                  throw std::runtime_error("RUN was not flushed");
+                                                              return PrecisionFixture(context, 192);
+                                                          });
     ARIADNE_TESTING_ADD_VARIANT_TEST(live_variant, test_precision);
     ConsoleReporter live_reporter(streamed);
-    if (!live.run(live_reporter).successful()) return 9;
-    if (streamed.str().find("[CHECK 1.1]") == std::string::npos) return 10;
+    if (!live.run(live_reporter).successful())
+        return 9;
+    if (streamed.str().find("[CHECK 1.1]") == std::string::npos)
+        return 10;
 
     // Reject unqualified variant and method names, avoiding ambiguous logs.
     try {
         (void)suite_variant(suite, "");
         return 11;
-    } catch (std::invalid_argument const&) {}
+    } catch (const std::invalid_argument&) {
+    }
     try {
         suite_variant(suite, "Valid").add("", [](Context&) {});
         return 12;
-    } catch (std::invalid_argument const&) {}
+    } catch (const std::invalid_argument&) {
+    }
 
     // Reuse the identical callable specialization for both accepted and
     // rejected names. The invalid call must not register another case.
@@ -198,11 +217,11 @@ int main() {
     bool rejected_empty_name = false;
     try {
         group.add("", named_case);
-    } catch (std::invalid_argument const&) {
+    } catch (const std::invalid_argument&) {
         rejected_empty_name = true;
     }
     CaptureReporter names_capture;
-    auto const names_summary = names.run(names_capture);
+    const auto names_summary = names.run(names_capture);
     if (!rejected_empty_name || names_summary.passed != 1 ||
         names_summary.failed != 0 || names_summary.errors != 0 ||
         names_capture.results.size() != 1 ||
@@ -223,7 +242,7 @@ int main() {
     policies.add("test_prefixed", check_precision, FixtureCheck::Direct);
     policies.add("manual_name", check_precision, FixtureCheck::NoThrow);
     CaptureReporter policies_capture;
-    auto const policies_summary = method_policies.run(policies_capture);
+    const auto policies_summary = method_policies.run(policies_capture);
     if (policies_summary.passed != 2 || policies_summary.failed != 0 ||
         policies_summary.errors != 0 || policies_capture.results.size() != 2 ||
         policies_capture.results[0].name != "Precision / prefixed" ||

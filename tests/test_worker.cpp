@@ -1,4 +1,3 @@
-#include "ariadne-testing.hpp"
 #include <future>
 #include <iostream>
 #include <stdexcept>
@@ -7,16 +6,18 @@
 #include <thread>
 #include <vector>
 
+#include "ariadne-testing.hpp"
+
 using namespace Ariadne::Testing;
 
 struct Capture final : Reporter {
     std::vector<CaseResult> cases;
     int checks = 0;
-    void check_started(CaseResult const&, std::size_t, std::string_view) override {
+    void check_started(const CaseResult&, std::size_t, std::string_view) override {
         ++checks;
     }
-    void case_finished(CaseResult const& result) override { cases.push_back(result); }
-    void suite_finished(std::string_view, Summary const&) override {}
+    void case_finished(const CaseResult& result) override { cases.push_back(result); }
+    void suite_finished(std::string_view, const Summary&) override {}
 };
 // Exercise the different mathematical and exceptional outcomes with one
 // concrete predicate type, so the same Worker::check specialization sees all
@@ -25,12 +26,18 @@ struct EvidenceScenario {
     int path;
     Evidence operator()() const {
         switch (path) {
-            case 0: return Evidence::True;
-            case 1: return Evidence::False;
-            case 2: return Evidence::Indeterminate;
-            case 3: return static_cast<Evidence>(99);
-            case 4: throw std::runtime_error("scenario standard exception");
-            default: throw 17;
+            case 0:
+                return Evidence::True;
+            case 1:
+                return Evidence::False;
+            case 2:
+                return Evidence::Indeterminate;
+            case 3:
+                return static_cast<Evidence>(99);
+            case 4:
+                throw std::runtime_error("scenario standard exception");
+            default:
+                throw 17;
         }
     }
 };
@@ -41,13 +48,19 @@ struct RunScenario {
     int mode;
     int* invocations = nullptr;
     void operator()(WorkerBatch::Worker& worker) const {
-        if (invocations) ++*invocations;
-        if (mode == 1) return;
-        if (mode == 2) throw std::runtime_error("standard runner failure");
-        if (mode == 3) throw 17;
+        if (invocations)
+            ++*invocations;
+        if (mode == 1)
+            return;
+        if (mode == 2)
+            throw std::runtime_error("standard runner failure");
+        if (mode == 3)
+            throw 17;
         worker.check([] { return true; }, "check before completion");
-        if (mode == 4) throw std::runtime_error("failure after a worker check");
-        if (mode == 5) throw 18;
+        if (mode == 4)
+            throw std::runtime_error("failure after a worker check");
+        if (mode == 5)
+            throw 18;
     }
 };
 
@@ -76,7 +89,7 @@ int main() {
         std::jthread d([&] {
             batch.run(2, [&](WorkerBatch::Worker& worker) {
                 ARIADNE_TESTING_WORKER_CHECK(worker,
-                    ([]() -> bool { throw std::runtime_error("predicate failure"); })());
+                                             ([]() -> bool { throw std::runtime_error("predicate failure"); })());
             });
         });
         a.join();
@@ -89,7 +102,11 @@ int main() {
     suite.add("incomplete batch is not silently consumed", [](Context& c) {
         WorkerBatch batch(1);
         bool early = false;
-        try { batch.flush(c); } catch (std::logic_error const&) { early = true; }
+        try {
+            batch.flush(c);
+        } catch (const std::logic_error&) {
+            early = true;
+        }
         c.prove(early, "premature flush rejected");
         batch.run(0, [](WorkerBatch::Worker& worker) {
             ARIADNE_TESTING_WORKER_CHECK(worker, true);
@@ -99,17 +116,27 @@ int main() {
     suite.add("slot lifecycle and one evaluation", [&](Context& c) {
         WorkerBatch batch(1);
         bool wrong = false;
-        try { batch.run(2, [](WorkerBatch::Worker&) {}); }
-        catch (std::logic_error const&) { wrong = true; }
+        try {
+            batch.run(2, [](WorkerBatch::Worker&) {});
+        } catch (const std::logic_error&) {
+            wrong = true;
+        }
         batch.run(0, [&](WorkerBatch::Worker& worker) {
             ARIADNE_TESTING_WORKER_CHECK(worker, ++evaluated == 1);
         });
         bool duplicate = false;
-        try { batch.run(0, [](WorkerBatch::Worker&) {}); }
-        catch (std::logic_error const&) { duplicate = true; }
+        try {
+            batch.run(0, [](WorkerBatch::Worker&) {});
+        } catch (const std::logic_error&) {
+            duplicate = true;
+        }
         batch.flush(c);
         bool second_flush = false;
-        try { batch.flush(c); } catch (std::logic_error const&) { second_flush = true; }
+        try {
+            batch.flush(c);
+        } catch (const std::logic_error&) {
+            second_flush = true;
+        }
         c.prove(wrong && duplicate && second_flush, "slot lifecycle enforced");
     });
     suite.add("empty worker produces an Error", [](Context& c) {
@@ -126,46 +153,50 @@ int main() {
         c.prove(true, "case thread remains operational");
     });
 
-    auto const summary = suite.run(capture);
+    const auto summary = suite.run(capture);
     bool ok = true;
-    auto verify = [&](bool test, std::string const& reason) {
-        if (!test) { std::cerr << reason << '\n'; ok = false; }
+    auto verify = [&](bool test, const std::string& reason) {
+        if (!test) {
+            std::cerr << reason << '\n';
+            ok = false;
+        }
     };
     verify(summary.passed == 3 && summary.errors == 3 &&
-           summary.failed == 0 && summary.inconclusive == 0 &&
-           summary.skipped == 0 && capture.cases.size() == 6 &&
-           capture.checks == 12 && evaluated == 1, "worker summary or CHECK counts");
+               summary.failed == 0 && summary.inconclusive == 0 &&
+               summary.skipped == 0 && capture.cases.size() == 6 &&
+               capture.checks == 12 && evaluated == 1,
+           "worker summary or CHECK counts");
     if (capture.cases.size() == 6) {
-        auto const& first = capture.cases[0].assertions;
+        const auto& first = capture.cases[0].assertions;
         verify(first.size() == 5, "worker records missing");
         if (first.size() == 5) {
             verify(first[0].outcome == Outcome::Failed &&
-                   first[1].outcome == Outcome::Inconclusive &&
-                   first[2].outcome == Outcome::Passed &&
-                   first[3].outcome == Outcome::Error &&
-                   first[4].outcome == Outcome::Error,
+                       first[1].outcome == Outcome::Inconclusive &&
+                       first[2].outcome == Outcome::Passed &&
+                       first[3].outcome == Outcome::Error &&
+                       first[4].outcome == Outcome::Error,
                    "worker outcomes changed");
             verify(first[0].description.find("worker[0]:") == 0 &&
-                   first[1].description.find("worker[0]:") == 0 &&
-                   first[2].description.find("worker[1]:") == 0 &&
-                   first[3].description.find("worker[1]:") == 0 &&
-                   first[4].description.find("worker[2]:") == 0,
+                       first[1].description.find("worker[0]:") == 0 &&
+                       first[2].description.find("worker[1]:") == 0 &&
+                       first[3].description.find("worker[1]:") == 0 &&
+                       first[4].description.find("worker[2]:") == 0,
                    "worker report order changed");
             verify(first[0].line != 0 && !first[0].file.empty() &&
-                   first[3].detail == "worker failure" &&
-                   first[4].detail == "predicate failure",
+                       first[3].detail == "worker failure" &&
+                       first[4].detail == "predicate failure",
                    "worker source or diagnostic lost");
         }
         verify(capture.cases[1].outcome == Outcome::Passed &&
-               capture.cases[1].assertions.size() == 2 &&
-               capture.cases[2].outcome == Outcome::Passed &&
-               capture.cases[2].assertions.size() == 2 &&
-               capture.cases[3].outcome == Outcome::Error &&
-               capture.cases[3].assertions[0].detail ==
-                   "worker completed without recording checks" &&
-               capture.cases[4].outcome == Outcome::Error &&
-               capture.cases[4].assertions[0].detail == "non-standard worker exception" &&
-               capture.cases[5].outcome == Outcome::Passed,
+                   capture.cases[1].assertions.size() == 2 &&
+                   capture.cases[2].outcome == Outcome::Passed &&
+                   capture.cases[2].assertions.size() == 2 &&
+                   capture.cases[3].outcome == Outcome::Error &&
+                   capture.cases[3].assertions[0].detail ==
+                       "worker completed without recording checks" &&
+                   capture.cases[4].outcome == Outcome::Error &&
+                   capture.cases[4].assertions[0].detail == "non-standard worker exception" &&
+                   capture.cases[5].outcome == Outcome::Passed,
                "worker lifecycle cases changed");
     }
     // These cases exercise valid public error handling that cannot arise in
@@ -175,7 +206,7 @@ int main() {
         bool rejected = false;
         try {
             WorkerBatch empty(0);
-        } catch (std::invalid_argument const& error) {
+        } catch (const std::invalid_argument& error) {
             rejected = std::string_view(error.what()) ==
                        "WorkerBatch needs a nonzero slot count";
         }
@@ -190,7 +221,7 @@ int main() {
         bool rejected = false;
         try {
             batch.run(0, [](WorkerBatch::Worker&) {});
-        } catch (std::logic_error const& error) {
+        } catch (const std::logic_error& error) {
             rejected = std::string_view(error.what()) ==
                        "invalid or repeated worker slot";
         }
@@ -213,22 +244,22 @@ int main() {
         batch.flush(c);
     });
     Capture contracts_capture;
-    auto const contracts_summary = contracts.run(contracts_capture);
+    const auto contracts_summary = contracts.run(contracts_capture);
     verify(contracts_summary.passed == 2 && contracts_summary.errors == 2 &&
-           contracts_summary.failed == 0 && contracts_summary.inconclusive == 0 &&
-           contracts_capture.cases.size() == 4 && contracts_capture.checks == 5,
+               contracts_summary.failed == 0 && contracts_summary.inconclusive == 0 &&
+               contracts_capture.cases.size() == 4 && contracts_capture.checks == 5,
            "worker boundary outcome or CHECK count changed");
     if (contracts_capture.cases.size() == 4) {
         verify(contracts_capture.cases[0].outcome == Outcome::Passed &&
-               contracts_capture.cases[1].outcome == Outcome::Passed &&
-               contracts_capture.cases[2].outcome == Outcome::Error &&
-               contracts_capture.cases[3].outcome == Outcome::Error,
+                   contracts_capture.cases[1].outcome == Outcome::Passed &&
+                   contracts_capture.cases[2].outcome == Outcome::Error &&
+                   contracts_capture.cases[3].outcome == Outcome::Error,
                "worker boundary classifications changed");
         verify(contracts_capture.cases[2].assertions.size() == 1 &&
-               contracts_capture.cases[2].assertions[0].detail == "invalid evidence" &&
-               contracts_capture.cases[3].assertions.size() == 1 &&
-               contracts_capture.cases[3].assertions[0].detail ==
-                   "non-standard worker predicate exception",
+                   contracts_capture.cases[2].assertions[0].detail == "invalid evidence" &&
+                   contracts_capture.cases[3].assertions.size() == 1 &&
+                   contracts_capture.cases[3].assertions[0].detail ==
+                       "non-standard worker predicate exception",
                "worker error diagnostics lost their semantic causes");
     }
     Suite scenario_suite("worker predicate outcome matrix");
@@ -243,26 +274,26 @@ int main() {
         batch.flush(c);
     });
     Capture scenario_capture;
-    auto const scenario_summary = scenario_suite.run(scenario_capture);
+    const auto scenario_summary = scenario_suite.run(scenario_capture);
     verify(scenario_summary.errors == 1 && scenario_summary.passed == 0 &&
-           scenario_capture.cases.size() == 1 && scenario_capture.checks == 6,
+               scenario_capture.cases.size() == 1 && scenario_capture.checks == 6,
            "single predicate specialization must preserve all six observations");
     if (scenario_capture.cases.size() == 1) {
-        auto const& records = scenario_capture.cases[0].assertions;
+        const auto& records = scenario_capture.cases[0].assertions;
         verify(records.size() == 6,
                "outcome matrix must record each worker observation");
         if (records.size() == 6) {
-            Outcome const expected[]{Outcome::Passed, Outcome::Failed,
-                Outcome::Inconclusive, Outcome::Error, Outcome::Error, Outcome::Error};
+            const Outcome expected[]{Outcome::Passed, Outcome::Failed,
+                                     Outcome::Inconclusive, Outcome::Error, Outcome::Error, Outcome::Error};
             for (std::size_t i = 0; i < 6; ++i) {
                 verify(records[i].outcome == expected[i] &&
-                       records[i].description ==
-                           "worker[0]: scenario " + std::to_string(i),
+                           records[i].description ==
+                               "worker[0]: scenario " + std::to_string(i),
                        "worker predicate outcome or order changed at " + std::to_string(i));
             }
             verify(records[3].detail == "invalid evidence" &&
-                   records[4].detail == "scenario standard exception" &&
-                   records[5].detail == "non-standard worker predicate exception",
+                       records[4].detail == "scenario standard exception" &&
+                       records[5].detail == "non-standard worker predicate exception",
                    "worker predicate exception diagnostics changed");
         }
     }
@@ -278,30 +309,30 @@ int main() {
         });
     }
     Capture runner_capture;
-    auto const runner_summary = runner_matrix.run(runner_capture);
+    const auto runner_summary = runner_matrix.run(runner_capture);
     verify(runner_summary.passed == 1 && runner_summary.errors == 5 &&
-           runner_summary.failed == 0 && runner_summary.inconclusive == 0 &&
-           runner_capture.checks == 8 && runner_capture.cases.size() == 6,
+               runner_summary.failed == 0 && runner_summary.inconclusive == 0 &&
+               runner_capture.checks == 8 && runner_capture.cases.size() == 6,
            "worker callback outcome matrix summary changed");
     if (runner_capture.cases.size() == 6) {
         for (std::size_t i = 0; i < 6; ++i) {
-            auto const expected = i == 0 ? Outcome::Passed : Outcome::Error;
-            auto const expected_checks = i >= 4 ? 2u : 1u;
+            const auto expected = i == 0 ? Outcome::Passed : Outcome::Error;
+            const auto expected_checks = i >= 4 ? 2u : 1u;
             verify(runner_capture.cases[i].outcome == expected &&
-                   runner_capture.cases[i].assertions.size() == expected_checks,
+                       runner_capture.cases[i].assertions.size() == expected_checks,
                    "worker callback outcome or check count changed at mode " +
-                   std::to_string(i));
+                       std::to_string(i));
         }
         verify(runner_capture.cases[1].assertions[0].detail ==
-                   "worker completed without recording checks" &&
-               runner_capture.cases[2].assertions[0].detail ==
-                   "standard runner failure" &&
-               runner_capture.cases[3].assertions[0].detail ==
-                   "non-standard worker exception" &&
-               runner_capture.cases[4].assertions[1].detail ==
-                   "failure after a worker check" &&
-               runner_capture.cases[5].assertions[1].detail ==
-                   "non-standard worker exception",
+                       "worker completed without recording checks" &&
+                   runner_capture.cases[2].assertions[0].detail ==
+                       "standard runner failure" &&
+                   runner_capture.cases[3].assertions[0].detail ==
+                       "non-standard worker exception" &&
+                   runner_capture.cases[4].assertions[1].detail ==
+                       "failure after a worker check" &&
+                   runner_capture.cases[5].assertions[1].detail ==
+                       "non-standard worker exception",
                "worker callback diagnostics changed");
     }
 
@@ -312,22 +343,31 @@ int main() {
         WorkerBatch batch(1);
         int invocations = 0;
         bool outside = false, repeated = false, flushed = false;
-        try { batch.run(1, RunScenario{0, &invocations}); }
-        catch (std::logic_error const&) { outside = true; }
+        try {
+            batch.run(1, RunScenario{0, &invocations});
+        } catch (const std::logic_error&) {
+            outside = true;
+        }
         batch.run(0, RunScenario{0, &invocations});
-        try { batch.run(0, RunScenario{0, &invocations}); }
-        catch (std::logic_error const&) { repeated = true; }
+        try {
+            batch.run(0, RunScenario{0, &invocations});
+        } catch (const std::logic_error&) {
+            repeated = true;
+        }
         batch.flush(c);
-        try { batch.run(0, RunScenario{0, &invocations}); }
-        catch (std::logic_error const&) { flushed = true; }
+        try {
+            batch.run(0, RunScenario{0, &invocations});
+        } catch (const std::logic_error&) {
+            flushed = true;
+        }
         c.prove(outside && repeated && flushed && invocations == 1,
                 "rejected runner callbacks must never be invoked");
     });
     Capture rejection_capture;
-    auto const rejection_summary = runner_rejections.run(rejection_capture);
+    const auto rejection_summary = runner_rejections.run(rejection_capture);
     verify(rejection_summary.passed == 1 && rejection_summary.failed == 0 &&
-           rejection_summary.errors == 0 && rejection_capture.checks == 2 &&
-           rejection_capture.cases.size() == 1,
+               rejection_summary.errors == 0 && rejection_capture.checks == 2 &&
+               rejection_capture.cases.size() == 1,
            "worker runner preconditions or check replay changed");
     return ok ? 0 : 1;
 }
