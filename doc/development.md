@@ -26,8 +26,7 @@ claim tests were executed or that every test branch is reachable.
 * infrastructure, I/O and visualization: foundation, logging, threading,
   utility, rendering, drawing;
 * infrastructure without comparable C++ test executables: macro (testing
-  macro definitions), python-common (no test sources found), configuration
-  (Python unittest and CMake-script tests).
+  macro definitions) and configuration (tooling checks).
 
 Baseline for absent/present capabilities: testing/main at
 [dc9c514](https://github.com/ariadne-cps/testing/commit/dc9c514a52d7c9139a17824f6ac59ce927f49a82):
@@ -292,26 +291,19 @@ changes DrawerManager configuration;
 [logging/test_logging.cpp](https://github.com/ariadne-cps/logging/blob/main/tests/test_logging.cpp)
 works with singleton Logger state.
 
-### D11. Compile-time checks and non-C++ test orchestration
+### D11. Compile-time assertions
 
-- [x] Add a lightweight naming/convenience API for compile-time
-      concepts, traits and type equality, while keeping \`static_assert\`
-      and C++ diagnostics authoritative.
-- [x] Support CMake/CTest registration of compile-only source targets,
-      negative compilation fixtures where justified, Python unittest
-      and CMake-script tests. Do not force them into a C++ \`Suite\`
-      or add a Python runtime to Testing.
-- [x] Preserve CTest executable targets and testing labels; consider
-      optional per-case discovery and filters only after reliable
-      suite identity and parameterization.
+- [x] Provide thin compile-time concept, trait and type-equality macros
+      while retaining `static_assert` and native compiler diagnostics.
+- [x] Register the C++ test executables directly through CMake/CTest.
+      Keep the Testing test suite focused on C++.
+- [x] Preserve existing CTest executables; consider optional per-case discovery
+      only after reliable suite identity and parameterization.
 
 **Evidence:** [foundation/test_paradigm.cpp](https://github.com/ariadne-cps/foundation/blob/main/tests/test_paradigm.cpp)
-uses \`ARIADNE_TESTING_COMPILE_CONCEPT\`;
+uses `ARIADNE_TESTING_COMPILE_CONCEPT`;
 [numeric/check_numeric.cpp](https://github.com/ariadne-cps/numeric/blob/main/tests/check_numeric.cpp)
-is compiled separately as an object target;
-[configuration/test_doc_markdown.py](https://github.com/ariadne-cps/configuration/blob/main/tests/test_doc_markdown.py)
-and [configuration/test_submodule_paths.cmake](https://github.com/ariadne-cps/configuration/blob/main/tests/test_submodule_paths.cmake)
-test non-C++ tooling.
+provides an independent compile-time check in the consuming repository.
 
 ### D12. Oracle data registration, reproducibility and dataset integrity
 
@@ -399,10 +391,9 @@ migration or edit to those repos.
   excluded. The \`ariadne/decoupling\` structure is a dependency inventory,
   not a claim that every repository's \`main\` has the same test coverage.
 * The graph describes \`configuration\` separately; it was inspected as
-  a 28th repository for Python/CMake checks.
+  a 28th repository for tooling checks.
 * \`macro\` exposes legacy test macros but no standalone tests in its
-  \`main\` test tree; \`python-common\` has no dedicated test sources
-  in its \`main\` tree.
+  \`main\` test tree.
 * This is a source-level survey, not a compilation or execution audit.
   Priority indicates likely migration leverage, not benchmarked effort.
 

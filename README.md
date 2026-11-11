@@ -33,23 +33,14 @@ CMake initializes only the pinned Build submodule (`ss/bui`); recursive checkout
 is not required. This framework is a **test-only dependency** and is not
 installed: consumers compile/link it from source for their test targets.
 
-## Compile-time and standalone CTest checks
+## Compile-time assertions
 
 The public `ARIADNE_TESTING_COMPILE_CONCEPT(expr)`, `ARIADNE_TESTING_COMPILE_TRAIT(expr)`
 and `ARIADNE_TESTING_COMPILE_SAME_TYPE(A, B)` macros expand directly to
-`static_assert`; compiler diagnostics remain authoritative.
-Parenthesize expressions containing commas or use named type aliases.
+`static_assert`, preserving compiler diagnostics. Parenthesize expressions
+containing commas or use named type aliases.
 
-Include `cmake/TestingOrchestration.cmake` to register
-`ariadne_add_compile_check(NAME ... SOURCE ... LINK_LIBRARIES ...)`.
-An optional `EXPECT_FAILURE EXPECTED_DIAGNOSTIC "marker"` checks that
-compilation fails for the intended reason, not an unrelated error.
-Compile checks use OBJECT targets excluded from normal builds; CTest
-builds them serially in the current configuration. The independent
-`ariadne_add_cmake_script_test(NAME ... SCRIPT ...)` runs CMake scripts.
-`ariadne_add_python_unittest_test(NAME ... DIRECTORY ...)` discovers
-unittest cases only when an interpreter exists, without requiring Python.
-CTest labels distinguish compile, cmake and python checks.
+The standalone test suite registers ordinary C++ executables with CTest.
 
 ## GitHub Actions: CTest JUnit reports
 

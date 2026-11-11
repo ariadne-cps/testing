@@ -1098,28 +1098,14 @@ errors, NoThrow body classification, variant lifecycle and explicitly
 shared resources. All cases run on every supported OS/compiler. CI
 verification of the current main commit remains required.
 
-## 2026-10-31 — D11: compile-only and non-C++ orchestration
+## 2026-10-31 — D11: compile-time assertions
 
-Compile-time names `ARIADNE_TESTING_COMPILE_CONCEPT`, `ARIADNE_TESTING_COMPILE_TRAIT`
-and `ARIADNE_TESTING_COMPILE_SAME_TYPE` are thin static_assert wrappers in
-`testing/compile.hpp`, exported from the umbrella header. They do
-not create runtime Suite cases or conceal native compiler diagnostics.
-
-`cmake/TestingOrchestration.cmake` registers compile-only OBJECT targets,
-excluded from normal builds and built only from the matching CTest test.
-Negative compilation requires both a nonzero build result and a specified
-diagnostic marker; unrelated failures do not pass. The nested CMake build
-is serialized by CTest. Independent CMake -P and optional Python unittest
-registrations retain their native execution models. Python is discovered
-only when requested and is not a production or build dependency. CTest
-labels are assigned without replacing existing executable targets.
-
-Positive compilation, an expected negative compile, and rejection of
-the wrong diagnostic were executed in an isolated CMake/Ninja/GCC harness.
-Repository-level coverage includes the concept and type-negative cases,
-the driver's missing-input contract, and an optional Python API test;
-CI remains the cross-platform release gate. The existing per-case
-discovery work remains intentionally deferred.
+The public `ARIADNE_TESTING_COMPILE_CONCEPT`, `ARIADNE_TESTING_COMPILE_TRAIT`
+and `ARIADNE_TESTING_COMPILE_SAME_TYPE` provide thin wrappers around
+`static_assert`, preserving the compiler's diagnostics and requiring no
+runtime Suite machinery. The macros now reside in `testing/macros.hpp`.
+Standalone auxiliary test-orchestration experiments were subsequently
+removed; the ordinary C++ test executables remain registered with CTest.
 
 ## 2026-10-31 — Unified public macro namespace
 
@@ -1144,8 +1130,7 @@ and `parameterized.hpp`. Every public macro definition now begins with
 The old spellings are deliberately no longer exported because no stable
 external consumers require compatibility. The `utility` consumer will be
 migrated separately rather than introducing ambiguity into the new API.
-The compile-only positive test now rejects each of the former names with
-preprocessor guards, preventing reintroduction. No changes to assertion
+The old names remain deliberately absent from public headers. No changes to assertion
 or test lifecycle semantics, or any platform/compiler exclusion.
 CI verification of the new commit is required.
 
@@ -1167,9 +1152,7 @@ Replaced all ten references with `ARIADNE_TESTING_PROVE_CTX` and
 `ARIADNE_TESTING_REQUIRE_CTX`. No compatibility aliases were restored,
 and no tests, requirements, assertions or scenarios were skipped,
 weakened or otherwise modified. Audited all repository C++ test sources
-and public headers for obsolete macro invocations; the only deliberate
-legacy-name occurrences in C++ source are the `#ifdef` checks in
-`tests/compile/positive.cpp` that assert the aliases remain unavailable.
+and public headers for obsolete macro invocations; the public headers no longer export compatibility aliases.
 Full platform CI on the correction commit is still the release gate.
 
 ## 2026-10-31 — D12: frozen oracle provenance and row completeness
@@ -1296,27 +1279,12 @@ JsonReporter is retained without change. No outcome policy, test
 coverage selection, test watchdog or external framework dependency
 changed. Full GitHub Actions CI remains the acceptance gate.
 
-## 2026-10-31 — D11 regression after public header organization
+## 2026-10-31 — Public header organization and compile-time macros
 
-The header refactor intentionally removed `testing/compile.hpp` and
-`testing/checks.hpp`, merging all 86 canonical macros into
-`testing/macros.hpp`. The C++ compile checks remained green, but the
-Python `python_compile_interface` regression still asserted the old
-`compile.hpp` include path and therefore failed on macOS. This was a
-test expectation made obsolete by the structural refactor, not a compiler
-or macro semantics defect. The CTest failure propagated correctly into
-the JUnit report and then dorny/test-reporter, whose default failure gate
-must NOT be disabled.
-
-Updated the Python regression to assert the new authoritative umbrella
-include, the absence of obsolete headers, the presence of compile-time
-and runtime and registration macros, uniqueness and single-location
-ownership of all public macro definitions. Added independent compile-only
-smoke tests for `results.hpp`, `reporters.hpp`, `testing.hpp` and
-`macros.hpp`, each included first with no other Testing header. The
-C++ positive/negative concept/type tests remain unchanged. All checks
-are cross-platform without warning exclusions. This correction requires
-its own green CI matrix before the refactor can be considered verified.
+The header refactor removed `testing/compile.hpp` and
+`testing/checks.hpp` and unified the public macros in `testing/macros.hpp`.
+The separate compile-only fixtures used during that migration have since been
+removed; the public C++ assertions and normal executable tests remain.
 
 ## 2026-10-31 — Separate test verdict from report publication
 
@@ -1623,3 +1591,12 @@ CI runs the optional sccache preflight and reads the startup-timeout
 configuration from the pinned Build submodule instead of duplicating those
 files in this repository. This is an infrastructure-only migration;
 Testing's assertions, reporters, tests and public API are unchanged.
+
+## 2026-11-11 — Simplify the standalone C++ test suite
+
+Removed auxiliary compile-only and script-based test directories, together
+with their dedicated CMake registration helpers. `tests/CMakeLists.txt` now
+registers the same 24 C++ test executables in a single loop. Removed
+redundant Windows PATH manipulation and explicit CTest timeouts, retaining
+the assertion-failure diagnostic check and the macOS crash coverage setting.
+The public compile-time assertion macros are unchanged.
