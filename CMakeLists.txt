@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(Testing VERSION 3.0 LANGUAGES CXX)
+project(AriadneTesting VERSION 3.0 LANGUAGES CXX)
 option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 if(NOT TARGET ariadne-build)
     find_package(Git REQUIRED)
