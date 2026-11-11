@@ -23,7 +23,7 @@
  */
 
 /** @file testing/state.hpp
- *  @brief Public declarations for this testing module.
+ *  @brief Scoped preservation and restoration of mutable test state.
  */
 #ifndef ARIADNE_TESTING_STATE_HPP
 #define ARIADNE_TESTING_STATE_HPP

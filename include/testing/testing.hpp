@@ -23,7 +23,7 @@
  */
 
 /** @file testing/testing.hpp
- *  @brief Framework test execution, case contexts, assertions, and suites.
+ *  @brief Test suites, case contexts, assertions, and execution policies.
  *
  *  All checks classify a result as Passed, Failed, Inconclusive, Skipped, or
  *  Error. Deferred checks evaluate arguments once, after check_started().

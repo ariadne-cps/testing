@@ -22,6 +22,9 @@
  *  along with Ariadne Testing. If not, see <https://www.gnu.org/licenses/>.
  */
 
+/** @file ariadne-testing.hpp
+ *  @brief Umbrella header for the Ariadne Testing C++ framework.
+ */
 #ifndef ARIADNE_TESTING_UMBRELLA_HPP
 #define ARIADNE_TESTING_UMBRELLA_HPP
 

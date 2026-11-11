@@ -23,7 +23,7 @@
  */
 
 /** @file testing/fixture.hpp
- *  @brief Public declarations for this testing module.
+ *  @brief Context-bound test fixtures, setup hooks, and assertion helpers.
  */
 #ifndef ARIADNE_TESTING_FIXTURE_HPP
 #define ARIADNE_TESTING_FIXTURE_HPP

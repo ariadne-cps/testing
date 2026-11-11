@@ -23,7 +23,7 @@
  */
 
 /** @file testing/parameterized.hpp
- *  @brief Public declarations for this testing module.
+ *  @brief Parameterized test cases and implementation-variant registration.
  */
 #ifndef ARIADNE_TESTING_PARAMETERIZED_HPP
 #define ARIADNE_TESTING_PARAMETERIZED_HPP
